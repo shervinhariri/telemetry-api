@@ -24,8 +24,12 @@ jobs:
 
       - name: Log in to Docker Hub (only on tag)
         if: startsWith(github.ref, 'refs/tags/')
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+          echo "Logging in to Docker Hub as $DOCKERHUB_USERNAME"
+          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
       - name: Extract metadata (tags, labels)
         id: meta
@@ -49,10 +53,9 @@ jobs:
 
       - name: Build & Push (on tag)
         if: startsWith(github.ref, 'refs/tags/')
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          platforms: linux/amd64
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:${{ github.ref_name }}
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          echo "Building and pushing image: $DOCKERHUB_USERNAME/telemetry-api:${{ github.ref_name }}"
+          docker build -t "$DOCKERHUB_USERNAME/telemetry-api:${{ github.ref_name }}" .
+          docker push "$DOCKERHUB_USERNAME/telemetry-api:${{ github.ref_name }}"
