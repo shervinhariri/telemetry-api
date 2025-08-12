@@ -1,6 +1,6 @@
 # Live Network Threat Telemetry API — MVP (Stage 3)
 
-[![Docker CI](https://github.com/${{ github.repository }}/actions/workflows/docker.yml/badge.svg)](https://github.com/${{ github.repository }}/actions/workflows/docker.yml)
+[![Docker CI](https://github.com/shervinhariri/telemetry-api/actions/workflows/docker.yml/badge.svg)](https://github.com/shervinhariri/telemetry-api/actions/workflows/docker.yml)
 
 Local-first MVP to ingest **Zeek `conn.log` JSON**, enrich with GeoIP/ASN + threatlist, and return enriched JSON.
 
