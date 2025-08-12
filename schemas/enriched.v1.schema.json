@@ -1,0 +1,189 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Enriched Telemetry v1",
+  "description": "Schema for enriched telemetry data output",
+  "type": "object",
+  "required": ["collector_id", "format", "count", "records"],
+  "properties": {
+    "collector_id": {
+      "type": "string",
+      "description": "Identifier for the data collector"
+    },
+    "format": {
+      "type": "string",
+      "enum": ["zeek.conn.v1", "flows.v1"],
+      "description": "Data format version"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of records in the response"
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["risk_score"],
+        "properties": {
+          "ts": {
+            "type": "number",
+            "description": "Timestamp in Unix epoch seconds"
+          },
+          "id_orig_h": {
+            "type": "string",
+            "format": "ipv4",
+            "description": "Originator host IP address (Zeek format)"
+          },
+          "id_orig_p": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "Originator port number (Zeek format)"
+          },
+          "id_resp_h": {
+            "type": "string",
+            "format": "ipv4",
+            "description": "Responder host IP address (Zeek format)"
+          },
+          "id_resp_p": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "Responder port number (Zeek format)"
+          },
+          "src_ip": {
+            "type": "string",
+            "format": "ipv4",
+            "description": "Source IP address (Flows format)"
+          },
+          "src_port": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "Source port number (Flows format)"
+          },
+          "dst_ip": {
+            "type": "string",
+            "format": "ipv4",
+            "description": "Destination IP address (Flows format)"
+          },
+          "dst_port": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "Destination port number (Flows format)"
+          },
+          "proto": {
+            "type": "string",
+            "enum": ["tcp", "udp", "icmp"],
+            "description": "Protocol"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": ["tcp", "udp", "icmp"],
+            "description": "Protocol (Flows format)"
+          },
+          "service": {
+            "type": "string",
+            "description": "Detected service"
+          },
+          "duration": {
+            "type": "number",
+            "description": "Connection duration in seconds"
+          },
+          "orig_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Bytes sent by originator"
+          },
+          "resp_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Bytes sent by responder"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total bytes transferred (Flows format)"
+          },
+          "packets": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total packets transferred (Flows format)"
+          },
+          "src_geo": {
+            "type": "object",
+            "description": "Source IP geolocation data",
+            "properties": {
+              "country": {"type": "string"},
+              "city": {"type": "string"},
+              "lat": {"type": "number"},
+              "lon": {"type": "number"}
+            }
+          },
+          "src_asn": {
+            "type": "object",
+            "description": "Source IP ASN data",
+            "properties": {
+              "asn": {"type": "integer"},
+              "org": {"type": "string"}
+            }
+          },
+          "dst_geo": {
+            "type": "object",
+            "description": "Destination IP geolocation data",
+            "properties": {
+              "country": {"type": "string"},
+              "city": {"type": "string"},
+              "lat": {"type": "number"},
+              "lon": {"type": "number"}
+            }
+          },
+          "dst_asn": {
+            "type": "object",
+            "description": "Destination IP ASN data",
+            "properties": {
+              "asn": {"type": "integer"},
+              "org": {"type": "string"}
+            }
+          },
+          "threat": {
+            "type": "object",
+            "required": ["matches", "matched"],
+            "properties": {
+              "matches": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "ip": {"type": "string", "format": "ipv4"},
+                    "match": {"type": "string"},
+                    "category": {"type": "string"},
+                    "confidence": {"type": "integer", "minimum": 0, "maximum": 100}
+                  }
+                }
+              },
+              "matched": {"type": "boolean"}
+            }
+          },
+          "risk_score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Calculated risk score (0-100)"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "List of reasons contributing to risk score"
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Additional tags for the record"
+          }
+        }
+      }
+    }
+  }
+}
