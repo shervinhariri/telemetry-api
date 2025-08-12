@@ -4,6 +4,8 @@
 
 Production-ready telemetry API that ingests **Zeek `conn.log` JSON** and **network flows**, enriches with GeoIP/ASN + threat intelligence, and returns enriched JSON with risk scoring.
 
+**Stage 3 Contract Alignment**: This version is fully aligned with Step 1-2 specifications, including all required endpoints, rate limiting, JSON schemas, and comprehensive testing.
+
 ## 🚀 Quick Start
 
 ### Production Deployment (3 steps)
@@ -25,8 +27,14 @@ cp .env.example .env  # edit values
 ./scripts/configure_elastic.sh
 ```
 
-## Quickstart (local)
+### Testing
+```bash
+./scripts/run_tests.sh  # Run all tests locally
+```
 
+## 🧪 Development & Testing
+
+### Local Development
 1) Put MaxMind DBs + a sample threat CSV in `./data/`:
 ```
 data/GeoLite2-City.mmdb
@@ -55,6 +63,16 @@ curl -s -X POST http://localhost:8080/v1/ingest \
   --data @samples/zeek_conn.json | jq .
 ```
 
+### Running Tests
+```bash
+# Run all tests (unit, integration, schema validation)
+./scripts/run_tests.sh
+
+# Run specific test categories
+python -m pytest tests/test_api.py -v
+python tests/validate_schemas.py
+```
+
 ## 🔗 API Endpoints
 
 - `GET /v1/health` - Health check
@@ -76,6 +94,8 @@ curl -s -X POST http://localhost:8080/v1/ingest \
   - Default: 600 req/min (configurable via `RATE_LIMIT_DEFAULT_RPM`)
 - **Retention**: 7 days for deadletter queue
 - **Error format**: JSON with `detail` field
+- **Authentication**: Bearer token required for all endpoints except `/v1/health`
+- **Versioning**: All responses include `X-API-Version` header
 
 ## 🔧 Environment Variables
 
@@ -96,7 +116,86 @@ curl -s -X POST http://localhost:8080/v1/ingest \
 | `BASIC_AUTH_PASS` | Metrics endpoint password | `changeme` |
 | `RATE_LIMIT_INGEST_RPM` | Ingest rate limit | `120` |
 | `RATE_LIMIT_DEFAULT_RPM` | Default rate limit | `600` |
+| `TZ` | Timezone | `UTC` |
 
-## Limits (from Step 2 – applied later)
-- Format: `zeek.conn.v1` only in Stage 3
-- Batch size/limits & rate limiting to be added in Stage 4
+## 📋 Data Formats
+
+### Supported Input Formats
+- **`zeek.conn.v1`** - Zeek connection logs
+- **`flows.v1`** - Network flow data
+
+### Enriched Output
+All records include:
+- **GeoIP data** (country, city, coordinates)
+- **ASN information** (ASN number, organization)
+- **Threat intelligence** (matches, categories, confidence)
+- **Risk scoring** (0-100 scale with reasons)
+- **Tags** for categorization
+
+## 🔒 Security Features
+
+- **HTTPS/TLS** with automatic Let's Encrypt certificates
+- **Rate limiting** to prevent abuse
+- **Basic authentication** for metrics endpoint
+- **CORS headers** for cross-origin requests
+- **Security headers** (X-Content-Type-Options, X-Frame-Options, etc.)
+- **UFW firewall** configuration
+- **Fail2ban** for brute force protection
+
+## 📈 Monitoring & Operations
+
+- **Health checks** with automatic restart
+- **Prometheus metrics** endpoint
+- **Structured logging** in JSON format
+- **Log rotation** for Caddy access/error logs
+- **Deadletter queue** for failed output processing
+- **Comprehensive test suite** with CI integration
+
+## 🚀 CI/CD Pipeline
+
+- **Automated testing** on pull requests
+- **Schema validation** in CI pipeline
+- **Docker image builds** on version tags
+- **Security scanning** and dependency updates
+- **Deployment automation** scripts
+
+## ✅ Stage 3 Contract Alignment
+
+This version is fully aligned with Step 1-2 specifications:
+
+### ✅ **Endpoint Parity**
+- All required endpoints implemented with proper authentication
+- X-API-Version header middleware for versioning
+- Proper error handling with JSON responses
+- Health checks and metrics endpoints
+
+### ✅ **Rate Limiting**
+- Environment-driven configuration
+- Contract-compliant defaults (120/600 req/min)
+- Configurable for trusted environments
+- Caddy-based implementation with burst handling
+
+### ✅ **Data Validation**
+- JSON schemas for all data formats
+- Schema validation in CI pipeline
+- Sample data with proper validation
+- Input/output format compliance
+
+### ✅ **Testing & Quality**
+- Comprehensive unit and integration tests
+- Schema validation for sample data
+- CI integration with GitHub Actions
+- Local test runner for development
+
+### ✅ **Production Readiness**
+- Complete deployment automation
+- Security configurations (UFW, fail2ban)
+- Monitoring and logging setup
+- Deadletter handling for reliability
+
+## 📚 Documentation
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
+- **[STAGE3_CHECKLIST.md](STAGE3_CHECKLIST.md)** - Complete deliverables checklist
+- **[schemas/](schemas/)** - JSON schema definitions
+- **[tests/](tests/)** - Test suite and validation scripts
