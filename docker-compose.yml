@@ -1,0 +1,13 @@
+services:
+  api:
+    image: telemetry-api:0.1.0
+    ports:
+      - "8080:8080"
+    environment:
+      API_KEY: ${API_KEY}
+      GEOIP_DB_CITY: ${GEOIP_DB_CITY}
+      GEOIP_DB_ASN: ${GEOIP_DB_ASN}
+      THREATLIST_CSV: ${THREATLIST_CSV}
+    volumes:
+      - ./data:/data:ro
+    restart: unless-stopped

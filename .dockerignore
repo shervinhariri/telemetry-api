@@ -1,0 +1,11 @@
+.git
+.github
+.vscode
+.devcontainer
+__pycache__/
+*.pyc
+*.log
+.env
+data/*.mmdb
+data/*.csv
+samples/*.pcap

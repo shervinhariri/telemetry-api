@@ -1,0 +1,18 @@
+{
+  "collector_id": "lab-zeek-1",
+  "format": "zeek.conn.v1",
+  "records": [
+    {
+      "ts": 1723351200.456,
+      "id_orig_h": "10.1.2.3",
+      "id_orig_p": 55342,
+      "id_resp_h": "8.8.8.8",
+      "id_resp_p": 53,
+      "proto": "udp",
+      "service": "dns",
+      "duration": 0.025,
+      "orig_bytes": 78,
+      "resp_bytes": 256
+    }
+  ]
+}

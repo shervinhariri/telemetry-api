@@ -1,0 +1,4 @@
+ip_or_cidr,category,confidence
+45.155.205.233,C2,85
+91.121.0.0/16,Malware,60
+8.8.8.8,Test,90
