@@ -4,17 +4,28 @@ services:
   api:
     image: ${API_IMAGE:-telemetry-api:latest}
     env_file: .env
+    environment:
+      - GEOIP_CITY_DB=/data/geo/GeoLite2-City.mmdb
+      - GEOIP_ASN_DB=/data/geo/GeoLite2-ASN.mmdb
+      - TI_PATH=/data/ti/indicators.txt
+      - ENRICH_ENABLE_GEOIP=true
+      - ENRICH_ENABLE_ASN=true
+      - ENRICH_ENABLE_TI=true
+      - EXPORT_ELASTIC_ENABLED=false
+      - EXPORT_SPLUNK_ENABLED=false
     expose:
       - "8080"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/v1/health || exit 1"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/v1/health')"]
       interval: 10s
       timeout: 3s
       retries: 6
       start_period: 30s
     restart: unless-stopped
     volumes:
-      - ./data:/data:ro
+      - ./data:/data
+      - ./geo:/data/geo:ro
+      - ./ti:/data/ti:ro
     networks:
       - telemetry_network
 

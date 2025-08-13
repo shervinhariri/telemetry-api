@@ -1,0 +1,15 @@
+# Sample threat indicators for testing
+# CIDR ranges
+45.149.3.0/24
+94.26.0.0/16
+192.168.1.100/32
+
+# Domains
+domain:evil-example.com
+domain:cnc.badco.org
+domain:malware.test
+
+# Additional test indicators
+10.0.0.0/8
+172.16.0.0/12
+domain:test-malicious.com

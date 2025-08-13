@@ -12,10 +12,10 @@ import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from .enrich.geoip import GeoIPEnricher
-from .enrich.asn import ASNEnricher
-from .enrich.threat import ThreatMatcher
-from .enrich.score import RiskScorer
+from .enrich.geo import enrich_geo_asn
+from .enrich.ti import match_ip, match_domain
+from .enrich.risk import score
+from .metrics import get_metrics, increment_requests, tick
 from .api.version import router as version_router
 from .api.admin_update import router as admin_update_router
 from .api.outputs import router as outputs_router
@@ -46,10 +46,21 @@ setup_logging()
 async def lifespan(app: FastAPI):
     # Startup
     from .pipeline import worker_loop
+    
     # Start two worker processes
     asyncio.create_task(worker_loop())
     asyncio.create_task(worker_loop())
     logging.info("Stage 6 pipeline workers started (2x)")
+    
+    # Start metrics ticker
+    async def metrics_ticker():
+        while True:
+            tick()
+            await asyncio.sleep(1)
+    
+    asyncio.create_task(metrics_ticker())
+    logging.info("Metrics ticker started")
+    
     yield
     # Shutdown
     logging.info("Shutting down pipeline workers")
@@ -69,6 +80,13 @@ ui_dir = os.path.abspath(os.path.join(app_dir, "..", "ui"))
 
 # Mount static files under /ui
 app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
+
+# Middleware to track requests
+@app.middleware("http")
+async def track_requests(request: Request, call_next):
+    response = await call_next(request)
+    increment_requests(response.status_code >= 400)
+    return response
 
 # Serve index.html at root
 @app.get("/", include_in_schema=False)
@@ -99,11 +117,8 @@ def _validate_record(rec: Dict[str, Any]) -> None:
         raise HTTPException(status_code=400, detail="Missing event timestamp.")
     # You can add per-schema checks (flows.v1, zeek.conn.v1) later
 
-# Enrichers are loaded once on startup
-geo = GeoIPEnricher(GEOIP_DB_CITY)
-asn = ASNEnricher(GEOIP_DB_ASN)
-threats = ThreatMatcher(THREATLIST_CSV)
-scorer = RiskScorer()
+# Enrichers are loaded once on startup via the new modules
+# (geo, asn, threats, and scorer are now imported and used directly)
 
 # Create deadletter directory
 DEADLETTER_DIR = Path("ops/deadletter")
@@ -186,19 +201,19 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
         if len(records) > 10000:
             raise HTTPException(status_code=413, detail="Too many records (max 10,000)")
 
-        # Validate & enqueue
-        accepted = 0
+        # Validate records
         for rec in records:
             if not isinstance(rec, dict):
                 raise HTTPException(status_code=400, detail="Records must be JSON objects.")
             _validate_record(rec)
-            try:
-                enqueue(rec)
-                accepted += 1
-            except Exception:
-                raise HTTPException(status_code=429, detail="Ingest temporarily overloaded, please retry.")
+        
+        # Enqueue records using batch processing
+        from .pipeline import enqueue_batch
+        accepted = enqueue_batch(records)
+        
+        if accepted < len(records):
+            raise HTTPException(status_code=429, detail="Ingest temporarily overloaded, please retry.")
 
-        record_batch_accepted(len(records))
         return {"status": "accepted", "queued": accepted}
 
     except HTTPException:
@@ -223,11 +238,20 @@ async def lookup(request: Request, response: Response, Authorization: Optional[s
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid IP address")
     
+    # Enrich the IP
+    geo_asn = enrich_geo_asn(ip)
+    ti_matches = match_ip(ip)
+    
+    # Create sample event for risk scoring
+    sample_event = {"dst_ip": ip}
+    risk_score = score(sample_event, ti_matches)
+    
     return {
         "ip": ip,
-        "geo": geo.lookup(ip),
-        "asn": asn.lookup(ip),
-        "threats": threats.match_any([ip])
+        "geo": geo_asn.get("geo") if geo_asn else None,
+        "asn": geo_asn.get("asn") if geo_asn else None,
+        "ti": {"matches": ti_matches},
+        "risk_score": risk_score
     }
 
 @app.post(f"{API_PREFIX}/outputs/splunk")
@@ -268,16 +292,7 @@ async def configure_alerts(request: Request, response: Response, Authorization: 
 @app.get(f"{API_PREFIX}/metrics")
 async def metrics(response: Response):
     add_version_header(response)
-    from .pipeline import get_stats
-    stats = get_stats()
-    return {
-        "requests_total": 0,
-        "requests_failed": 0,
-        "records_processed": stats["records_processed"],
-        "queue_depth": stats["queue_depth"],
-        "records_queued": 0,  # TODO: increment this counter
-        "eps": stats["eps"]
-    }
+    return get_metrics()
 
 # ---------- Stage 6 Pipeline Functions ----------
 def write_deadletter(record: Dict[str, Any], reason: str):
