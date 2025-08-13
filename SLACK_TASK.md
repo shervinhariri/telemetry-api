@@ -1,9 +1,9 @@
 🚀 **Tomorrow Morning Task: Stage 4 Pro Dashboard Validation (v1.4.0)**
 
-**Goal**: Run the production bundle locally (Docker), validate endpoints against the Stage 1–2 contract, and ingest real sample logs generated on the fly.
+**Goal**: Implement end-to-end enrichment and live metrics to make the dashboard come alive. Add GeoIP/ASN/Threat Intel enrichment, real-time metrics with sliding windows, and proper UI wiring for moving tiles and sparklines.
 
 **Repo**: `shervinhariri/telemetry-api`  
-**Tag**: `v0.3.0`
+**Tag**: `v1.4.0`
 
 ---
 
@@ -11,33 +11,62 @@
 
 ---
 
-**0) Prep Workspace**
+**0) Prep Workspace & Data**
 ```bash
 git fetch --all --tags
-git checkout v0.3.0
+git checkout stage4-pro-dashboard
+
+# Create data directories
+mkdir -p geo ti data
+
+# Create sample threat indicators
+cat > ti/indicators.txt <<'EOF'
+45.149.3.0/24
+94.26.0.0/16
+domain:evil-example.com
+domain:cnc.badco.org
+EOF
+
+# Update environment
 cp -n .env.example .env
 sed -i.bak 's/^API_KEY=.*/API_KEY=TEST_KEY/' .env || gsed -i 's/^API_KEY=.*/API_KEY=TEST_KEY/' .env
-export RATE_LIMIT_INGEST_RPM=${RATE_LIMIT_INGEST_RPM:-120}
-export RATE_LIMIT_DEFAULT_RPM=${RATE_LIMIT_DEFAULT_RPM:-600}
+
+# Add enrichment environment variables
+cat >> .env <<'EOF'
+
+# Enrichment Configuration
+GEOIP_CITY_DB=/data/geo/GeoLite2-City.mmdb
+GEOIP_ASN_DB=/data/geo/GeoLite2-ASN.mmdb
+TI_PATH=/data/ti/indicators.txt
+ENRICH_ENABLE_GEOIP=true
+ENRICH_ENABLE_ASN=true
+ENRICH_ENABLE_TI=true
+EXPORT_ELASTIC_ENABLED=false
+EXPORT_SPLUNK_ENABLED=false
+EOF
 ```
 
-**1) Build & Launch Services**
+**1) Implement Enrichment Modules**
 ```bash
-docker compose pull || true
+# Create enrichment modules (see TOMORROW_TASK.md for full code)
+mkdir -p app/enrich
+# Create: app/enrich/geo.py, app/enrich/ti.py, app/enrich/risk.py
+# Create: app/metrics.py with live aggregator
+```
+
+**2) Update API with Enrichment**
+```bash
+# Update app/main.py to integrate enrichment and metrics
+# Wire enrichment into ingest endpoint
+# Update metrics endpoint with live data
+```
+
+**3) Build & Test**
+```bash
 docker compose build --pull
 docker compose up -d
-docker compose ps
 ./scripts/test_health.sh
 ```
-*Pass criteria: GET /v1/health returns 200 and response includes X-API-Version.*
-
-**2) Run Test Suite**
-```bash
-./scripts/run_tests.sh
-```
-*Pass criteria: All unit/integration tests pass; schema validation completes with no errors.*
-
-**3) Generate Sample Logs**
 ```bash
 mkdir -p samples/generated
 
@@ -82,79 +111,93 @@ cat > samples/generated/zeek_conn_sample.json <<'JSON'
 JSON
 ```
 
-**4) Ingest Tests**
+**4) Load Test with Enrichment**
 ```bash
-# Test flows
-curl -i -X POST http://localhost:8080/v1/ingest \
-  -H "Authorization: Bearer TEST_KEY" \
-  -H "Content-Type: application/json" \
-  --data @samples/generated/flows_sample.json
+# Create load test script
+cat > test_enrichment.py <<'PY'
+import json, time, random, requests
+import ipaddress
 
-# Test zeek.conn
-curl -i -X POST http://localhost:8080/v1/ingest \
-  -H "Authorization: Bearer TEST_KEY" \
-  -H "Content-Type: application/json" \
-  --data @samples/generated/zeek_conn_sample.json
+def rand_ip():
+    if random.random() < 0.1:
+        return f"45.149.3.{random.randint(1,254)}"
+    return str(ipaddress.IPv4Address(random.randint(0,2**32-1)))
 
-# Check logs
-./scripts/logs.sh | tail -n +1
+def event():
+    return {
+        "src_ip": rand_ip(),
+        "dst_ip": "8.8.8.8",
+        "src_port": random.randint(1024,65535),
+        "dst_port": random.choice([53,80,443,445,3389,1433,22,23]),
+        "bytes": random.randint(200, 5_000_000),
+        "protocol": random.choice(["tcp","udp"]),
+        "ts": int(time.time()*1000)
+    }
+
+print("Starting enrichment load test...")
+buf = []
+for i in range(2000):
+    buf.append(event())
+    if len(buf) == 100:
+        try:
+            response = requests.post(
+                "http://localhost:8080/v1/ingest",
+                headers={"Authorization": "Bearer TEST_KEY"},
+                json={"collector_id": "test-enrich", "format": "flows.v1", "records": buf}
+            )
+            if response.status_code != 200:
+                print(f"Error: {response.status_code}")
+        except Exception as e:
+            print(f"Request failed: {e}")
+        buf = []
+        time.sleep(0.1)
+print("Load test complete!")
+PY
+
+python3 test_enrichment.py
 ```
 
-**5) Contract Endpoints Check**
+**5) Validate Live Metrics**
 ```bash
-# Version metadata
-curl -s -i -H "Authorization: Bearer TEST_KEY" http://localhost:8080/v1/version
+# Check metrics are live
+curl -s http://localhost:8080/v1/metrics | jq
 
-# Schema
-curl -s -H "Authorization: Bearer TEST_KEY" http://localhost:8080/v1/schema | jq '.enriched_schema,.input_schemas'
-
-# Single lookup
+# Test enrichment lookup
 curl -s -X POST http://localhost:8080/v1/lookup \
-  -H "Authorization: Bearer TEST_KEY" -H "Content-Type: application/json" \
-  --data '{"ip": "8.8.8.8"}' | jq
+  -H "Authorization: Bearer TEST_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{"ip":"8.8.8.8"}' | jq
 ```
 
-**6) Rate-limit Test**
+**6) UI Validation**
 ```bash
-for i in $(seq 1 140); do
-  curl -s -o /dev/null -w "%{http_code}\n" \
-    -X POST http://localhost:8080/v1/ingest \
-    -H "Authorization: Bearer TEST_KEY" \
-    -H "Content-Type: application/json" \
-    --data '{"collector_id":"test","format":"flows.v1","records":[]}' &
-done
-wait
-```
-*Pass criteria: mixture of 200/202 and 429 after threshold.*
-
-**7) Metrics Check**
-```bash
-curl -i -u "$BASIC_AUTH_USER:$BASIC_AUTH_PASS" http://localhost:8080/v1/metrics | head -n 20
+# If dashboard UI is running, verify:
+# - Events Ingested tile shows live rates
+# - Threat Matches increases with 45.149.3.x hits
+# - Avg Risk reflects scoring
+# - Sparklines move every 5 seconds
+# - Queue Lag shows realistic values
 ```
 
-**8) Dead-letter Check**
-```bash
-ls -R ops/deadletter || true
-```
-
-**9) Clean Up**
+**7) Clean Up**
 ```bash
 docker compose down
 ```
 
 ---
 
-**✅ Success Criteria**: All endpoints respond correctly, rate limiting works, schema validation passes, sample data ingests successfully, metrics and health checks work, no errors in container logs.
+**✅ Success Criteria**: Real enrichment working (GeoIP, ASN, TI, risk scoring), live metrics with sliding windows, moving tiles and sparklines, threat detection working (45.149.3.x hits), risk scoring reflects rules, queue lag tracking, time series data for charts.
 
-**Ready for production deployment!** 🚀
+**Dashboard is now alive and responsive!** 🚀
 
 ---
 
-**📁 Optional Postman Collection**: See `TOMORROW_TASK.md` for complete Postman collection and detailed instructions.
+**📁 Full Implementation**: See `TOMORROW_TASK.md` for complete enrichment modules, metrics system, and detailed implementation.
 
 **❓ FAQ**:
-- **Postman vs Cursor?** Either works. Cursor for automation, Postman for visual checks
-- **Enriched fields?** In ingest responses/logs and downstream outputs
-- **Raise RPM to 600?** Set `RATE_LIMIT_INGEST_RPM=600` in .env and restart
-- **Tests fail?** Check logs: `./scripts/logs.sh`, verify: `docker compose ps`
+- **Why are tiles moving now?** Real enrichment adds processing time, live metrics track rates over time, threat detection creates variable load
+- **How to adjust risk scoring?** Edit `app/enrich/risk.py` scoring rules and restart API
+- **Where do enriched fields appear?** In `/v1/ingest` responses, `/v1/lookup` results, and downstream exports
+- **How to add more threat indicators?** Edit `ti/indicators.txt` and restart API
+- **Performance impact?** GeoIP lookups add ~1-2ms per record, TI matching is fast, risk scoring is negligible
 
