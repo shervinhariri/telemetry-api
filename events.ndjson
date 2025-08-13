@@ -1,0 +1,1 @@
+{"ts": 1723290000, "src_ip": "10.0.0.10", "dst_ip": "1.1.1.1", "src_port": 12345, "dst_port": 53, "proto": "udp", "bytes": 84, "packets": 1, "app": "dns", "_enriched": true, "_processed_at": "2025-08-13T21:20:50.522890", "_source": "telemetry-api", "_risk_score": 50}

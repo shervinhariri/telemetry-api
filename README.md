@@ -16,9 +16,11 @@ Local-first MVP to ingest NetFlow/IPFIX and Zeek JSON, enrich with GeoIP/ASN + t
 
 - ✅ **Step 5: Production-Ready Ingest Pipeline** — Robust ingest endpoint with queue-based processing, gzip support, proper error handling (4xx/5xx), and background worker pipeline. Accepts raw JSON arrays and wrapped `{"records": [...]}` format. Backpressure handling with 429 responses.
 
-- 🟣 **Step 5.1: Version Management & Output Connectors (current)** — Version badge with update notifications, Docker Hub integration, Stage 5.1 output connector configuration endpoints (Splunk HEC, Elastic bulk), and dev-safe update mechanism. Foundation for Stage 5.2 dispatcher wiring.
+- ✅ **Step 5.1: Version Management & Output Connectors** — Version badge with update notifications, Docker Hub integration, Stage 5.1 output connector configuration endpoints (Splunk HEC, Elastic bulk), and dev-safe update mechanism. Foundation for Stage 5.2 dispatcher wiring.
 
-> Current version: **v0.5.1** (Patch 5.1 - version management + output connectors).  
+- 🟣 **Step 6: Deploy & Host MVP (current)** — Activated processing pipeline workers, file sink for daily NDJSON, stats/events/download endpoints, Logs tab with live tail and file upload, minimal version indicator, and clean header design.
+
+> Current version: **v0.6.0** (Stage 6 - deploy & host MVP).  
 > Docs for Steps 1–2 are in `/docs/` and PDFs.
 
 ## Quickstart
@@ -55,9 +57,9 @@ echo '[{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1"}]' | gzip | c
 ```
 
 ## Release & Images
-Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.5.1
+Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.6.0
 
-GitHub Tags: v0.5.1 (Patch 5.1)
+GitHub Tags: v0.6.0 (Stage 6)
 
 ### Validation
 ```bash
@@ -107,6 +109,64 @@ GitHub Tags: v0.5.1 (Patch 5.1)
 - **`/v1/outputs/splunk`**: Splunk HEC configuration (requires auth)
 - **`/v1/outputs/elastic`**: Elasticsearch configuration (requires auth)
 - **`/v1/admin/update`**: Dev-only image update (requires admin token)
+
+## 🚀 Stage 6 Features
+
+### Activated Processing Pipeline
+- **Background Workers**: Two async workers process records from ingest queue
+- **File Sink**: Daily NDJSON files written to `/data/events-YYYY-MM-DD.ndjson`
+- **Statistics Tracking**: Real-time counters for records processed, batches, EPS, queue depth
+- **Ring Buffer**: Last 1000 processed events kept in memory for recent queries
+- **Dead Letter Queue**: Failed records written to `/data/deadletter.ndjson`
+
+### New API Endpoints
+- **`/v1/stats`**: Processing pipeline statistics (records_processed, batches, eps, queue_depth)
+- **`/v1/events/recent?limit=100`**: Recent processed events from ring buffer
+- **`/v1/download[?date=YYYY-MM-DD]`**: Download processed events as NDJSON (today by default)
+- **`/v1/logs/tail?max_bytes=2000000&format=text|json`**: Tail application logs
+- **`/v1/logs/download?max_bytes=2000000`**: Download last 2MB of app logs
+- **`/v1/logs/upload`**: Upload files for support review (multipart)
+- **`/v1/logs/uploads`**: List uploaded files
+
+### Logs Tab & Support Features
+- **Live Tail**: Real-time log viewing with auto-scroll
+- **Download 2MB**: Quick download of recent logs for troubleshooting
+- **File Upload**: Upload logs for support review (saved to `/data/uploads/`)
+- **Rotating Logs**: Application logs rotated at 5MB with 3 backups
+- **Heartbeat Logging**: System metrics logged every 15 seconds
+
+### Minimal UI Design
+- **Clean Header**: Removed "— Dashboard" and "Live (15m)" labels
+- **Version Dot**: Minimal version indicator with colored status (green=up-to-date, amber=update available)
+- **Logs Tab**: New tab for log management and support features
+- **Responsive Design**: Maintains dark theme and modern UI
+
+### Quick Test Steps
+```bash
+# 1. Start the API and send some data
+curl -s -X POST http://localhost:8080/v1/ingest \
+  -H "Authorization: Bearer TEST_KEY" \
+  -H "Content-Type: application/json" \
+  --data '[{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1"}]'
+
+# 2. Check stats are moving
+curl -s http://localhost:8080/v1/stats | jq
+
+# 3. View recent processed events
+curl -s http://localhost:8080/v1/events/recent?limit=5 | jq
+
+# 4. Download processed data
+curl -s -o events.ndjson http://localhost:8080/v1/download
+
+# 5. View live logs
+curl -s 'http://localhost:8080/v1/logs/tail?max_bytes=65536&format=text'
+
+# 6. Download app logs
+curl -s -o app_tail.log 'http://localhost:8080/v1/logs/download?max_bytes=2000000'
+
+# 7. Upload a file for support
+curl -s -F 'file=@app_tail.log' http://localhost:8080/v1/logs/upload | jq
+```
 
 ## 🚀 Patch 5.1 Features
 

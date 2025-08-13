@@ -19,6 +19,10 @@ from .enrich.score import RiskScorer
 from .api.version import router as version_router
 from .api.admin_update import router as admin_update_router
 from .api.outputs import router as outputs_router
+from .api.stats import router as stats_router
+from .api.logs import router as logs_router
+from .pipeline import ingest_queue, record_batch_accepted, enqueue
+from .logging_config import setup_logging, log_heartbeat
 
 API_PREFIX = "/v1"
 API_VERSION = "1.0.0"
@@ -35,20 +39,20 @@ ELASTIC_URL = os.getenv("ELASTIC_URL")
 ELASTIC_USERNAME = os.getenv("ELASTIC_USERNAME")
 ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD")
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# Ingest queue for processing pipeline
-ingest_queue: asyncio.Queue = asyncio.Queue(maxsize=10000)  # backpressure
+# Configure logging with rotating file handler
+setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    from .pipeline import worker_loop
+    # Start two worker processes
     asyncio.create_task(worker_loop())
-    logging.info("Stage 5 worker loop started")
+    asyncio.create_task(worker_loop())
+    logging.info("Stage 6 pipeline workers started (2x)")
     yield
     # Shutdown
-    logging.info("Shutting down worker loop")
+    logging.info("Shutting down pipeline workers")
 
 app = FastAPI(title="Live Network Threat Telemetry API (MVP)", lifespan=lifespan)
 
@@ -56,6 +60,8 @@ app = FastAPI(title="Live Network Threat Telemetry API (MVP)", lifespan=lifespan
 app.include_router(version_router, prefix=API_PREFIX)
 app.include_router(admin_update_router, prefix=API_PREFIX)
 app.include_router(outputs_router, prefix=API_PREFIX)
+app.include_router(stats_router, prefix=API_PREFIX)
+app.include_router(logs_router, prefix=API_PREFIX)
 
 # Mount static files for UI
 app_dir = os.path.dirname(__file__)
@@ -187,12 +193,12 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
                 raise HTTPException(status_code=400, detail="Records must be JSON objects.")
             _validate_record(rec)
             try:
-                ingest_queue.put_nowait(rec)   # backpressure if queue is full
+                enqueue(rec)
                 accepted += 1
-            except asyncio.QueueFull:
-                # Tell client to retry later
+            except Exception:
                 raise HTTPException(status_code=429, detail="Ingest temporarily overloaded, please retry.")
 
+        record_batch_accepted(len(records))
         return {"status": "accepted", "queued": accepted}
 
     except HTTPException:
@@ -262,34 +268,29 @@ async def configure_alerts(request: Request, response: Response, Authorization: 
 @app.get(f"{API_PREFIX}/metrics")
 async def metrics(response: Response):
     add_version_header(response)
-    # TODO: Implement Prometheus metrics with queue depth
+    from .pipeline import get_stats
+    stats = get_stats()
     return {
         "requests_total": 0,
         "requests_failed": 0,
-        "records_processed": 0,
-        "queue_depth": ingest_queue.qsize(),
-        "records_queued": 0  # TODO: increment this counter
+        "records_processed": stats["records_processed"],
+        "queue_depth": stats["queue_depth"],
+        "records_queued": 0,  # TODO: increment this counter
+        "eps": stats["eps"]
     }
 
-# ---------- Stage 5 Worker Loop ----------
-async def worker_loop():
-    """Background worker that processes records from the ingest queue"""
-    while True:
-        try:
-            rec = await ingest_queue.get()
-            try:
-                # TODO: enrich (GeoIP, ASN, threat intel, risk score)
-                # TODO: dispatch to connectors (Splunk/Elastic) via an internal dispatcher
-                logging.info(f"Processing record: {rec.get('ts', 'no-ts')}")
-                pass
-            except Exception as e:
-                logging.exception("worker failed: %s", e)
-                # Optionally push to DLQ (file/Redis/Kafka topic)
-                write_deadletter(rec, f"worker_failure: {str(e)}")
-            finally:
-                ingest_queue.task_done()
-        except Exception as e:
-            logging.exception("worker loop error: %s", e)
-            await asyncio.sleep(1)  # Don't spin on errors
+# ---------- Stage 6 Pipeline Functions ----------
+def write_deadletter(record: Dict[str, Any], reason: str):
+    """Write failed record to dead letter queue"""
+    try:
+        dlq_file = Path("/data/deadletter.ndjson")
+        with open(dlq_file, "a") as f:
+            f.write(json.dumps({
+                "record": record,
+                "reason": reason,
+                "timestamp": datetime.now().isoformat()
+            }) + "\n")
+    except Exception as e:
+        logging.error(f"Failed to write to dead letter queue: {e}")
 
 

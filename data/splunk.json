@@ -1,0 +1,10 @@
+{
+  "hec_url": "https://splunk.example:8088/services/collector",
+  "token": "REDACTED",
+  "index": "telemetry",
+  "sourcetype": "telemetry:event",
+  "batch_size": 500,
+  "max_retries": 5,
+  "backoff_ms": 200,
+  "verify_tls": true
+}

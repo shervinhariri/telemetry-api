@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-ARG APP_VERSION=0.5.1
+ARG APP_VERSION=0.6.0
 ARG GIT_SHA=dev
 ARG IMAGE=shvin/telemetry-api
 

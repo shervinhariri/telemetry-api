@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.6.0 — Stage 6 (2025-08-13)
+- Activated processing pipeline: background workers process records and write to daily NDJSON files
+- File sink: processed events saved to `/data/events-YYYY-MM-DD.ndjson` with 7-day retention
+- Statistics endpoints: `/v1/stats` for processing metrics, `/v1/events/recent` for recent events
+- Download endpoint: `/v1/download` for NDJSON export of processed data
+- Logs tab: live tail, 2MB download, and file upload for support review
+- Logging system: rotating file logs with heartbeat metrics and log management endpoints
+- Minimal UI: clean header design with version dot indicator (green=up-to-date, amber=update available)
+- Support features: log upload/download, file management, and troubleshooting tools
+
 ## v0.5.1 — Patch 5.1 (2025-08-13)
 - Version management: real-time version badge with Docker Hub update notifications
 - Update notifications: green badge (up-to-date) vs amber badge (update available)

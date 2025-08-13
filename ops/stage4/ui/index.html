@@ -3,38 +3,25 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Telemetry API — Dashboard</title>
+  <title>Telemetry</title>
   <style>
-    .version-badge {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      z-index: 1000;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 12px;
+    .version-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
       font-weight: 500;
-      color: white;
-      background: #059669;
+      color: var(--muted);
+    }
+    .version-dot .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
       transition: background-color 0.3s;
     }
-    .version-badge.update-available {
-      background: #d97706;
-      cursor: pointer;
-    }
-    .version-badge.update-available:hover {
-      background: #b45309;
-    }
-    .version-badge .update-btn {
-      margin-left: 8px;
-      padding: 2px 6px;
-      background: rgba(0,0,0,0.2);
-      border-radius: 3px;
-      font-size: 10px;
-      cursor: pointer;
-    }
-    .version-badge .update-btn:hover {
-      background: rgba(0,0,0,0.3);
+    .version-dot.update-available .dot {
+      background: #f59e0b;
     }
   </style>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -80,16 +67,16 @@
   </style>
 </head>
 <body>
-  <div id="versionBadge" class="version-badge">
-    <span id="versionText">Loading...</span>
-  </div>
   <div class="wrap">
     <div class="topbar">
       <div class="inline">
-        <div class="title">🚀 Telemetry API — Dashboard</div>
-        <div class="pill">Live (15m)</div>
+        <div class="title">🚀 Telemetry</div>
       </div>
       <div class="inline right">
+        <div id="versionDot" class="version-dot">
+          <div class="dot"></div>
+          <span id="versionText">v0.6.0</span>
+        </div>
         <label for="key" class="small">API Key</label>
         <input id="key" style="min-width:220px" value="TEST_KEY" />
         <button id="btnHealth">Health</button>
@@ -101,6 +88,7 @@
       <div class="tab" data-tab="ingest">Ingest Test</div>
       <div class="tab" data-tab="outputs">Outputs</div>
       <div class="tab" data-tab="lookup">Lookup</div>
+      <div class="tab" data-tab="logs">Logs</div>
       <div class="tab" data-tab="system">System</div>
     </div>
 
@@ -247,6 +235,29 @@
           <button id="btnLookup">POST /v1/lookup</button>
         </div>
         <pre class="log" id="lookupLog"></pre>
+      </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="panel" id="panel-logs">
+      <div class="split">
+        <div class="card">
+          <h3 style="color:var(--muted);margin-top:0">Live Tail</h3>
+          <pre class="log" id="logsTail" style="height:300px;font-size:11px;line-height:1.4">Loading logs...</pre>
+          <div class="row" style="margin-top:10px">
+            <button id="btnRefreshLogs">Refresh</button>
+            <button class="mutebtn" id="btnClearLogs">Clear</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="color:var(--muted);margin-top:0">Download & Upload</h3>
+          <div class="row" style="margin-top:10px">
+            <button id="btnDownloadLogs">Download 2MB</button>
+            <button class="mutebtn" id="btnUploadLogs">Upload File</button>
+          </div>
+          <input type="file" id="logFileInput" style="display:none" />
+          <pre class="log" id="logsUpload" style="height:200px;font-size:11px">Ready for upload.</pre>
+        </div>
       </div>
     </div>
 

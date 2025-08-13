@@ -206,6 +206,65 @@ function initHandlers(){
   };
 
   $("btnTestElastic").onclick = () => { $("elasticLog").textContent = "Tip: run an ingest, then query the index in Elastic."; };
+
+  // Logs tab handlers
+  $("btnRefreshLogs").onclick = refreshLogs;
+  $("btnClearLogs").onclick = () => { $("logsTail").textContent = ""; };
+  $("btnDownloadLogs").onclick = downloadLogs;
+  $("btnUploadLogs").onclick = () => { $("logFileInput").click(); };
+  
+  $("logFileInput").onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const res = await fetch("/v1/logs/upload", {
+        method: "POST",
+        body: formData
+      });
+      
+      const result = await res.json();
+      $("logsUpload").textContent = JSON.stringify(result, null, 2);
+    } catch (e) {
+      $("logsUpload").textContent = `Upload failed: ${e.message}`;
+    }
+  };
+}
+
+// ---------- Logs Functions ----------
+async function refreshLogs() {
+  try {
+    const res = await fetch("/v1/logs/tail?max_bytes=65536&format=text");
+    const text = await res.text();
+    $("logsTail").textContent = text;
+    
+    // Auto-scroll to bottom
+    const tail = $("logsTail");
+    tail.scrollTop = tail.scrollHeight;
+  } catch (e) {
+    $("logsTail").textContent = `Failed to load logs: ${e.message}`;
+  }
+}
+
+async function downloadLogs() {
+  try {
+    const res = await fetch("/v1/logs/download?max_bytes=2000000");
+    const blob = await res.blob();
+    
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `app_log_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.log`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  } catch (e) {
+    alert(`Download failed: ${e.message}`);
+  }
 }
 
 // ---------- Start Refresh Loop ----------
@@ -215,76 +274,44 @@ function startRefresh(){
   setInterval(refresh, 5000);
 }
 
-// ---------- Version Badge ----------
-async function initVersionBadge() {
-  const badge = document.getElementById("versionBadge");
+// ---------- Minimal Version Dot ----------
+async function initVersionDot() {
+  const dot = document.getElementById("versionDot");
   const text = document.getElementById("versionText");
-  
+
   try {
-    // Get version info
     const verRes = await fetch("/v1/version");
     const ver = await verRes.json();
-    
-    // Check for updates
+
     const updateRes = await fetch("/v1/updates/check");
     const update = await updateRes.json();
-    
-    // Update badge
-    text.textContent = `${ver.service} ${ver.version} • ${ver.git_sha}`;
-    
+
+    text.textContent = `v${ver.version}`;
+
     if (update.enabled && update.update_available) {
-      badge.classList.add("update-available");
-      badge.title = `Update available: ${update.latest}`;
-      
-      // Add update button
-      const updateBtn = document.createElement("span");
-      updateBtn.className = "update-btn";
-      updateBtn.textContent = "Update";
-      updateBtn.onclick = async () => {
-        const token = prompt("Admin token (dev only):");
-        if (!token) return;
-        
-        try {
-          const res = await fetch("/v1/admin/update", {
-            method: "POST",
-            headers: {"X-Admin-Token": token}
-          });
-          
-          if (res.ok) {
-            alert("Pulled latest image. Restart your stack to apply.");
-          } else {
-            const error = await res.text();
-            alert(`Update failed: ${error}`);
-          }
-        } catch (e) {
-          alert(`Update failed: ${e.message}`);
-        }
-      };
-      badge.appendChild(updateBtn);
+      dot.classList.add("update-available");
+      dot.title = `Update available: ${update.latest}`;
     } else {
-      badge.title = "Up to date";
+      dot.classList.remove("update-available");
+      dot.title = "Up to date";
     }
   } catch (e) {
-    text.textContent = "Version check failed";
-    badge.style.background = "#6b7280";
+    text.textContent = "v0.6.0";
+    dot.title = "Version check failed";
   }
-  
-  // Check for updates every 60 seconds
+
   setInterval(async () => {
     try {
       const res = await fetch("/v1/updates/check");
       const update = await res.json();
-      
       if (update.enabled && update.update_available) {
-        badge.classList.add("update-available");
-        badge.title = `Update available: ${update.latest}`;
+        dot.classList.add("update-available");
+        dot.title = `Update available: ${update.latest}`;
       } else {
-        badge.classList.remove("update-available");
-        badge.title = "Up to date";
+        dot.classList.remove("update-available");
+        dot.title = "Up to date";
       }
-    } catch (e) {
-      // Silently fail on update checks
-    }
+    } catch (e) { /* Silently fail on update checks */ }
   }, 60000);
 }
 
@@ -293,7 +320,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initTabs();
   initHandlers();
   startRefresh();
-  initVersionBadge();
+  initVersionDot();
   
   // simple runtime diag
   window.__uiDiag = () => ({
