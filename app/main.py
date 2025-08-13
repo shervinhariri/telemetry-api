@@ -16,6 +16,9 @@ from .enrich.geoip import GeoIPEnricher
 from .enrich.asn import ASNEnricher
 from .enrich.threat import ThreatMatcher
 from .enrich.score import RiskScorer
+from .api.version import router as version_router
+from .api.admin_update import router as admin_update_router
+from .api.outputs import router as outputs_router
 
 API_PREFIX = "/v1"
 API_VERSION = "1.0.0"
@@ -48,6 +51,11 @@ async def lifespan(app: FastAPI):
     logging.info("Shutting down worker loop")
 
 app = FastAPI(title="Live Network Threat Telemetry API (MVP)", lifespan=lifespan)
+
+# Include API routers
+app.include_router(version_router, prefix=API_PREFIX)
+app.include_router(admin_update_router, prefix=API_PREFIX)
+app.include_router(outputs_router, prefix=API_PREFIX)
 
 # Mount static files for UI
 app_dir = os.path.dirname(__file__)

@@ -4,6 +4,39 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Telemetry API — Dashboard</title>
+  <style>
+    .version-badge {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: white;
+      background: #059669;
+      transition: background-color 0.3s;
+    }
+    .version-badge.update-available {
+      background: #d97706;
+      cursor: pointer;
+    }
+    .version-badge.update-available:hover {
+      background: #b45309;
+    }
+    .version-badge .update-btn {
+      margin-left: 8px;
+      padding: 2px 6px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 3px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .version-badge .update-btn:hover {
+      background: rgba(0,0,0,0.3);
+    }
+  </style>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -47,6 +80,9 @@
   </style>
 </head>
 <body>
+  <div id="versionBadge" class="version-badge">
+    <span id="versionText">Loading...</span>
+  </div>
   <div class="wrap">
     <div class="topbar">
       <div class="inline">

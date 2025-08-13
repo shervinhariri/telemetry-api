@@ -215,11 +215,85 @@ function startRefresh(){
   setInterval(refresh, 5000);
 }
 
+// ---------- Version Badge ----------
+async function initVersionBadge() {
+  const badge = document.getElementById("versionBadge");
+  const text = document.getElementById("versionText");
+  
+  try {
+    // Get version info
+    const verRes = await fetch("/v1/version");
+    const ver = await verRes.json();
+    
+    // Check for updates
+    const updateRes = await fetch("/v1/updates/check");
+    const update = await updateRes.json();
+    
+    // Update badge
+    text.textContent = `${ver.service} ${ver.version} • ${ver.git_sha}`;
+    
+    if (update.enabled && update.update_available) {
+      badge.classList.add("update-available");
+      badge.title = `Update available: ${update.latest}`;
+      
+      // Add update button
+      const updateBtn = document.createElement("span");
+      updateBtn.className = "update-btn";
+      updateBtn.textContent = "Update";
+      updateBtn.onclick = async () => {
+        const token = prompt("Admin token (dev only):");
+        if (!token) return;
+        
+        try {
+          const res = await fetch("/v1/admin/update", {
+            method: "POST",
+            headers: {"X-Admin-Token": token}
+          });
+          
+          if (res.ok) {
+            alert("Pulled latest image. Restart your stack to apply.");
+          } else {
+            const error = await res.text();
+            alert(`Update failed: ${error}`);
+          }
+        } catch (e) {
+          alert(`Update failed: ${e.message}`);
+        }
+      };
+      badge.appendChild(updateBtn);
+    } else {
+      badge.title = "Up to date";
+    }
+  } catch (e) {
+    text.textContent = "Version check failed";
+    badge.style.background = "#6b7280";
+  }
+  
+  // Check for updates every 60 seconds
+  setInterval(async () => {
+    try {
+      const res = await fetch("/v1/updates/check");
+      const update = await res.json();
+      
+      if (update.enabled && update.update_available) {
+        badge.classList.add("update-available");
+        badge.title = `Update available: ${update.latest}`;
+      } else {
+        badge.classList.remove("update-available");
+        badge.title = "Up to date";
+      }
+    } catch (e) {
+      // Silently fail on update checks
+    }
+  }, 60000);
+}
+
 // ---------- DOM Ready Initialization ----------
 document.addEventListener("DOMContentLoaded", () => {
   initTabs();
   initHandlers();
   startRefresh();
+  initVersionBadge();
   
   // simple runtime diag
   window.__uiDiag = () => ({

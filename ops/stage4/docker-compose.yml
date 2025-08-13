@@ -1,6 +1,6 @@
 services:
-  api:
-    image: telemetry-api:latest
+  telemetry-api:
+    image: shvin/telemetry-api:latest
     # If building from source, use:
     # build: ../../
     container_name: telemetry-api
@@ -8,6 +8,11 @@ services:
       - API_KEYS=TEST_KEY
       - LOG_LEVEL=info
       - RETENTION_DAYS=7
+      - APP_VERSION=0.5.1
+      - GIT_SHA=dev
+      - IMAGE=shvin/telemetry-api
+      - UPDATE_CHECK_ENABLED=true
+      - ADMIN_TOKEN=dev-only-token  # Only for development
     ports:
       - "8080:8080"
     healthcheck:
@@ -19,3 +24,14 @@ services:
     restart: unless-stopped
     volumes:
       - ../../data:/data:ro
+
+  # Optional: Watchtower for automatic updates (production)
+  # Uncomment to enable auto-updates
+  # watchtower:
+  #   image: containrrr/watchtower
+  #   restart: unless-stopped
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   command: --cleanup --interval 60 telemetry-api
+  #   environment:
+  #     - WATCHTOWER_POLL_INTERVAL=60
