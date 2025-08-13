@@ -22,7 +22,7 @@ Local-first MVP to ingest NetFlow/IPFIX and Zeek JSON, enrich with GeoIP/ASN + t
 # run single container (API + UI)
 docker run -d -p 8080:8080 \
   -e API_KEYS=TEST_KEY \
-  --name telemetry-api shervinhariri/telemetry-api:latest
+  --name telemetry-api shvin/telemetry-api:latest
 
 # open UI
 open http://localhost:8080
@@ -38,7 +38,7 @@ curl -s -X POST http://localhost:8080/v1/ingest \
 ```
 
 ## Release & Images
-Docker Hub: shervinhariri/telemetry-api:latest, shervinhariri/telemetry-api:v0.4.0
+Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.4.0
 
 GitHub Tags: v0.4.0 (Stage 4)
 
