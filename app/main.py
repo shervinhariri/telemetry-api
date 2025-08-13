@@ -31,8 +31,19 @@ ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD")
 app = FastAPI(title="Live Network Threat Telemetry API (MVP)")
 
 # Mount static files for UI
-ui_dir = os.path.join(os.path.dirname(__file__), "..", "ui")
+app_dir = os.path.dirname(__file__)
+ui_dir = os.path.abspath(os.path.join(app_dir, "..", "ops", "stage4", "ui"))
+if not os.path.exists(ui_dir):
+    # fallback if UI lives elsewhere (adjust if needed)
+    ui_dir = os.path.abspath(os.path.join(app_dir, "ui"))
+
+# Mount static files under /ui
 app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
+
+# Serve index.html at root
+@app.get("/", include_in_schema=False)
+async def root():
+    return FileResponse(os.path.join(ui_dir, "index.html"))
 
 # Enrichers are loaded once on startup
 geo = GeoIPEnricher(GEOIP_DB_CITY)

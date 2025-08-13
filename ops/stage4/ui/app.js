@@ -1,14 +1,32 @@
 const $ = (id) => document.getElementById(id);
 
-// ---------- Tabs ----------
-document.querySelectorAll(".tab").forEach(t => {
-  t.onclick = () => {
-    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach(x => x.classList.remove("active"));
-    t.classList.add("active");
-    document.getElementById("panel-" + t.dataset.tab).classList.add("active");
-  };
-});
+// ---------- Hardened Tab Initialization ----------
+function initTabs(){
+  const tabs = document.querySelectorAll(".tab");
+  const panels = document.querySelectorAll(".panel");
+  if (!tabs.length || !panels.length) {
+    console.warn("Tab init: no tabs/panels found");
+    return;
+  }
+  tabs.forEach(t => {
+    t.onclick = () => {
+      tabs.forEach(x => x.classList.remove("active"));
+      panels.forEach(x => x.classList.remove("active"));
+      t.classList.add("active");
+      const pane = document.getElementById("panel-" + t.dataset.tab);
+      if (pane) pane.classList.add("active");
+      // optional deep-link
+      try { location.hash = "#tab=" + t.dataset.tab; } catch {}
+    };
+  });
+
+  // activate from hash if present
+  const m = location.hash.match(/#tab=([a-z0-9_-]+)/i);
+  if (m) {
+    const t = document.querySelector(`.tab[data-tab="${m[1]}"]`);
+    if (t) t.click();
+  }
+}
 
 // ---------- Helpers ----------
 function authHeader() {
@@ -93,7 +111,7 @@ function updateChart(v){
 
 // ---------- Refresh metrics loop ----------
 async function refresh(){
-  const mres = await call("/metrics");
+  const mres = await call("/v1/metrics");
   if (!mres.ok) { $("metricsLog").textContent = `[${mres.status}] Failed to fetch`; return; }
   $("metricsLog").textContent = mres.raw;
 
@@ -140,55 +158,79 @@ async function refresh(){
   state.prevIngest = ingestTotal;
 }
 
-// ---------- Buttons & Actions ----------
-$("btnHealth").onclick = async () => {
-  const r = await call("/v1/health", { headers: authHeader() });
-  $("healthLog").textContent = `[${r.status}]\n${r.body}`;
-};
-
-$("btnMetrics").onclick = async () => {
-  const r = await call("/metrics");
-  $("metricsLog").textContent = `[${r.status}]\n${r.raw}`;
-};
-
-$("btnIngest").onclick = async () => {
-  let body = $("ingestBody").value;
-  try { JSON.parse(body); } catch (e) { return $("ingestLog").textContent = "Invalid JSON body"; }
-  const r = await call("/v1/ingest", { method:"POST", headers: authHeader(), body });
-  $("ingestLog").textContent = `[${r.status}]\n${r.body}`;
-};
-
-$("btnIngestClear").onclick = () => { $("ingestLog").textContent = ""; };
-
-$("btnLookup").onclick = async () => {
-  const value = $("lookupValue").value.trim();
-  const type = $("lookupType").value;
-  const r = await call("/v1/lookup", { method:"POST", headers: authHeader(), body: JSON.stringify({ type, value }) });
-  $("lookupLog").textContent = `[${r.status}]\n${r.body}`;
-};
-
-$("btnSaveSplunk").onclick = async () => {
-  const payload = { url: $("splunkUrl").value.trim(), token: $("splunkToken").value.trim() };
-  const r = await call("/v1/outputs/splunk", { method:"POST", headers: authHeader(), body: JSON.stringify(payload) });
-  $("splunkLog").textContent = `[${r.status}]\n${r.body}`;
-};
-
-$("btnTestSplunk").onclick = () => { $("splunkLog").textContent = "Tip: send a tiny ingest and check HEC events."; };
-
-$("btnSaveElastic").onclick = async () => {
-  const payload = {
-    url: $("esUrl").value.trim(),
-    index: $("esIndex").value.trim() || "telemetry-events",
-    username: $("esUser").value.trim(),
-    password: $("esPass").value.trim()
+// ---------- Button Handlers ----------
+function initHandlers(){
+  $("btnHealth").onclick = async () => {
+    const r = await call("/v1/health", { headers: authHeader() });
+    $("healthLog").textContent = `[${r.status}]\n${r.body}`;
   };
-  const r = await call("/v1/outputs/elastic", { method:"POST", headers: authHeader(), body: JSON.stringify(payload) });
-  $("elasticLog").textContent = `[${r.status}]\n${r.body}`;
-};
 
-$("btnTestElastic").onclick = () => { $("elasticLog").textContent = "Tip: run an ingest, then query the index in Elastic."; };
+  $("btnMetrics").onclick = async () => {
+    const r = await call("/v1/metrics");
+    $("metricsLog").textContent = `[${r.status}]\n${r.raw}`;
+  };
 
-// ---------- Start ----------
-ensureChart();
-refresh();
-setInterval(refresh, 5000);
+  $("btnIngest").onclick = async () => {
+    let body = $("ingestBody").value;
+    try { JSON.parse(body); } catch (e) { return $("ingestLog").textContent = "Invalid JSON body"; }
+    const r = await call("/v1/ingest", { method:"POST", headers: authHeader(), body });
+    $("ingestLog").textContent = `[${r.status}]\n${r.body}`;
+  };
+
+  $("btnIngestClear").onclick = () => { $("ingestLog").textContent = ""; };
+
+  $("btnLookup").onclick = async () => {
+    const value = $("lookupValue").value.trim();
+    const type = $("lookupType").value;
+    const r = await call("/v1/lookup", { method:"POST", headers: authHeader(), body: JSON.stringify({ type, value }) });
+    $("lookupLog").textContent = `[${r.status}]\n${r.body}`;
+  };
+
+  $("btnSaveSplunk").onclick = async () => {
+    const payload = { url: $("splunkUrl").value.trim(), token: $("splunkToken").value.trim() };
+    const r = await call("/v1/outputs/splunk", { method:"POST", headers: authHeader(), body: JSON.stringify(payload) });
+    $("splunkLog").textContent = `[${r.status}]\n${r.body}`;
+  };
+
+  $("btnTestSplunk").onclick = () => { $("splunkLog").textContent = "Tip: send a tiny ingest and check HEC events."; };
+
+  $("btnSaveElastic").onclick = async () => {
+    const payload = {
+      url: $("esUrl").value.trim(),
+      index: $("esIndex").value.trim() || "telemetry-events",
+      username: $("esUser").value.trim(),
+      password: $("esPass").value.trim()
+    };
+    const r = await call("/v1/outputs/elastic", { method:"POST", headers: authHeader(), body: JSON.stringify(payload) });
+    $("elasticLog").textContent = `[${r.status}]\n${r.body}`;
+  };
+
+  $("btnTestElastic").onclick = () => { $("elasticLog").textContent = "Tip: run an ingest, then query the index in Elastic."; };
+}
+
+// ---------- Start Refresh Loop ----------
+function startRefresh(){
+  ensureChart();
+  refresh();
+  setInterval(refresh, 5000);
+}
+
+// ---------- DOM Ready Initialization ----------
+document.addEventListener("DOMContentLoaded", () => {
+  initTabs();
+  initHandlers();
+  startRefresh();
+  
+  // simple runtime diag
+  window.__uiDiag = () => ({
+    tabs: document.querySelectorAll(".tab").length,
+    panels: document.querySelectorAll(".panel").length,
+    appJsLoaded: true,
+    scriptSrcOk: Array.from(document.scripts).some(s => (s.src||"").includes("/ui/app.js"))
+  });
+  
+  // Update diagnostics display
+  const d = window.__uiDiag();
+  const el = document.getElementById("diagLine");
+  if (el) el.textContent = `diag → tabs:${d.tabs} panels:${d.panels} appJsLoaded:${d.appJsLoaded}`;
+});
