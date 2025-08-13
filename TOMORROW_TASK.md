@@ -1,4 +1,4 @@
-# 🚀 Tomorrow Morning Task: Stage 3 Local Validation (v0.3.0)
+# 🚀 Tomorrow Morning Task: Stage 4 Pro Dashboard Validation (v1.4.0)
 
 ## Goal
 Run the production bundle locally (Docker), validate endpoints against the Stage 1–2 contract, and ingest real sample logs generated on the fly.
@@ -231,7 +231,7 @@ Only if you have test endpoints/tokens ready.
 docker compose down
 ```
 
-**Done. If all pass, Stage 3 is validated locally.**
+**Done. If all pass, Stage 4 is validated locally.**
 
 ---
 
@@ -340,7 +340,7 @@ If you prefer Postman, import this minimal collection (save as `Telemetry-API.po
 
 ## ✅ Success Criteria
 
-If all steps pass, Stage 3 contract alignment is validated locally:
+If all steps pass, Stage 4 Pro Dashboard is validated locally:
 
 - ✅ All endpoints respond correctly
 - ✅ Rate limiting works as expected
@@ -350,3 +350,4 @@ If all steps pass, Stage 3 contract alignment is validated locally:
 - ✅ No errors in container logs
 
 **Ready for production deployment!** 🚀
+

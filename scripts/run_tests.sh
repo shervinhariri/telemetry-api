@@ -6,7 +6,7 @@ set -euo pipefail
 echo "🧪 Running Telemetry API tests..."
 
 # Check if we're in a virtual environment
-if [[ "$VIRTUAL_ENV" == "" ]]; then
+if [[ "${VIRTUAL_ENV:-}" == "" ]]; then
     echo "⚠️  Consider using a virtual environment"
 fi
 

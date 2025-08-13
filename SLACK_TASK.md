@@ -1,4 +1,4 @@
-🚀 **Tomorrow Morning Task: Stage 3 Local Validation (v0.3.0)**
+🚀 **Tomorrow Morning Task: Stage 4 Pro Dashboard Validation (v1.4.0)**
 
 **Goal**: Run the production bundle locally (Docker), validate endpoints against the Stage 1–2 contract, and ingest real sample logs generated on the fly.
 
@@ -157,3 +157,4 @@ docker compose down
 - **Enriched fields?** In ingest responses/logs and downstream outputs
 - **Raise RPM to 600?** Set `RATE_LIMIT_INGEST_RPM=600` in .env and restart
 - **Tests fail?** Check logs: `./scripts/logs.sh`, verify: `docker compose ps`
+
