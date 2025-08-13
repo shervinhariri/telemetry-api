@@ -12,9 +12,11 @@ Local-first MVP to ingest NetFlow/IPFIX and Zeek JSON, enrich with GeoIP/ASN + t
 
 - ✅ **Step 3: Contract Alignment** — Containerized MVP build, verified API endpoints, schema validation, sample data ingestion working, CI pipeline added. Prepared for production deployment.
 
-- 🟣 **Step 4: Open-Source Launch (current)** — Single container (API + Dashboard UI) with health, metrics, ingest, lookup, and output configuration in GUI. On-prem/cloud ready, Docker Hub publishing with `latest` and version tags. Focus on adoption via free open-source release.
+- ✅ **Step 4: Open-Source Launch** — Single container (API + Dashboard UI) with health, metrics, ingest, lookup, and output configuration in GUI. On-prem/cloud ready, Docker Hub publishing with `latest` and version tags. Focus on adoption via free open-source release.
 
-> Current version: **v0.4.0** (Stage 4 GUI + single container).  
+- 🟣 **Step 5: Production-Ready Ingest Pipeline (current)** — Robust ingest endpoint with queue-based processing, gzip support, proper error handling (4xx/5xx), and background worker pipeline. Accepts raw JSON arrays and wrapped `{"records": [...]}` format. Backpressure handling with 429 responses. Foundation for Stage 5.2 output connectors.
+
+> Current version: **v0.5.0** (Stage 5 robust ingest + queue pipeline).  
 > Docs for Steps 1–2 are in `/docs/` and PDFs.
 
 ## Quickstart
@@ -27,20 +29,33 @@ docker run -d -p 8080:8080 \
 # open UI
 open http://localhost:8080
 
-# health
-curl -s http://localhost:8080/v1/health -H "Authorization: Bearer TEST_KEY" | jq .
+# health (no auth required)
+curl -s http://localhost:8080/v1/health | jq .
 
-# ingest a sample
+# ingest - raw array format
 curl -s -X POST http://localhost:8080/v1/ingest \
   -H "Authorization: Bearer TEST_KEY" \
   -H "Content-Type: application/json" \
-  --data @samples/zeek_conn.json | jq .
+  --data '[{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1", "src_port":12345, "dst_port":53, "proto":"udp", "bytes":84, "packets":1, "app":"dns"}]' | jq .
+
+# ingest - wrapped format (also supported)
+curl -s -X POST http://localhost:8080/v1/ingest \
+  -H "Authorization: Bearer TEST_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{"records": [{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1", "src_port":12345, "dst_port":53, "proto":"udp", "bytes":84, "packets":1, "app":"dns"}]}' | jq .
+
+# ingest with gzip compression
+echo '[{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1"}]' | gzip | curl -s -X POST http://localhost:8080/v1/ingest \
+  -H "Authorization: Bearer TEST_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Content-Encoding: gzip" \
+  --data-binary @- | jq .
 ```
 
 ## Release & Images
-Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.4.0
+Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.5.0
 
-GitHub Tags: v0.4.0 (Stage 4)
+GitHub Tags: v0.5.0 (Stage 5)
 
 ### Validation
 ```bash
@@ -58,6 +73,34 @@ GitHub Tags: v0.4.0 (Stage 4)
 ```bash
 ./scripts/run_tests.sh  # Run all tests locally
 ```
+
+## 🚀 Stage 5 Features
+
+### Robust Ingest Pipeline
+- **Dual Format Support**: Accepts both raw JSON arrays `[...]` and wrapped `{"records": [...]}`
+- **Gzip Compression**: Auto-detects gzip via header or magic number (`1F 8B`)
+- **Queue-Based Processing**: Records processed asynchronously via background worker
+- **Backpressure Handling**: Returns 429 when queue is full (10k limit)
+- **Proper Error Handling**: 4xx for client errors, 5xx only for server faults
+
+### Input Validation
+- **Timestamp Required**: Records must have `ts`, `time`, or `@timestamp` field
+- **Size Limits**: 5MB gzipped, 10k records per batch
+- **JSON Validation**: Proper UTF-8 encoding and valid JSON structure
+- **Graceful Degradation**: Queue full → 429 with retry guidance
+
+### Background Processing
+- **Async Worker Loop**: Processes records from queue in background
+- **Error Isolation**: Worker failures don't affect ingest endpoint
+- **Dead Letter Queue**: Failed records written to files for analysis
+- **Queue Metrics**: Real-time queue depth and processing status
+
+### API Endpoints
+- **`/v1/health`**: Public health check (no auth required)
+- **`/v1/ingest`**: Robust ingest with queue processing
+- **`/v1/metrics`**: Queue depth and processing metrics
+- **`/v1/lookup`**: IP/domain enrichment (requires auth)
+- **`/v1/outputs/*`**: Output configuration (requires auth)
 
 ## 🧪 Development & Testing
 
