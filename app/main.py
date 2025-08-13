@@ -32,10 +32,7 @@ app = FastAPI(title="Live Network Threat Telemetry API (MVP)")
 
 # Mount static files for UI
 app_dir = os.path.dirname(__file__)
-ui_dir = os.path.abspath(os.path.join(app_dir, "..", "ops", "stage4", "ui"))
-if not os.path.exists(ui_dir):
-    # fallback if UI lives elsewhere (adjust if needed)
-    ui_dir = os.path.abspath(os.path.join(app_dir, "ui"))
+ui_dir = os.path.abspath(os.path.join(app_dir, "..", "ui"))
 
 # Mount static files under /ui
 app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
