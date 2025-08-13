@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telemetry API — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg:#0b0f1a; --surface:#0f172a; --card:#111729; --ink:#e6edf3; --muted:#9fb3c8;
+      --brand:#8b5cf6; --ok:#34d399; --warn:#f59e0b; --err:#fb7185; --accent:#60a5fa;
+      --line:#1e293b; --glow: rgba(139,92,246,.35);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+    .wrap{max-width:1200px;margin:28px auto;padding:0 16px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+    .title{font-size:22px;font-weight:700;letter-spacing:.2px}
+    .pill{background:linear-gradient(135deg, #0b1224, #0c1730);border:1px solid #1f2a44;color:var(--muted);padding:8px 12px;border-radius:999px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .tabs{display:flex;gap:8px;margin:10px 0 18px}
+    .tab{padding:10px 14px;border-radius:12px;background:#0c1324;border:1px solid #1d2842;color:var(--muted);cursor:pointer}
+    .tab.active{background:linear-gradient(135deg, rgba(139,92,246,.15), rgba(96,165,250,.15));color:var(--ink);border-color:#2c3c63;box-shadow:0 0 0 1px #2c3c63,0 8px 28px rgba(0,0,0,.35),0 0 40px var(--glow)}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media (min-width: 900px){ .grid{grid-template-columns:repeat(3,1fr)} }
+    .card{background:var(--card);border:1px solid #1d2842;border-radius:16px;padding:16px;box-shadow:0 12px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.03)}
+    .kpi{display:flex;align-items:center;justify-content:space-between}
+    .kpi h3{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:500}
+    .kpi .big{font-size:28px;font-weight:800;letter-spacing:.3px}
+    .spark{height:28px;width:120px}
+    .panel{display:none}
+    .panel.active{display:block}
+    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
+    input,textarea,select{width:100%;padding:10px 12px;border-radius:12px;background:#0c1324;color:var(--ink);border:1px solid #1d2842;outline:none}
+    button{display:inline-flex;align-items:center;gap:8px;border:none;background:linear-gradient(135deg,var(--brand),var(--accent));color:#07101e;font-weight:800;padding:10px 14px;border-radius:12px;cursor:pointer}
+    .mutebtn{background:#0c1324;color:var(--ink);border:1px solid #263455}
+    .split{display:grid;grid-template-columns:1fr;gap:14px}
+    @media (min-width: 900px){ .split{grid-template-columns:2fr 1fr} }
+    .small{font-size:12px;color:var(--muted)}
+    .log{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;background:#0c1324;border:1px solid #1d2842;border-radius:12px;padding:10px;height:170px;overflow:auto}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
+    .footer{margin:16px 0 0;color:var(--muted);font-size:12px}
+    .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .right{margin-left:auto}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="inline">
+        <div class="title">🚀 Telemetry API — Dashboard</div>
+        <div class="pill">Live (15m)</div>
+      </div>
+      <div class="inline right">
+        <label for="key" class="small">API Key</label>
+        <input id="key" style="min-width:220px" value="TEST_KEY" />
+        <button id="btnHealth">Health</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="dashboard">Dashboard</div>
+      <div class="tab" data-tab="ingest">Ingest Test</div>
+      <div class="tab" data-tab="outputs">Outputs</div>
+      <div class="tab" data-tab="lookup">Lookup</div>
+      <div class="tab" data-tab="system">System</div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="panel active" id="panel-dashboard">
+      <div class="grid">
+        <div class="card">
+          <div class="kpi">
+            <div>
+              <h3>Events Ingested</h3>
+              <div class="big" id="kpi-events">—</div>
+            </div>
+            <svg class="spark" id="spark-events"></svg>
+          </div>
+        </div>
+        <div class="card">
+          <div class="kpi">
+            <div>
+              <h3>Unique Sources</h3>
+              <div class="big" id="kpi-sources">—</div>
+            </div>
+            <svg class="spark" id="spark-sources"></svg>
+          </div>
+        </div>
+        <div class="card">
+          <div class="kpi">
+            <div>
+              <h3>Batches</h3>
+              <div class="big" id="kpi-batches">—</div>
+            </div>
+            <svg class="spark" id="spark-batches"></svg>
+          </div>
+        </div>
+        <div class="card">
+          <div class="kpi">
+            <div>
+              <h3>Threat Matches</h3>
+              <div class="big" id="kpi-threats">—</div>
+            </div>
+            <svg class="spark" id="spark-threats"></svg>
+          </div>
+        </div>
+        <div class="card">
+          <div class="kpi">
+            <div>
+              <h3>Avg Risk</h3>
+              <div class="big" id="kpi-risk">—</div>
+            </div>
+            <svg class="spark" id="spark-risk"></svg>
+          </div>
+        </div>
+        <div class="card">
+          <div class="kpi">
+            <div>
+              <h3>Queue Lag</h3>
+              <div class="big" id="kpi-lag">—</div>
+            </div>
+            <svg class="spark" id="spark-lag"></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="inline" style="justify-content:space-between;margin-bottom:8px">
+          <h3 style="color:var(--muted);margin:0">Events per Minute</h3>
+          <div class="small">Auto-refresh every 5s</div>
+        </div>
+        <canvas id="eventsChart" height="100"></canvas>
+      </div>
+    </div>
+
+    <!-- INGEST TEST -->
+    <div class="panel" id="panel-ingest">
+      <div class="split">
+        <div class="card">
+          <h3 style="color:var(--muted);margin-top:0">Sample Batch (JSON)</h3>
+          <textarea id="ingestBody" rows="12">[
+  {"ts": 1723290000, "src_ip": "10.0.0.10", "dst_ip": "1.1.1.1", "src_port": 12345, "dst_port": 53, "proto":"udp", "bytes": 84, "packets": 1, "app":"dns"}
+]</textarea>
+          <div class="row" style="margin-top:10px">
+            <button id="btnIngest">POST /v1/ingest</button>
+            <button class="mutebtn" id="btnIngestClear">Clear Log</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="color:var(--muted);margin-top:0">Response</h3>
+          <pre class="log" id="ingestLog"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- OUTPUTS -->
+    <div class="panel" id="panel-outputs">
+      <div class="split">
+        <div class="card">
+          <h3 style="color:var(--muted);margin-top:0">Configure Splunk Output</h3>
+          <label>HEC URL</label>
+          <input id="splunkUrl" placeholder="https://splunk.example.com:8088/services/collector" />
+          <label>HEC Token</label>
+          <input id="splunkToken" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+          <div class="row" style="margin-top:10px">
+            <button id="btnSaveSplunk">Save</button>
+            <button id="btnTestSplunk" class="mutebtn">Test</button>
+          </div>
+          <pre class="log" id="splunkLog"></pre>
+        </div>
+
+        <div class="card">
+          <h3 style="color:var(--muted);margin-top:0">Configure Elastic Output</h3>
+          <label>Elasticsearch URL</label>
+          <input id="esUrl" placeholder="https://es.example.com:9200" />
+          <label>Index</label>
+          <input id="esIndex" placeholder="telemetry-events" value="telemetry-events" />
+          <label>Username</label>
+          <input id="esUser" placeholder="elastic" />
+          <label>Password</label>
+          <input id="esPass" type="password" placeholder="********" />
+          <div class="row" style="margin-top:10px">
+            <button id="btnSaveElastic">Save</button>
+            <button id="btnTestElastic" class="mutebtn">Test</button>
+          </div>
+          <pre class="log" id="elasticLog"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOOKUP -->
+    <div class="panel" id="panel-lookup">
+      <div class="card">
+        <div class="row">
+          <div style="flex:1">
+            <label>IP / Domain</label>
+            <input id="lookupValue" placeholder="8.8.8.8" value="8.8.8.8" />
+          </div>
+          <div style="width:180px">
+            <label>Type</label>
+            <select id="lookupType">
+              <option value="ip">ip</option>
+              <option value="domain">domain</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button id="btnLookup">POST /v1/lookup</button>
+        </div>
+        <pre class="log" id="lookupLog"></pre>
+      </div>
+    </div>
+
+    <!-- SYSTEM -->
+    <div class="panel" id="panel-system">
+      <div class="split">
+        <div class="card">
+          <h3 style="color:var(--muted);margin-top:0">/metrics</h3>
+          <pre class="log" id="metricsLog">Ready.</pre>
+          <div class="row" style="margin-top:10px">
+            <button class="mutebtn" id="btnMetrics">Fetch /metrics</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="color:var(--muted);margin-top:0">/v1/health</h3>
+          <pre class="log" id="healthLog">Ready.</pre>
+        </div>
+      </div>
+      <div class="footer">Need help? Check README for curl tests. Values show "—" until metrics are available.</div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

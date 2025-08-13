@@ -10,6 +10,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app /app/app
 
+# Copy UI files
+COPY ops/stage4/ui /app/ui
+
 EXPOSE 8080
 ENV API_KEY=TEST_KEY
 

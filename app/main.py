@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Header, HTTPException, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from typing import Optional, List, Dict, Any
 import os
 import ipaddress
@@ -28,6 +29,10 @@ ELASTIC_USERNAME = os.getenv("ELASTIC_USERNAME")
 ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD")
 
 app = FastAPI(title="Live Network Threat Telemetry API (MVP)")
+
+# Mount static files for UI
+ui_dir = os.path.join(os.path.dirname(__file__), "..", "ui")
+app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
 
 # Enrichers are loaded once on startup
 geo = GeoIPEnricher(GEOIP_DB_CITY)
@@ -232,3 +237,7 @@ async def metrics(response: Response):
         "requests_failed": 0,
         "records_processed": 0
     }
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return FileResponse(os.path.join(ui_dir, "index.html"))

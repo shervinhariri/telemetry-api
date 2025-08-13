@@ -1,0 +1,21 @@
+services:
+  api:
+    image: telemetry-api:latest
+    # If building from source, use:
+    # build: ../../
+    container_name: telemetry-api
+    environment:
+      - API_KEYS=TEST_KEY
+      - LOG_LEVEL=info
+      - RETENTION_DAYS=7
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/v1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    volumes:
+      - ../../data:/data:ro
