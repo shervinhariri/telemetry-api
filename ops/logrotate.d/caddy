@@ -1,0 +1,12 @@
+/var/log/caddy/*.log {
+    daily
+    missingok
+    rotate 52
+    compress
+    delaycompress
+    notifempty
+    create 644 www-data www-data
+    postrotate
+        systemctl reload caddy
+    endscript
+}

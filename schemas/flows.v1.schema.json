@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Network Flows v1",
+  "description": "Schema for network flow data",
+  "type": "object",
+  "required": ["collector_id", "format", "records"],
+  "properties": {
+    "collector_id": {
+      "type": "string",
+      "description": "Identifier for the data collector"
+    },
+    "format": {
+      "type": "string",
+      "enum": ["flows.v1"],
+      "description": "Data format version"
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ts", "src_ip", "dst_ip", "src_port", "dst_port", "protocol"],
+        "properties": {
+          "ts": {
+            "type": "number",
+            "description": "Timestamp in Unix epoch seconds"
+          },
+          "src_ip": {
+            "type": "string",
+            "format": "ipv4",
+            "description": "Source IP address"
+          },
+          "dst_ip": {
+            "type": "string",
+            "format": "ipv4",
+            "description": "Destination IP address"
+          },
+          "src_port": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "Source port number"
+          },
+          "dst_port": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "Destination port number"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": ["tcp", "udp", "icmp"],
+            "description": "Protocol"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total bytes transferred"
+          },
+          "packets": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total packets transferred"
+          }
+        }
+      }
+    }
+  }
+}

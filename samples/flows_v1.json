@@ -1,0 +1,16 @@
+{
+  "collector_id": "lab-flows-1",
+  "format": "flows.v1",
+  "records": [
+    {
+      "ts": 1723351200.456,
+      "src_ip": "192.168.1.100",
+      "dst_ip": "1.1.1.1",
+      "src_port": 12345,
+      "dst_port": 80,
+      "protocol": "tcp",
+      "bytes": 1024,
+      "packets": 10
+    }
+  ]
+}
