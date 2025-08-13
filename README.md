@@ -1,33 +1,46 @@
-# Live Network Threat Telemetry API — MVP (Stage 4)
+# Live Network Threat Telemetry API
 
-[![Docker CI](https://github.com/shervinhariri/telemetry-api/actions/workflows/docker.yml/badge.svg)](https://github.com/shervinhariri/telemetry-api/actions/workflows/docker.yml)
+Local-first MVP to ingest NetFlow/IPFIX and Zeek JSON, enrich with GeoIP/ASN + threat intel, apply basic risk scoring, and ship SIEM-ready outputs.
 
-Production-ready telemetry API that ingests **Zeek `conn.log` JSON** and **network flows**, enriches with GeoIP/ASN + threat intelligence, and returns enriched JSON with risk scoring.
+![Build](https://github.com/shervinhariri/telemetry-api/actions/workflows/docker.yml/badge.svg)
 
-**Stage 4 Pro Dashboard**: Single-container deployment with modern web dashboard, real-time metrics visualization, and comprehensive API testing interface.
+## Project Stages & Status
 
-## 🎯 Stage Progression
+- ✅ **Step 1: MVP Scope** — Inputs: NetFlow/IPFIX JSON (nfdump, pmacct, ntopng), Zeek JSON logs (conn.log, dns.log, ssl.log). Enrichments: GeoIP (MaxMind GeoLite2), ASN (Team Cymru), threat intel match, basic risk scoring (0–100). Outputs: Splunk HEC, Elastic bulk JSON, JSON download. Retention: 7 days. Exclusions: PCAP headers, TLS JA3, anomaly ML, QRadar, Datadog, Kafka.
 
-- **Stage 1**: Basic API endpoints and data structures
-- **Stage 2**: Contract alignment with all required endpoints
-- **Stage 3**: Production deployment and testing framework
-- **Stage 4**: **Pro Dashboard** - Single container with web UI
+- ✅ **Step 2: Data Models & API Contract** — Base URL: `/v1`, Bearer auth, endpoints: `/health`, `/ingest`, `/lookup`, `/outputs/splunk`, `/outputs/elastic`, `/alerts/rules`, `/metrics`. Input schemas: flows.v1 JSON, zeek.conn.v1, zeek.dns.v1. Output schema: enriched JSON with src/dst IP, ASN, GeoIP, threat matches, risk score, tags. Limits: max batch 5MB gzipped, 10k records, 600 req/min.
 
-## 🚀 Quick Start
+- ✅ **Step 3: Contract Alignment** — Containerized MVP build, verified API endpoints, schema validation, sample data ingestion working, CI pipeline added. Prepared for production deployment.
 
-### Stage 4 Dashboard (Single Container)
+- 🟣 **Step 4: Open-Source Launch (current)** — Single container (API + Dashboard UI) with health, metrics, ingest, lookup, and output configuration in GUI. On-prem/cloud ready, Docker Hub publishing with `latest` and version tags. Focus on adoption via free open-source release.
+
+> Current version: **v0.4.0** (Stage 4 GUI + single container).  
+> Docs for Steps 1–2 are in `/docs/` and PDFs.
+
+## Quickstart
 ```bash
-cd ops/stage4
-docker compose up -d
-open http://localhost:8080  # Modern web dashboard
+# run single container (API + UI)
+docker run -d -p 8080:8080 \
+  -e API_KEYS=TEST_KEY \
+  --name telemetry-api shervinhariri/telemetry-api:latest
+
+# open UI
+open http://localhost:8080
+
+# health
+curl -s http://localhost:8080/v1/health -H "Authorization: Bearer TEST_KEY" | jq .
+
+# ingest a sample
+curl -s -X POST http://localhost:8080/v1/ingest \
+  -H "Authorization: Bearer TEST_KEY" \
+  -H "Content-Type: application/json" \
+  --data @samples/zeek_conn.json | jq .
 ```
 
-### Production Deployment (3 steps)
-```bash
-./scripts/bootstrap.sh
-cp .env.example .env  # edit values
-./scripts/deploy.sh
-```
+## Release & Images
+Docker Hub: shervinhariri/telemetry-api:latest, shervinhariri/telemetry-api:v0.4.0
+
+GitHub Tags: v0.4.0 (Stage 4)
 
 ### Validation
 ```bash
