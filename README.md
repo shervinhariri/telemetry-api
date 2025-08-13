@@ -1,12 +1,26 @@
-# Live Network Threat Telemetry API — MVP (Stage 3)
+# Live Network Threat Telemetry API — MVP (Stage 4)
 
 [![Docker CI](https://github.com/shervinhariri/telemetry-api/actions/workflows/docker.yml/badge.svg)](https://github.com/shervinhariri/telemetry-api/actions/workflows/docker.yml)
 
 Production-ready telemetry API that ingests **Zeek `conn.log` JSON** and **network flows**, enriches with GeoIP/ASN + threat intelligence, and returns enriched JSON with risk scoring.
 
-**Stage 3 Contract Alignment**: This version is fully aligned with Step 1-2 specifications, including all required endpoints, rate limiting, JSON schemas, and comprehensive testing.
+**Stage 4 Pro Dashboard**: Single-container deployment with modern web dashboard, real-time metrics visualization, and comprehensive API testing interface.
+
+## 🎯 Stage Progression
+
+- **Stage 1**: Basic API endpoints and data structures
+- **Stage 2**: Contract alignment with all required endpoints
+- **Stage 3**: Production deployment and testing framework
+- **Stage 4**: **Pro Dashboard** - Single container with web UI
 
 ## 🚀 Quick Start
+
+### Stage 4 Dashboard (Single Container)
+```bash
+cd ops/stage4
+docker compose up -d
+open http://localhost:8080  # Modern web dashboard
+```
 
 ### Production Deployment (3 steps)
 ```bash
@@ -72,6 +86,19 @@ curl -s -X POST http://localhost:8080/v1/ingest \
 python -m pytest tests/test_api.py -v
 python tests/validate_schemas.py
 ```
+
+## 🎨 Stage 4 Dashboard Features
+
+- **Modern Dark Theme** with responsive design
+- **Real-time KPI Cards** with sparklines (Events, Sources, Batches, Threats, Risk, Lag)
+- **Interactive Charts** using Chart.js (Events per minute)
+- **API Testing Interface** with tabs for:
+  - Ingest Test (JSON batch testing)
+  - Outputs (Splunk/Elastic configuration)
+  - Lookup (IP/domain enrichment)
+  - System (Health and metrics)
+- **Auto-refresh** every 5 seconds
+- **Bearer Authentication** support
 
 ## 🔗 API Endpoints
 
