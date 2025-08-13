@@ -14,9 +14,11 @@ Local-first MVP to ingest NetFlow/IPFIX and Zeek JSON, enrich with GeoIP/ASN + t
 
 - ✅ **Step 4: Open-Source Launch** — Single container (API + Dashboard UI) with health, metrics, ingest, lookup, and output configuration in GUI. On-prem/cloud ready, Docker Hub publishing with `latest` and version tags. Focus on adoption via free open-source release.
 
-- 🟣 **Step 5: Production-Ready Ingest Pipeline (current)** — Robust ingest endpoint with queue-based processing, gzip support, proper error handling (4xx/5xx), and background worker pipeline. Accepts raw JSON arrays and wrapped `{"records": [...]}` format. Backpressure handling with 429 responses. Foundation for Stage 5.2 output connectors.
+- ✅ **Step 5: Production-Ready Ingest Pipeline** — Robust ingest endpoint with queue-based processing, gzip support, proper error handling (4xx/5xx), and background worker pipeline. Accepts raw JSON arrays and wrapped `{"records": [...]}` format. Backpressure handling with 429 responses.
 
-> Current version: **v0.5.0** (Stage 5 robust ingest + queue pipeline).  
+- 🟣 **Step 5.1: Version Management & Output Connectors (current)** — Version badge with update notifications, Docker Hub integration, Stage 5.1 output connector configuration endpoints (Splunk HEC, Elastic bulk), and dev-safe update mechanism. Foundation for Stage 5.2 dispatcher wiring.
+
+> Current version: **v0.5.1** (Patch 5.1 - version management + output connectors).  
 > Docs for Steps 1–2 are in `/docs/` and PDFs.
 
 ## Quickstart
@@ -53,9 +55,9 @@ echo '[{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1"}]' | gzip | c
 ```
 
 ## Release & Images
-Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.5.0
+Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.5.1
 
-GitHub Tags: v0.5.0 (Stage 5)
+GitHub Tags: v0.5.1 (Patch 5.1)
 
 ### Validation
 ```bash
@@ -97,10 +99,67 @@ GitHub Tags: v0.5.0 (Stage 5)
 
 ### API Endpoints
 - **`/v1/health`**: Public health check (no auth required)
+- **`/v1/version`**: Version information and metadata
+- **`/v1/updates/check`**: Docker Hub update availability check
 - **`/v1/ingest`**: Robust ingest with queue processing
 - **`/v1/metrics`**: Queue depth and processing metrics
 - **`/v1/lookup`**: IP/domain enrichment (requires auth)
-- **`/v1/outputs/*`**: Output configuration (requires auth)
+- **`/v1/outputs/splunk`**: Splunk HEC configuration (requires auth)
+- **`/v1/outputs/elastic`**: Elasticsearch configuration (requires auth)
+- **`/v1/admin/update`**: Dev-only image update (requires admin token)
+
+## 🚀 Patch 5.1 Features
+
+### Version Management & Update Notifications
+- **Version Badge**: Real-time version display in GUI with update notifications
+- **Docker Hub Integration**: Automatic checking for newer images every 60 seconds
+- **Update Notifications**: Green badge = up-to-date, Amber badge = update available
+- **Dev-Safe Updates**: One-click image pulling with admin token (development only)
+- **Production Updates**: Watchtower integration for automatic container updates
+
+### Stage 5.1 Output Connectors
+- **Splunk HEC Configuration**: Full HEC endpoint configuration with batching and retry settings
+- **Elasticsearch Configuration**: Multi-node Elasticsearch setup with bulk indexing
+- **Configuration Persistence**: In-memory storage of connector settings
+- **Validation**: Pydantic models ensure proper configuration format
+- **API Contract Compliance**: Implements Step-2 contract endpoints exactly
+
+### Update Mechanisms
+```bash
+# Check version
+curl -s http://localhost:8080/v1/version
+
+# Check for updates
+curl -s http://localhost:8080/v1/updates/check
+
+# Dev-only: pull latest image
+curl -s -X POST http://localhost:8080/v1/admin/update -H "X-Admin-Token: $ADMIN_TOKEN"
+
+# Configure Splunk HEC
+curl -s -X POST http://localhost:8080/v1/outputs/splunk \
+  -H "Authorization: Bearer TEST_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{"hec_url":"https://splunk.example:8088/services/collector","token":"***","index":"telemetry"}'
+
+# Configure Elasticsearch
+curl -s -X POST http://localhost:8080/v1/outputs/elastic \
+  -H "Authorization: Bearer TEST_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{"urls":["https://es1:9200"],"index_prefix":"telemetry-","bulk_size":1000}'
+```
+
+### Production Deployment
+For production environments, use Watchtower for automatic updates:
+```yaml
+# docker-compose.yml
+services:
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --cleanup --interval 60 telemetry-api
+```
 
 ## 🧪 Development & Testing
 
