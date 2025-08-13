@@ -10,30 +10,33 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write           # needed for GHCR
-      id-token: write
+      packages: write   # for GHCR mirror; safe to keep
     env:
       IMAGE_NAME: telemetry-api
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Validate Docker Hub secrets
         run: |
           if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ] || [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-            echo "::error::Missing DOCKERHUB_USERNAME or DOCKERHUB_TOKEN repository secrets"
+            echo "::error::Missing DOCKERHUB_USERNAME or DOCKERHUB_TOKEN"
             exit 1
           fi
-          echo "✓ Secrets present"
+          echo "Will push to Docker Hub: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}"
 
-      - name: Resolve image names
-        id: img
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Echo who we are and try a pull (soft)
         run: |
-          echo "DH_OWNER=${{ secrets.DOCKERHUB_USERNAME }}" >> $GITHUB_OUTPUT
-          echo "DH_REPO=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}" >> $GITHUB_OUTPUT
-          echo "GHCR_REPO=ghcr.io/${{ github.repository }}" >> $GITHUB_OUTPUT
-          echo "Will push Docker Hub: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}"
-          echo "Will push GHCR: ghcr.io/${{ github.repository }}"
+          echo "Logged in as: ${{ secrets.DOCKERHUB_USERNAME }}"
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:nonexistent || true
 
       - name: Extract version
         id: ver
@@ -43,24 +46,6 @@ jobs:
           else
             echo "VERSION=v0.4.0" >> $GITHUB_OUTPUT
           fi
-          echo "Resolved VERSION=${{ steps.ver.outputs.VERSION }}"
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Probe Docker Hub permissions (soft)
-        run: |
-          docker pull ${{ steps.img.outputs.DH_REPO }}:nonexistent || true
-          echo "Docker Hub login OK: pushing next step"
 
       - name: Build & push to Docker Hub
         uses: docker/build-push-action@v6
@@ -69,25 +54,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ steps.img.outputs.DH_REPO }}:latest
-            ${{ steps.img.outputs.DH_REPO }}:${{ steps.ver.outputs.VERSION }}
-          cache-from: type=registry,ref=${{ steps.img.outputs.DH_REPO }}:buildcache
-          cache-to: type=registry,ref=${{ steps.img.outputs.DH_REPO }}:buildcache,mode=max
-
-      # Mirror to GHCR for reliability
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build & push to GHCR
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ steps.img.outputs.GHCR_REPO }}:latest
-            ${{ steps.img.outputs.GHCR_REPO }}:${{ steps.ver.outputs.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.VERSION }}
