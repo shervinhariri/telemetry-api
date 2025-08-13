@@ -161,7 +161,7 @@ async function refresh(){
 // ---------- Button Handlers ----------
 function initHandlers(){
   $("btnHealth").onclick = async () => {
-    const r = await call("/v1/health", { headers: authHeader() });
+    const r = await call("/v1/health");
     $("healthLog").textContent = `[${r.status}]\n${r.body}`;
   };
 

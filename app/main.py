@@ -122,7 +122,7 @@ def write_deadletter(payload: Dict[str, Any], reason: str):
 @app.get(f"{API_PREFIX}/health")
 async def health(response: Response):
     add_version_header(response)
-    return {"status": "ok"}
+    return {"status": "ok", "service": "telemetry-api", "version": "v1"}
 
 @app.get(f"{API_PREFIX}/version")
 async def version(response: Response):
