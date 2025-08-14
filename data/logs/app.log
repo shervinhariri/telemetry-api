@@ -56,3 +56,767 @@
 2025-08-13 22:38:58,666 - root - INFO - Metrics ticker started
 2025-08-13 22:38:58,666 - root - INFO - Pipeline worker started
 2025-08-13 22:38:58,666 - root - INFO - Pipeline worker started
+2025-08-14 08:45:44,283 - root - INFO - Shutting down pipeline workers
+2025-08-14 08:46:15,273 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 08:46:15,278 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 08:46:15,278 - root - INFO - Metrics ticker started
+2025-08-14 08:46:15,278 - root - INFO - Pipeline worker started
+2025-08-14 08:46:15,278 - root - INFO - Pipeline worker started
+2025-08-14 08:51:35,871 - root - INFO - Shutting down pipeline workers
+2025-08-14 08:51:46,257 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 08:51:46,263 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 08:51:46,263 - root - INFO - Metrics ticker started
+2025-08-14 08:51:46,263 - root - INFO - Pipeline worker started
+2025-08-14 08:51:46,263 - root - INFO - Pipeline worker started
+2025-08-14 08:52:28,031 - root - INFO - Shutting down pipeline workers
+2025-08-14 08:52:28,862 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 08:52:28,867 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 08:52:28,867 - root - INFO - Metrics ticker started
+2025-08-14 08:52:28,867 - root - INFO - Pipeline worker started
+2025-08-14 08:52:28,867 - root - INFO - Pipeline worker started
+2025-08-14 08:53:24,390 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 08:53:51,102 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 08:53:51,111 - httpx - INFO - HTTP Request: GET http://testserver/v1/metrics "HTTP/1.1 200 OK"
+2025-08-14 08:55:10,021 - root - INFO - Shutting down pipeline workers
+2025-08-14 08:55:11,361 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 08:55:11,367 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 08:55:11,367 - root - INFO - Metrics ticker started
+2025-08-14 08:55:11,367 - root - INFO - Pipeline worker started
+2025-08-14 08:55:11,367 - root - INFO - Pipeline worker started
+2025-08-14 08:56:43,092 - root - INFO - Shutting down pipeline workers
+2025-08-14 08:56:44,140 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 08:56:44,145 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 08:56:44,145 - root - INFO - Metrics ticker started
+2025-08-14 08:56:44,145 - root - INFO - Pipeline worker started
+2025-08-14 08:56:44,146 - root - INFO - Pipeline worker started
+2025-08-14 08:57:35,128 - root - INFO - Shutting down pipeline workers
+2025-08-14 08:57:35,929 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 08:57:35,934 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 08:57:35,934 - root - INFO - Metrics ticker started
+2025-08-14 08:57:35,934 - root - INFO - Pipeline worker started
+2025-08-14 08:57:35,935 - root - INFO - Pipeline worker started
+2025-08-14 08:58:03,910 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:58:03,915 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:58:03,915 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,594 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,596 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,597 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,597 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,598 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,598 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,599 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,600 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,600 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,601 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,601 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,602 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,602 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,603 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,603 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,604 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,604 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,604 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,604 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,605 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,605 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,605 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,606 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,606 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,606 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,606 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,607 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,607 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,607 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,608 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,608 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,608 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,609 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,609 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,609 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,609 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,610 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,610 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,610 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,611 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,611 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,611 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,612 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,612 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,612 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,613 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,613 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,613 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,614 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,614 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,614 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,614 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,615 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,615 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,615 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,616 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,616 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,616 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,616 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,617 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,617 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,617 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,618 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,618 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,618 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,619 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,619 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,619 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,620 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,620 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,620 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,620 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,621 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,621 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,621 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,621 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,622 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,622 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,622 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,623 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,623 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,623 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,623 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,623 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,624 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,624 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,624 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,624 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,625 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,625 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,625 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,626 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,626 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,626 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,626 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,626 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,627 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,627 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,627 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 08:59:21,627 - root - ERROR - Worker failed processing record: cannot access local variable 'record_event' where it is not associated with a value
+Traceback (most recent call last):
+  File "/app/app/pipeline.py", line 169, in worker_loop
+    record_event(risk_score, len(ti_matches))
+    ^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'record_event' where it is not associated with a value
+2025-08-14 09:02:06,385 - root - INFO - Shutting down pipeline workers
+2025-08-14 09:02:07,758 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 09:02:07,764 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 09:02:07,764 - root - INFO - Metrics ticker started
+2025-08-14 09:02:07,765 - root - INFO - Pipeline worker started
+2025-08-14 09:02:07,765 - root - INFO - Pipeline worker started
+2025-08-14 09:03:26,310 - root - INFO - Shutting down pipeline workers
+2025-08-14 09:03:27,228 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 09:03:27,233 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 09:03:27,233 - root - INFO - Metrics ticker started
+2025-08-14 09:03:27,233 - root - INFO - Pipeline worker started
+2025-08-14 09:03:27,233 - root - INFO - Pipeline worker started
+2025-08-14 09:03:54,236 - root - INFO - Shutting down pipeline workers
+2025-08-14 09:03:56,781 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 09:03:56,787 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 09:03:56,787 - root - INFO - Metrics ticker started
+2025-08-14 09:03:56,787 - root - INFO - Pipeline worker started
+2025-08-14 09:03:56,787 - root - INFO - Pipeline worker started
+2025-08-14 09:07:42,465 - root - INFO - Shutting down pipeline workers
+2025-08-14 09:08:52,227 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 09:08:52,233 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 09:08:52,233 - root - INFO - Metrics ticker started
+2025-08-14 09:08:52,233 - root - INFO - Pipeline worker started
+2025-08-14 09:08:52,233 - root - INFO - Pipeline worker started
+2025-08-14 09:18:15,375 - root - INFO - Shutting down pipeline workers
+2025-08-14 09:19:34,652 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 09:19:34,658 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 09:19:34,658 - root - INFO - Metrics ticker started
+2025-08-14 09:19:34,658 - root - INFO - Pipeline worker started
+2025-08-14 09:19:34,658 - root - INFO - Pipeline worker started
+2025-08-14 09:20:45,449 - root - INFO - Shutting down pipeline workers
+2025-08-14 09:20:46,818 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 09:20:46,824 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 09:20:46,824 - root - INFO - Metrics ticker started
+2025-08-14 09:20:46,824 - root - INFO - Pipeline worker started
+2025-08-14 09:20:46,824 - root - INFO - Pipeline worker started
+2025-08-14 09:23:43,694 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 09:24:44,213 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 09:25:44,210 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 09:26:09,177 - root - INFO - Shutting down pipeline workers
+2025-08-14 09:54:49,280 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 09:54:49,288 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 09:54:49,288 - root - INFO - Metrics ticker started
+2025-08-14 09:54:49,289 - root - INFO - Pipeline worker started
+2025-08-14 09:54:49,289 - root - INFO - Pipeline worker started
+2025-08-14 09:57:50,687 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 09:58:51,156 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 09:59:51,168 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:00:51,193 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:01:51,157 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:02:51,158 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:03:51,525 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:04:51,157 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:04:57,430 - root - INFO - Shutting down pipeline workers
+2025-08-14 10:06:17,272 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 10:06:17,278 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 10:06:17,279 - root - INFO - Metrics ticker started
+2025-08-14 10:06:17,279 - root - INFO - Pipeline worker started
+2025-08-14 10:06:17,279 - root - INFO - Pipeline worker started
+2025-08-14 10:06:51,155 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:07:51,178 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:08:51,273 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:09:51,169 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:10:51,156 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:11:51,167 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:12:51,132 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:13:51,139 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:14:51,155 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:15:51,169 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:20:52,034 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:21:51,448 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:22:51,121 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:23:51,310 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:24:51,177 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:25:51,415 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:26:51,128 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:27:51,133 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:28:51,148 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:29:35,562 - root - INFO - Shutting down pipeline workers
+2025-08-14 10:30:31,399 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 10:30:31,405 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 10:30:31,405 - root - INFO - Metrics ticker started
+2025-08-14 10:30:31,405 - root - INFO - Pipeline worker started
+2025-08-14 10:30:31,405 - root - INFO - Pipeline worker started
+2025-08-14 10:30:51,149 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:31:51,609 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:32:02,028 - root - INFO - Shutting down pipeline workers
+2025-08-14 10:32:04,534 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 10:32:04,540 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 10:32:04,540 - root - INFO - Metrics ticker started
+2025-08-14 10:32:04,540 - root - INFO - Pipeline worker started
+2025-08-14 10:32:04,540 - root - INFO - Pipeline worker started
+2025-08-14 10:32:50,576 - root - INFO - Shutting down pipeline workers
+2025-08-14 10:32:53,066 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 10:32:53,072 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 10:32:53,072 - root - INFO - Metrics ticker started
+2025-08-14 10:32:53,072 - root - INFO - Pipeline worker started
+2025-08-14 10:32:53,073 - root - INFO - Pipeline worker started
+2025-08-14 10:33:51,191 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:34:51,157 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:35:18,332 - root - INFO - Shutting down pipeline workers
+2025-08-14 10:35:21,311 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 10:35:21,317 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 10:35:21,317 - root - INFO - Metrics ticker started
+2025-08-14 10:35:21,317 - root - INFO - Pipeline worker started
+2025-08-14 10:35:21,317 - root - INFO - Pipeline worker started
+2025-08-14 10:35:51,148 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"

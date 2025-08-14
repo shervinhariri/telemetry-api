@@ -171,8 +171,14 @@ class MetricsAggregator:
             }
             
     def record_event(self, risk_score: int, threat_matches: int):
-        """Record a single event for window tracking"""
+        """Record a single event for window tracking and totals"""
         with self.lock:
+            # Update totals
+            self.totals["events"] += 1
+            self.totals["threat_matches"] += threat_matches
+            self.totals["risk_sum"] += risk_score
+            self.totals["risk_count"] += 1
+            
             # Add to sliding windows
             self.eps_window.append(1)  # 1 event this second
             if threat_matches > 0:

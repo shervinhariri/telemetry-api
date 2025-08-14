@@ -13,7 +13,9 @@ import threading
 from .enrich.geo import enrich_geo_asn
 from .enrich.ti import match_ip, match_domain
 from .enrich.risk import score
-from .metrics import record_batch, record_queue_lag, record_event, tick
+
+# Import metrics functions
+from .metrics import record_event, record_queue_lag
 
 # Global state (keeping for backward compatibility)
 STATS = {
@@ -55,27 +57,16 @@ def enqueue(record: Dict[str, Any]):
         raise
 
 def enqueue_batch(records: List[Dict[str, Any]]):
-    """Enqueue a batch of records and record metrics"""
+    """Enqueue a batch of records for processing"""
     enqueued = 0
-    threat_matches = 0
-    risk_scores = []
-    sources = []
     
     for record in records:
         try:
             enqueue(record)
             enqueued += 1
-            
-            # Extract data for batch metrics
-            src_ip = record.get('src_ip') or record.get('id_orig_h')
-            if src_ip:
-                sources.append(src_ip)
-                
         except asyncio.QueueFull:
             break
     
-    # Record batch metrics
-    record_batch(len(records), threat_matches, risk_scores, sources)
     return enqueued
 
 def _enrich_record(record: Dict[str, Any]) -> Dict[str, Any]:
@@ -159,9 +150,17 @@ async def worker_loop():
                 # Extract data for metrics
                 ti_matches = enriched.get('ti', {}).get('matches', [])
                 risk_score = enriched.get('risk_score', 0)
+                src_ip = record.get('src_ip') or record.get('id_orig_h')
                 
-                # Record event for metrics (only once)
+                # Record event for metrics (this now updates totals)
                 record_event(risk_score, len(ti_matches))
+                
+                # Record unique sources
+                if src_ip:
+                    # Update unique sources directly
+                    from .metrics import metrics
+                    with metrics.lock:
+                        metrics.totals["unique_sources"].add(src_ip)
                 
                 # Append to daily NDJSON
                 _append_ndjson(enriched)
