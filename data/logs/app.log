@@ -820,3 +820,256 @@ UnboundLocalError: cannot access local variable 'record_event' where it is not a
 2025-08-14 10:35:21,317 - root - INFO - Pipeline worker started
 2025-08-14 10:35:21,317 - root - INFO - Pipeline worker started
 2025-08-14 10:35:51,148 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:36:51,185 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 500 Internal Server Error"
+2025-08-14 10:37:51,140 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:38:51,145 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:39:51,146 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:40:51,158 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:41:51,133 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:42:51,285 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:43:51,115 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:44:51,127 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:45:51,353 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:46:51,223 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:47:51,216 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:48:51,223 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:49:51,246 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:50:51,188 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:51:51,307 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:52:51,254 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:53:51,287 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:54:51,250 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:55:51,240 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:56:51,251 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:57:51,227 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:58:51,201 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 10:59:51,240 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 11:00:51,262 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 11:01:51,200 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 11:02:43,398 - root - INFO - Shutting down pipeline workers
+2025-08-14 11:06:54,565 - root - INFO - Logging configured - level: INFO, file: /data/logs/app.log
+2025-08-14 11:06:54,571 - root - INFO - Stage 6 pipeline workers started (2x)
+2025-08-14 11:06:54,571 - root - INFO - Metrics ticker started
+2025-08-14 11:06:54,572 - root - INFO - Pipeline worker started
+2025-08-14 11:06:54,572 - root - INFO - Pipeline worker started
+2025-08-14 11:07:08,129 - root - INFO - Processing event: risk_score=70, threat_matches=1
+2025-08-14 11:07:08,130 - root - INFO - Event recorded successfully
+2025-08-14 11:07:08,131 - root - INFO - Processing event: risk_score=70, threat_matches=1
+2025-08-14 11:07:08,131 - root - INFO - Event recorded successfully
+2025-08-14 11:07:08,132 - root - INFO - Processing event: risk_score=70, threat_matches=1
+2025-08-14 11:07:08,132 - root - INFO - Event recorded successfully
+2025-08-14 11:07:08,132 - root - INFO - Processing event: risk_score=70, threat_matches=1
+2025-08-14 11:07:08,132 - root - INFO - Event recorded successfully
+2025-08-14 11:07:08,133 - root - INFO - Processing event: risk_score=70, threat_matches=1
+2025-08-14 11:07:08,133 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,173 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,173 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,175 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,175 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,176 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,177 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,177 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,177 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,178 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,178 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,179 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,179 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,180 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,180 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,180 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,181 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,181 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,181 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,182 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,182 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,183 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,183 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,183 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,183 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,184 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,184 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,184 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,184 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,185 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,185 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,185 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,186 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,186 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,186 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,187 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,187 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,188 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,189 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,189 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,189 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,190 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,190 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,190 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,191 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,191 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,191 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,192 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,192 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,192 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,192 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,193 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,193 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,193 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,193 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,194 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,194 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,194 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,194 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,195 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,195 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,195 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,195 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,195 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,196 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,196 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,196 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,196 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,196 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,197 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,197 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,197 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,197 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,198 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,198 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,198 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,198 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,198 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,199 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,199 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,199 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,199 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,199 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,200 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,200 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,200 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,200 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,201 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,201 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,201 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,201 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,202 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,202 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,203 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,203 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,203 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,203 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,204 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,204 - root - INFO - Event recorded successfully
+2025-08-14 11:07:13,204 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:13,204 - root - INFO - Event recorded successfully
+2025-08-14 11:07:50,040 - root - INFO - Processing event: risk_score=70, threat_matches=1
+2025-08-14 11:07:50,042 - root - INFO - Event recorded successfully
+2025-08-14 11:07:50,047 - root - INFO - Processing event: risk_score=70, threat_matches=1
+2025-08-14 11:07:50,048 - root - INFO - Event recorded successfully
+2025-08-14 11:07:50,048 - root - INFO - Processing event: risk_score=70, threat_matches=1
+2025-08-14 11:07:50,048 - root - INFO - Event recorded successfully
+2025-08-14 11:07:50,049 - root - INFO - Processing event: risk_score=70, threat_matches=1
+2025-08-14 11:07:50,049 - root - INFO - Event recorded successfully
+2025-08-14 11:07:50,049 - root - INFO - Processing event: risk_score=70, threat_matches=1
+2025-08-14 11:07:50,049 - root - INFO - Event recorded successfully
+2025-08-14 11:07:51,296 - httpx - INFO - HTTP Request: GET https://hub.docker.com/v2/repositories/shvin/telemetry-api/tags?page_size=1 "HTTP/1.1 200 OK"
+2025-08-14 11:07:55,118 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,118 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,119 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,120 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,121 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,121 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,122 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,122 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,122 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,123 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,123 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,123 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,124 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,124 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,129 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,133 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,135 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,136 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,138 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,138 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,139 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,139 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,140 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,140 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,141 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,141 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,141 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,141 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,142 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,142 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,142 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,143 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,143 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,143 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,144 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,144 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,144 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,145 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,145 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,145 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,146 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,146 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,146 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,147 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,147 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,147 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,148 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,148 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,149 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,150 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,151 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,151 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,152 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,152 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,153 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,153 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,154 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,154 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,154 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,154 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,155 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,155 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,156 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,156 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,156 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,156 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,157 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,157 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,157 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,157 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,158 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,158 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,158 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,158 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,159 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,159 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,159 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,159 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,159 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,160 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,160 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,160 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,161 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,161 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,161 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,161 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,162 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,162 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,162 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,162 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,163 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,163 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,163 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,163 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,164 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,164 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,164 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,164 - root - INFO - Event recorded successfully
+2025-08-14 11:07:55,164 - root - INFO - Processing event: risk_score=10, threat_matches=0
+2025-08-14 11:07:55,165 - root - INFO - Event recorded successfully

@@ -153,7 +153,9 @@ async def worker_loop():
                 src_ip = record.get('src_ip') or record.get('id_orig_h')
                 
                 # Record event for metrics (this now updates totals)
+                logging.info(f"Processing event: risk_score={risk_score}, threat_matches={len(ti_matches)}")
                 record_event(risk_score, len(ti_matches))
+                logging.info(f"Event recorded successfully")
                 
                 # Record unique sources
                 if src_ip:

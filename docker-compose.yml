@@ -5,7 +5,7 @@ services:
     image: ${API_IMAGE:-shvin/telemetry-api:latest}
     env_file: .env
     environment:
-      - APP_VERSION=0.6.1
+      - APP_VERSION=0.6.2
       - GEOIP_CITY_DB=/data/geo/GeoLite2-City.mmdb
       - GEOIP_ASN_DB=/data/geo/GeoLite2-ASN.mmdb
       - TI_PATH=/data/ti/indicators.txt
@@ -14,8 +14,8 @@ services:
       - ENRICH_ENABLE_TI=true
       - EXPORT_ELASTIC_ENABLED=false
       - EXPORT_SPLUNK_ENABLED=false
-    expose:
-      - "8080"
+    ports:
+      - "80:8080"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/v1/health')"]
       interval: 10s
@@ -27,30 +27,3 @@ services:
       - ./data:/data
       - ./geo:/data/geo:ro
       - ./ti:/data/ti:ro
-    networks:
-      - telemetry_network
-
-  caddy:
-    image: caddy:2-alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-      - ./logs:/var/log/caddy
-    depends_on:
-      api:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - telemetry_network
-
-volumes:
-  caddy_data:
-  caddy_config:
-
-networks:
-  telemetry_network:
-    driver: bridge
