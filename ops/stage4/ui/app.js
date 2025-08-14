@@ -2,19 +2,30 @@ const $ = (id) => document.getElementById(id);
 
 // ---------- Hardened Tab Initialization ----------
 function initTabs(){
+  console.log("Initializing tabs...");
   const tabs = document.querySelectorAll(".tab");
   const panels = document.querySelectorAll(".panel");
+  console.log("Found tabs:", tabs.length, "panels:", panels.length);
+  
   if (!tabs.length || !panels.length) {
     console.warn("Tab init: no tabs/panels found");
     return;
   }
+  
   tabs.forEach(t => {
+    console.log("Setting up tab:", t.dataset.tab);
     t.onclick = () => {
+      console.log("Tab clicked:", t.dataset.tab);
       tabs.forEach(x => x.classList.remove("active"));
       panels.forEach(x => x.classList.remove("active"));
       t.classList.add("active");
       const pane = document.getElementById("panel-" + t.dataset.tab);
-      if (pane) pane.classList.add("active");
+      if (pane) {
+        pane.classList.add("active");
+        console.log("Activated panel:", "panel-" + t.dataset.tab);
+      } else {
+        console.error("Panel not found:", "panel-" + t.dataset.tab);
+      }
       // optional deep-link
       try { location.hash = "#tab=" + t.dataset.tab; } catch {}
     };
@@ -121,39 +132,40 @@ function updateChart(v){
 
 // ---------- Refresh metrics loop ----------
 async function refresh(){
-  const mres = await call("/v1/metrics");
-  if (!mres.ok) { $("metricsLog").textContent = `[${mres.status}] Failed to fetch`; return; }
-  $("metricsLog").textContent = mres.raw;
-
-  // Parse JSON response instead of Prometheus format
-  let metrics;
   try {
-    metrics = JSON.parse(mres.raw);
-  } catch (e) {
-    console.error("Failed to parse metrics JSON:", e);
-    return;
-  }
+    console.log("=== REFRESH START ===");
+    
+    // Get requests summary for dashboard
+    const requestsSummary = await refreshRequestsSummary();
+    console.log("Requests summary:", requestsSummary);
+    
+    // Get metrics for additional data
+    const mres = await call("/v1/metrics");
+    console.log("Metrics response:", mres);
+    let metrics = {};
+    if (mres.ok) {
+      try {
+        metrics = JSON.parse(mres.raw);
+        console.log("Parsed metrics:", metrics);
+      } catch (e) {
+        console.error("Failed to parse metrics JSON:", e);
+      }
+    }
 
-  // Extract values from new JSON structure
-  const ingestTotal = metrics.records_processed || 0;
-  const threatsTotal = metrics.totals?.threat_matches || 0;
-  const riskSum = metrics.totals?.risk_sum || 0;
-  const riskCount = metrics.totals?.risk_count || 0;
-  const lag = metrics.queue?.lag_ms_p95 || 0; // Use p95 lag
-  const sourcesActive = metrics.totals?.unique_sources || 0;
-  const batchesTotal = metrics.totals?.batches || 0;
-  const eps = metrics.rates?.eps_1m || 0; // Events per second (1m window)
+    // Extract values from metrics
+    const ingestTotal = metrics.records_processed || 0;
+    const threatsTotal = metrics.totals?.threat_matches || 0;
+    const riskSum = metrics.totals?.risk_sum || 0;
+    const riskCount = metrics.totals?.risk_count || 0;
+    const eps = metrics.rates?.eps_1m || 0;
 
-  // Get requests summary for dashboard
-  const requestsSummary = await refreshRequestsSummary();
-
-  // KPIs - Minimal Dashboard (6 cards)
-  $("kpi-events").textContent  = n(ingestTotal);
-  $("kpi-threats").textContent = n(threatsTotal);
-  $("kpi-risk").textContent    = (riskCount > 0) ? f2(riskSum / riskCount) : "—";
-  $("kpi-requests").textContent = n(requestsSummary?.requests || 0);
-  $("kpi-latency").textContent = n(requestsSummary?.p95_latency_ms || 0);
-  $("kpi-clients").textContent = n(requestsSummary?.active_clients || 0);
+    // KPIs - Minimal Dashboard (6 cards)
+    $("kpi-events").textContent  = n(ingestTotal);
+    $("kpi-threats").textContent = n(threatsTotal);
+    $("kpi-risk").textContent    = (riskCount > 0) ? f2(riskSum / riskCount) : "—";
+    $("kpi-requests").textContent = n(requestsSummary?.requests || 0);
+    $("kpi-latency").textContent = requestsSummary?.p95_latency_ms ? `${requestsSummary.p95_latency_ms}ms` : "—";
+    $("kpi-clients").textContent = n(requestsSummary?.active_clients || 0);
 
   // Sparklines (push current)
   pushSpark(state.sparkData.events, ingestTotal || 0);
@@ -180,6 +192,14 @@ async function refresh(){
     document.querySelector('.status-2xx').textContent = `2xx: ${codes['2xx'] || 0}`;
     document.querySelector('.status-4xx').textContent = `4xx: ${codes['4xx'] || 0}`;
     document.querySelector('.status-5xx').textContent = `5xx: ${codes['5xx'] || 0}`;
+  } else {
+    // Set defaults if no data
+    document.querySelector('.status-2xx').textContent = '2xx: 0';
+    document.querySelector('.status-4xx').textContent = '4xx: 0';
+    document.querySelector('.status-5xx').textContent = '5xx: 0';
+  }
+  } catch (e) {
+    console.error("Dashboard refresh failed:", e);
   }
 }
 
@@ -196,8 +216,17 @@ function initHandlers(){
   };
 
   $("btnSystem").onclick = async () => {
-    const r = await call("/v1/system");
-    $("systemLog").textContent = `[${r.status}]\n${r.body}`;
+    try {
+      const r = await call("/v1/system");
+      if (r.ok) {
+        const jsonData = JSON.parse(r.body);
+        $("systemLog").textContent = JSON.stringify(jsonData, null, 2);
+      } else {
+        $("systemLog").textContent = `[${r.status}]\n${r.body}`;
+      }
+    } catch (e) {
+      $("systemLog").textContent = `Error loading system info: ${e.message}`;
+    }
   };
 
   $("btnCopySystem").onclick = () => {
@@ -260,6 +289,9 @@ function initHandlers(){
   $("filterIP").onchange = () => loadRequests(1);
   $("filterAPIKey").onchange = () => loadRequests(1);
   
+  // Drawer handlers
+  $("btnCloseDrawer").onclick = closeRequestDrawer;
+  
   $("logFileInput").onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -279,38 +311,6 @@ function initHandlers(){
       $("logsUpload").textContent = `Upload failed: ${e.message}`;
     }
   };
-}
-
-// ---------- Requests Functions ----------
-async function refreshRequestsSummary() {
-  try {
-    const res = await fetch("/v1/admin/requests/summary?window=15");
-    const data = await res.json();
-    
-    // Update dashboard cards
-    $("kpi-requests").textContent = n(data.requests);
-    $("kpi-latency").textContent = data.p95_latency_ms ? `${data.p95_latency_ms}ms` : "—";
-    $("kpi-clients").textContent = n(data.active_clients);
-    
-    // Update status codes
-    $("status-codes").innerHTML = `
-      <span class="status-2xx">2xx: ${n(data.codes['2xx'] || 0)}</span>
-      <span class="status-4xx">4xx: ${n(data.codes['4xx'] || 0)}</span>
-      <span class="status-5xx">5xx: ${n(data.codes['5xx'] || 0)}</span>
-    `;
-    
-    // Update sparklines
-    pushSpark(state.sparkData.requests, data.requests);
-    pushSpark(state.sparkData.latency, data.p95_latency_ms);
-    pushSpark(state.sparkData.clients, data.active_clients);
-    
-    renderSpark("spark-requests", state.sparkData.requests, "#8b5cf6");
-    renderSpark("spark-latency", state.sparkData.latency, "#f59e0b");
-    renderSpark("spark-clients", state.sparkData.clients, "#10b981");
-    
-  } catch (e) {
-    console.error("Failed to load requests summary:", e);
-  }
 }
 
 // ---------- Requests Summary Function ----------
@@ -383,6 +383,8 @@ function renderRequestsTable(requests) {
   
   requests.forEach(req => {
     const row = document.createElement("tr");
+    row.style.cursor = "pointer";
+    row.onclick = () => showRequestDetails(req.id);
     row.innerHTML = `
       <td>${formatTime(req.ts)}</td>
       <td>${req.client_ip} ${req.geo_country ? `🇺🇸` : ''}</td>
@@ -474,6 +476,50 @@ function stopLiveTail() {
   state.requests.liveTail = false;
   $("btnLiveTail").textContent = "Live Tail";
   $("btnLiveTail").classList.remove("active");
+}
+
+async function closeRequestDrawer() {
+  const drawer = $("requestDetailsDrawer");
+  drawer.classList.remove("open");
+  drawer.style.display = "none";
+}
+
+async function showRequestDetails(requestId) {
+  try {
+    const res = await fetch(`/v1/admin/requests/${requestId}`);
+    const req = await res.json();
+    
+    const content = $("requestDetailsContent");
+    content.innerHTML = `
+      <h4>Request Information</h4>
+      <pre>${JSON.stringify({
+        id: req.id,
+        timestamp: req.ts,
+        method: req.method,
+        path: req.path,
+        status: req.status,
+        duration_ms: req.duration_ms,
+        client_ip: req.client_ip,
+        user_agent: req.user_agent,
+        geo_country: req.geo_country,
+        asn: req.asn
+      }, null, 2)}</pre>
+      
+      <h4>Operations Data</h4>
+      <pre>${req.ops ? JSON.stringify(req.ops, null, 2) : 'No operations data available'}</pre>
+      
+      ${req.error ? `<h4>Error</h4><pre class="err">${req.error}</pre>` : ''}
+      
+      <h4>Full Request Data</h4>
+      <pre>${JSON.stringify(req, null, 2)}</pre>
+    `;
+    
+    const drawer = $("requestDetailsDrawer");
+    drawer.style.display = "block";
+    setTimeout(() => drawer.classList.add("open"), 10);
+  } catch (e) {
+    console.error("Failed to load request details:", e);
+  }
 }
 
 async function exportCSV() {
@@ -606,6 +652,7 @@ async function initVersionDot() {
 
 // ---------- DOM Ready Initialization ----------
 document.addEventListener("DOMContentLoaded", () => {
+  console.log("DOM Content Loaded - Starting initialization...");
   initTabs();
   initHandlers();
   startRefresh();

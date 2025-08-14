@@ -96,6 +96,14 @@
     
     /* Pagination */
     .pagination{display:flex;align-items:center;justify-content:center;gap:12px}
+    
+    /* Drawer styling */
+    .drawer{position:fixed;top:0;right:0;width:400px;height:100vh;background:var(--card);border-left:1px solid #1d2842;z-index:1000;transform:translateX(100%);transition:transform 0.3s ease}
+    .drawer.open{transform:translateX(0)}
+    .drawer-header{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid #1d2842}
+    .drawer-content{padding:16px;overflow-y:auto;height:calc(100vh - 60px)}
+    .drawer-content h4{margin:0 0 8px;color:var(--muted);font-size:14px}
+    .drawer-content pre{background:#0c1324;border:1px solid #1d2842;border-radius:8px;padding:12px;overflow-x:auto;font-size:12px}
   </style>
 </head>
 <body>
@@ -107,7 +115,7 @@
       <div class="inline right">
         <div id="versionDot" class="version-dot">
           <div class="dot"></div>
-          <span id="versionText">v0.7.2</span>
+                      <span id="versionText">v0.7.5</span>
         </div>
         <label for="key" class="small">API Key</label>
         <input id="key" style="min-width:220px" value="TEST_KEY" />
@@ -277,6 +285,19 @@
           <span id="pageInfo">Page 1 of 1</span>
           <button id="btnNextPage" class="mutebtn">Next</button>
         </div>
+        
+        <!-- Request Details Drawer -->
+        <div id="requestDetailsDrawer" class="drawer" style="display:none">
+          <div class="drawer-header">
+            <h3>Request Details</h3>
+            <button id="btnCloseDrawer" class="mutebtn">×</button>
+          </div>
+          <div class="drawer-content">
+            <div id="requestDetailsContent">
+              <!-- Details will be populated by JavaScript -->
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -405,6 +426,35 @@
     </div>
   </div>
 
-  <script src="/ui/app.js?v=1.0.2" defer></script>
+      <script src="/ui/app.js?v=1.0.4" defer></script>
+  <script>
+    // Simple test to see if JavaScript is working
+    console.log("Inline script loaded - testing basic functionality");
+    document.addEventListener("DOMContentLoaded", () => {
+      console.log("DOM Content Loaded - Inline script");
+      const tabs = document.querySelectorAll(".tab");
+      console.log("Found tabs:", tabs.length);
+      
+      // Simple tab functionality as backup
+      tabs.forEach(tab => {
+        tab.addEventListener("click", function() {
+          console.log("Tab clicked:", this.dataset.tab);
+          // Remove active from all tabs and panels
+          document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+          document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+          
+          // Add active to clicked tab
+          this.classList.add("active");
+          
+          // Show corresponding panel
+          const panel = document.getElementById("panel-" + this.dataset.tab);
+          if (panel) {
+            panel.classList.add("active");
+            console.log("Activated panel:", "panel-" + this.dataset.tab);
+          }
+        });
+      });
+    });
+  </script>
 </body>
 </html>

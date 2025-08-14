@@ -30,6 +30,9 @@ in_memory_audit_logs = []
 # Request context for storing operations data
 request_context = {}
 
+# Counter for audit record IDs
+audit_id_counter = 0
+
 def hash_api_key(api_key: str) -> str:
     """Hash API key for storage"""
     return hmac.new(
@@ -160,7 +163,12 @@ async def audit_request(request, api_key: str, tenant_id: str):
 
 async def store_audit_record(record: dict):
     """Store audit record asynchronously"""
+    global audit_id_counter
     try:
+        # Assign unique ID
+        audit_id_counter += 1
+        record['id'] = audit_id_counter
+        
         # Add to in-memory audit logs
         in_memory_audit_logs.append(record)
         

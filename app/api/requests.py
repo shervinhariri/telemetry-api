@@ -14,18 +14,16 @@ from ..audit import mask_api_key, get_active_clients_count
 
 router = APIRouter()
 
-# Mock audit data for now (replace with database queries)
-mock_audit_data = []
+from ..audit import in_memory_audit_logs, mask_api_key, get_active_clients_count
 
 def get_audit_summary(window_minutes: int = 15) -> Dict[str, Any]:
     """Get audit summary for dashboard cards"""
-    # Mock data - replace with actual database queries
     now = datetime.utcnow()
     cutoff = now - timedelta(minutes=window_minutes)
     
-    # Filter mock data by time window
+    # Use real audit data from memory
     recent_requests = [
-        req for req in mock_audit_data 
+        req for req in in_memory_audit_logs 
         if req.get('ts', now) >= cutoff
     ]
     
@@ -81,8 +79,8 @@ async def get_requests(
     api_key_prefix: Optional[str] = Query(None, description="API key prefix")
 ):
     """Get paginated audit records"""
-    # Mock implementation - replace with database queries
-    filtered_data = mock_audit_data.copy()
+    # Use real audit data from memory
+    filtered_data = in_memory_audit_logs.copy()
     
     # Apply filters
     if since:
@@ -157,7 +155,7 @@ async def stream_requests(
                     break
                 
                 # Get recent audit records
-                recent_data = mock_audit_data[-10:]  # Last 10 records
+                recent_data = in_memory_audit_logs[-10:]  # Last 10 records
                 
                 for record in recent_data:
                     # Apply filters
@@ -211,69 +209,6 @@ async def stream_requests(
         }
     )
 
-# Add some mock data for testing
-def add_mock_audit_data():
-    """Add mock audit data for testing"""
-    global mock_audit_data
-    
-    now = datetime.utcnow()
-    mock_audit_data = [
-        {
-            'id': 1,
-            'ts': now - timedelta(minutes=5),
-            'tenant_id': 'tenant1',
-            'api_key': 'TEST_KEY_123456789',
-            'client_ip': '192.168.1.100',
-            'user_agent': 'curl/7.68.0',
-            'method': 'POST',
-            'path': '/v1/ingest',
-            'status': 200,
-            'duration_ms': 45,
-            'bytes_in': 1024,
-            'bytes_out': 512,
-            'result': 'ok',
-            'trace_id': '550e8400-e29b-41d4-a716-446655440000',
-            'geo_country': 'US',
-            'asn': 'AS15169 Google LLC'
-        },
-        {
-            'id': 2,
-            'ts': now - timedelta(minutes=3),
-            'tenant_id': 'tenant2',
-            'api_key': 'PROD_KEY_987654321',
-            'client_ip': '10.0.0.50',
-            'user_agent': 'Python/3.9 requests/2.25.1',
-            'method': 'GET',
-            'path': '/v1/metrics',
-            'status': 200,
-            'duration_ms': 12,
-            'bytes_in': 0,
-            'bytes_out': 2048,
-            'result': 'ok',
-            'trace_id': '550e8400-e29b-41d4-a716-446655440001',
-            'geo_country': 'CA',
-            'asn': 'AS812 Rogers Communications'
-        },
-        {
-            'id': 3,
-            'ts': now - timedelta(minutes=1),
-            'tenant_id': 'tenant1',
-            'api_key': 'TEST_KEY_123456789',
-            'client_ip': '192.168.1.100',
-            'user_agent': 'curl/7.68.0',
-            'method': 'POST',
-            'path': '/v1/ingest',
-            'status': 429,
-            'duration_ms': 8,
-            'bytes_in': 2048,
-            'bytes_out': 128,
-            'result': 'rate_limited',
-            'trace_id': '550e8400-e29b-41d4-a716-446655440002',
-            'geo_country': 'US',
-            'asn': 'AS15169 Google LLC'
-        }
-    ]
-
 @router.get("/admin/requests/{request_id}")
 async def get_request_detail(request_id: int):
     """Get detailed information about a specific request"""
@@ -283,12 +218,3 @@ async def get_request_detail(request_id: int):
             return req
     
     raise HTTPException(status_code=404, detail="Request not found")
-
-@router.get("/admin/requests/stream")
-async def stream_requests():
-    """Stream requests via Server-Sent Events"""
-    # TODO: Implement SSE streaming
-    return {"status": "not_implemented"}
-
-# Initialize mock data
-add_mock_audit_data()

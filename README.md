@@ -20,9 +20,9 @@ Local-first MVP to ingest NetFlow/IPFIX and Zeek JSON, enrich with GeoIP/ASN + t
 
 - ✅ **Step 6: Deploy & Host MVP** — Activated processing pipeline workers, file sink for daily NDJSON, stats/events/download endpoints, Logs tab with live tail and file upload, minimal version indicator, and clean header design.
 
-- ✅ **Step 7: Request Observability (v0.7.2)** — Professional minimal dashboard (6 cards), request audit system with operations tracking, system info endpoint, enhanced UI with status codes and sparklines, performance optimizations.
+- 🟣 **Step 7: Request Observability (v0.7.5) - CURRENT** — Professional minimal dashboard (6 cards), request audit system with operations tracking, system info endpoint, enhanced UI with status codes and sparklines, performance optimizations.
 
-> Current version: **v0.7.2** (Professional Dashboard & Request Observability).  
+> Current version: **v0.7.5** (Professional Dashboard & Request Observability).  
 > Docs for Steps 1–7 are in `/docs/` and PDFs.
 
 ## Quickstart
@@ -59,9 +59,9 @@ echo '[{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1"}]' | gzip | c
 ```
 
 ## Release & Images
-Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.7.2
+Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.7.5
 
-GitHub Tags: v0.7.2 (Step 7 - Request Observability)
+GitHub Tags: v0.7.5 (Step 7 - Request Observability)
 
 ### Validation
 ```bash
@@ -80,7 +80,7 @@ GitHub Tags: v0.7.2 (Step 7 - Request Observability)
 ./scripts/run_tests.sh  # Run all tests locally
 ```
 
-## 🚀 Stage 5 Features
+## 🚀 Core Features
 
 ### Robust Ingest Pipeline
 - **Dual Format Support**: Accepts both raw JSON arrays `[...]` and wrapped `{"records": [...]}`
@@ -89,88 +89,15 @@ GitHub Tags: v0.7.2 (Step 7 - Request Observability)
 - **Backpressure Handling**: Returns 429 when queue is full (10k limit)
 - **Proper Error Handling**: 4xx for client errors, 5xx only for server faults
 
-### Input Validation
-- **Timestamp Required**: Records must have `ts`, `time`, or `@timestamp` field
-- **Size Limits**: 5MB gzipped, 10k records per batch
-- **JSON Validation**: Proper UTF-8 encoding and valid JSON structure
-- **Graceful Degradation**: Queue full → 429 with retry guidance
+### Request Observability (v0.7.5)
+- **Professional Dashboard**: 6 KPI cards with live sparklines and status indicators
+- **Request Audit Trail**: Complete request logging with operations tracking
+- **System Monitoring**: Structured system information and metrics
+- **Live Tail**: Real-time request monitoring with filters and export
 
-### Background Processing
-- **Async Worker Loop**: Processes records from queue in background
-- **Error Isolation**: Worker failures don't affect ingest endpoint
-- **Dead Letter Queue**: Failed records written to files for analysis
-- **Queue Metrics**: Real-time queue depth and processing status
 
-### API Endpoints
-- **`/v1/health`**: Public health check (no auth required)
-- **`/v1/version`**: Version information and metadata
-- **`/v1/updates/check`**: Docker Hub update availability check
-- **`/v1/ingest`**: Robust ingest with queue processing
-- **`/v1/metrics`**: Queue depth and processing metrics
-- **`/v1/lookup`**: IP/domain enrichment (requires auth)
-- **`/v1/outputs/splunk`**: Splunk HEC configuration (requires auth)
-- **`/v1/outputs/elastic`**: Elasticsearch configuration (requires auth)
-- **`/v1/admin/update`**: Dev-only image update (requires admin token)
 
-## 🚀 Stage 6 Features
-
-### Activated Processing Pipeline
-- **Background Workers**: Two async workers process records from ingest queue
-- **File Sink**: Daily NDJSON files written to `/data/events-YYYY-MM-DD.ndjson`
-- **Statistics Tracking**: Real-time counters for records processed, batches, EPS, queue depth
-- **Ring Buffer**: Last 1000 processed events kept in memory for recent queries
-- **Dead Letter Queue**: Failed records written to `/data/deadletter.ndjson`
-
-### New API Endpoints
-- **`/v1/stats`**: Processing pipeline statistics (records_processed, batches, eps, queue_depth)
-- **`/v1/events/recent?limit=100`**: Recent processed events from ring buffer
-- **`/v1/download[?date=YYYY-MM-DD]`**: Download processed events as NDJSON (today by default)
-- **`/v1/logs/tail?max_bytes=2000000&format=text|json`**: Tail application logs
-- **`/v1/logs/download?max_bytes=2000000`**: Download last 2MB of app logs
-- **`/v1/logs/upload`**: Upload files for support review (multipart)
-- **`/v1/logs/uploads`**: List uploaded files
-
-### Logs Tab & Support Features
-- **Live Tail**: Real-time log viewing with auto-scroll
-- **Download 2MB**: Quick download of recent logs for troubleshooting
-- **File Upload**: Upload logs for support review (saved to `/data/uploads/`)
-- **Rotating Logs**: Application logs rotated at 5MB with 3 backups
-- **Heartbeat Logging**: System metrics logged every 15 seconds
-
-### Minimal UI Design
-- **Clean Header**: Removed "— Dashboard" and "Live (15m)" labels
-- **Version Dot**: Minimal version indicator with colored status (green=up-to-date, amber=update available)
-- **Logs Tab**: New tab for log management and support features
-- **Responsive Design**: Maintains dark theme and modern UI
-
-### Quick Test Steps
-```bash
-# 1. Start the API and send some data
-curl -s -X POST http://localhost:8080/v1/ingest \
-  -H "Authorization: Bearer TEST_KEY" \
-  -H "Content-Type: application/json" \
-  --data '[{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1"}]'
-
-# 2. Check stats are moving
-curl -s http://localhost:8080/v1/stats | jq
-
-# 3. View recent processed events
-curl -s http://localhost:8080/v1/events/recent?limit=5 | jq
-
-# 4. Download processed data
-curl -s -o events.ndjson http://localhost:8080/v1/download
-
-# 5. View live logs
-curl -s 'http://localhost:8080/v1/logs/tail?max_bytes=65536&format=text'
-
-# 6. Download app logs
-curl -s -o app_tail.log 'http://localhost:8080/v1/logs/download?max_bytes=2000000'
-
-# 7. Upload a file for support
-curl -s -F 'file=@app_tail.log' http://localhost:8080/v1/logs/upload | jq
-```
-
-## 🚀 Step 7 Features (v0.7.2)
+## 🚀 Step 7 Features (v0.7.5)
 
 ### Professional Minimal Dashboard
 - **6 KPI Cards**: Events, Threats, Risk, Requests (15m), Status Codes, P95 Latency
@@ -204,7 +131,7 @@ curl -s -F 'file=@app_tail.log' http://localhost:8080/v1/logs/upload | jq
 - **Status Indicators**: Color-coded status badges and result indicators
 - **Responsive Design**: Maintains professional appearance on all devices
 
-### Quick Test Steps for v0.7.2
+### Quick Test Steps for v0.7.3
 ```bash
 # 1. Check system information
 curl -s http://localhost:8080/v1/system | jq
@@ -225,112 +152,23 @@ curl -X POST http://localhost:8080/v1/lookup \
 curl -s http://localhost:8080/v1/metrics | jq '.totals'
 ```
 
-## 🚀 Patch 5.1 Features
 
-### Version Management & Update Notifications
-- **Version Badge**: Real-time version display in GUI with update notifications
-- **Docker Hub Integration**: Automatic checking for newer images every 60 seconds
-- **Update Notifications**: Green badge = up-to-date, Amber badge = update available
-- **Dev-Safe Updates**: One-click image pulling with admin token (development only)
-- **Production Updates**: Watchtower integration for automatic container updates
-
-### Stage 5.1 Output Connectors
-- **Splunk HEC Configuration**: Full HEC endpoint configuration with batching and retry settings
-- **Elasticsearch Configuration**: Multi-node Elasticsearch setup with bulk indexing
-- **Configuration Persistence**: In-memory storage of connector settings
-- **Validation**: Pydantic models ensure proper configuration format
-- **API Contract Compliance**: Implements Step-2 contract endpoints exactly
-
-### Update Mechanisms
-```bash
-# Check version
-curl -s http://localhost:8080/v1/version
-
-# Check for updates
-curl -s http://localhost:8080/v1/updates/check
-
-# Dev-only: pull latest image
-curl -s -X POST http://localhost:8080/v1/admin/update -H "X-Admin-Token: $ADMIN_TOKEN"
-
-# Configure Splunk HEC
-curl -s -X POST http://localhost:8080/v1/outputs/splunk \
-  -H "Authorization: Bearer TEST_KEY" \
-  -H "Content-Type: application/json" \
-  --data '{"hec_url":"https://splunk.example:8088/services/collector","token":"***","index":"telemetry"}'
-
-# Configure Elasticsearch
-curl -s -X POST http://localhost:8080/v1/outputs/elastic \
-  -H "Authorization: Bearer TEST_KEY" \
-  -H "Content-Type: application/json" \
-  --data '{"urls":["https://es1:9200"],"index_prefix":"telemetry-","bulk_size":1000}'
-```
-
-### Production Deployment
-For production environments, use Watchtower for automatic updates:
-```yaml
-# docker-compose.yml
-services:
-  watchtower:
-    image: containrrr/watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --cleanup --interval 60 telemetry-api
-```
 
 ## 🧪 Development & Testing
 
 ### Local Development
-1) Put MaxMind DBs + a sample threat CSV in `./data/`:
-```
-data/GeoLite2-City.mmdb
-data/GeoLite2-ASN.mmdb
-data/threats.csv
-```
-
-2) Build and run:
 ```bash
-docker build -t telemetry-api:0.1.0 .
-docker run -d -p 8080:8080 \
-  -e API_KEY=TEST_KEY \
-  -e GEOIP_DB_CITY=/data/GeoLite2-City.mmdb \
-  -e GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb \
-  -e THREATLIST_CSV=/data/threats.csv \
-  -v $PWD/data:/data:ro \
-  --name tel-api telemetry-api:0.1.0
+# Build and run
+docker build -t telemetry-api:latest .
+docker run -d -p 8080:8080 -e APP_VERSION=0.7.2 telemetry-api:latest
+
+# Test endpoints
+curl http://localhost:8080/v1/health
+curl http://localhost:8080/v1/system
+curl http://localhost:8080/v1/admin/requests/summary
 ```
 
-3) Test:
-```bash
-curl -s http://localhost:8080/v1/health | jq .
-curl -s -X POST http://localhost:8080/v1/ingest \
-  -H "Authorization: Bearer TEST_KEY" \
-  -H "Content-Type: application/json" \
-  --data @samples/zeek_conn.json | jq .
-```
 
-### Running Tests
-```bash
-# Run all tests (unit, integration, schema validation)
-./scripts/run_tests.sh
-
-# Run specific test categories
-python -m pytest tests/test_api.py -v
-python tests/validate_schemas.py
-```
-
-## 🎨 Stage 4 Dashboard Features
-
-- **Modern Dark Theme** with responsive design
-- **Real-time KPI Cards** with sparklines (Events, Sources, Batches, Threats, Risk, Lag)
-- **Interactive Charts** using Chart.js (Events per minute)
-- **API Testing Interface** with tabs for:
-  - Ingest Test (JSON batch testing)
-  - Outputs (Splunk/Elastic configuration)
-  - Lookup (IP/domain enrichment)
-  - System (Health and metrics)
-- **Auto-refresh** every 5 seconds
-- **Bearer Authentication** support
 
 ## 🔗 API Endpoints
 
@@ -345,7 +183,7 @@ python tests/validate_schemas.py
 - `POST /v1/alerts/rules` - Configure alert rules
 - `GET /v1/metrics` - Prometheus metrics (basic auth)
 
-### Observability Endpoints (v0.7.2)
+### Observability Endpoints (v0.7.5)
 - `GET /v1/system` - Structured system information
 - `GET /v1/admin/requests` - Request audit log (paginated)
 - `GET /v1/admin/requests/summary` - Request summary metrics
@@ -425,45 +263,9 @@ All records include:
 - **Security scanning** and dependency updates
 - **Deployment automation** scripts
 
-## ✅ Stage 4 Pro Dashboard
-
-This version is fully aligned with Step 1-2 specifications:
-
-### ✅ **Endpoint Parity**
-- All required endpoints implemented with proper authentication
-- X-API-Version header middleware for versioning
-- Proper error handling with JSON responses
-- Health checks and metrics endpoints
-
-### ✅ **Rate Limiting**
-- Environment-driven configuration
-- Contract-compliant defaults (120/600 req/min)
-- Configurable for trusted environments
-- Caddy-based implementation with burst handling
-
-### ✅ **Data Validation**
-- JSON schemas for all data formats
-- Schema validation in CI pipeline
-- Sample data with proper validation
-- Input/output format compliance
-
-### ✅ **Testing & Quality**
-- Comprehensive unit and integration tests
-- Schema validation for sample data
-- CI integration with GitHub Actions
-- Local test runner for development
-
-### ✅ **Production Readiness**
-- Complete deployment automation
-- Security configurations (UFW, fail2ban)
-- Monitoring and logging setup
-- Deadletter handling for reliability
-
 ## 📚 Documentation
 
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
-- **[STAGE3_CHECKLIST.md](STAGE3_CHECKLIST.md)** - Complete deliverables checklist
+- **[docs/](docs/)** - Project documentation and PDFs
 - **[schemas/](schemas/)** - JSON schema definitions
-- **[tests/](tests/)** - Test suite and validation scripts
 
 
