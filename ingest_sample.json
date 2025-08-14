@@ -1,0 +1,16 @@
+{
+  "records": [
+    {
+      "ts": "2025-08-14T12:00:00Z",
+      "src_ip": "93.184.216.34",
+      "dst_ip": "8.8.8.8",
+      "src_port": 54321,
+      "dst_port": 53,
+      "proto": "udp",
+      "bytes": 128,
+      "packets": 2,
+      "sensor": "lab-zeek-1",
+      "type": "flow"
+    }
+  ]
+}
