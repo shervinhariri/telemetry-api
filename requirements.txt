@@ -2,8 +2,5 @@ fastapi==0.111.0
 uvicorn[standard]==0.30.1
 geoip2==4.8.0
 pydantic==2.7.4
-pytest==8.0.0
 httpx==0.27.0
-jsonschema==4.21.0
 packaging==24.0
-reportlab==4.1.0

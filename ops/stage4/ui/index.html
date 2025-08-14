@@ -64,6 +64,38 @@
     .footer{margin:16px 0 0;color:var(--muted);font-size:12px}
     .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .right{margin-left:auto}
+    
+    /* Status codes styling */
+    .status-codes{display:flex;gap:8px;font-size:12px}
+    .status-2xx{color:#10b981}
+    .status-4xx{color:#f59e0b}
+    .status-5xx{color:#ef4444}
+    
+    /* Filters styling */
+    .filters{display:flex;gap:8px;flex-wrap:wrap}
+    .filter{padding:4px 8px;border:1px solid #1d2842;border-radius:4px;background:#0c1324;color:var(--ink);font-size:12px}
+    
+    /* Table styling */
+    .table-container{max-height:400px;overflow-y:auto;border:1px solid #1d2842;border-radius:4px}
+    .data-table{width:100%;border-collapse:collapse;font-size:12px}
+    .data-table th{background:#0c1324;padding:8px;text-align:left;border-bottom:1px solid #1d2842;position:sticky;top:0;z-index:1}
+    .data-table td{padding:6px 8px;border-bottom:1px solid #1d2842}
+    .data-table tr:hover{background:#0c1324}
+    
+    /* Status badges */
+    .status-badge{padding:2px 6px;border-radius:3px;font-size:11px;font-weight:500}
+    .status-200{background:#dcfce7;color:#166534}
+    .status-400{background:#fef3c7;color:#92400e}
+    .status-429{background:#fef3c7;color:#92400e}
+    .status-500{background:#fee2e2;color:#991b1b}
+    
+    /* Result badges */
+    .result-ok{background:#dcfce7;color:#166534}
+    .result-rate_limited{background:#fef3c7;color:#92400e}
+    .result-error{background:#fee2e2;color:#991b1b}
+    
+    /* Pagination */
+    .pagination{display:flex;align-items:center;justify-content:center;gap:12px}
   </style>
 </head>
 <body>
@@ -75,7 +107,7 @@
       <div class="inline right">
         <div id="versionDot" class="version-dot">
           <div class="dot"></div>
-          <span id="versionText">v0.6.0</span>
+          <span id="versionText">v0.7.2</span>
         </div>
         <label for="key" class="small">API Key</label>
         <input id="key" style="min-width:220px" value="TEST_KEY" />
@@ -85,6 +117,7 @@
 
     <div class="tabs">
       <div class="tab active" data-tab="dashboard">Dashboard</div>
+      <div class="tab" data-tab="requests">Requests</div>
       <div class="tab" data-tab="ingest">Ingest Test</div>
       <div class="tab" data-tab="outputs">Outputs</div>
       <div class="tab" data-tab="lookup">Lookup</div>
@@ -95,6 +128,7 @@
     <!-- DASHBOARD -->
     <div class="panel active" id="panel-dashboard">
       <div class="grid">
+        <!-- Row 1: Core Metrics -->
         <div class="card">
           <div class="kpi">
             <div>
@@ -102,24 +136,6 @@
               <div class="big" id="kpi-events">—</div>
             </div>
             <svg class="spark" id="spark-events"></svg>
-          </div>
-        </div>
-        <div class="card">
-          <div class="kpi">
-            <div>
-              <h3>Unique Sources</h3>
-              <div class="big" id="kpi-sources">—</div>
-            </div>
-            <svg class="spark" id="spark-sources"></svg>
-          </div>
-        </div>
-        <div class="card">
-          <div class="kpi">
-            <div>
-              <h3>Batches</h3>
-              <div class="big" id="kpi-batches">—</div>
-            </div>
-            <svg class="spark" id="spark-batches"></svg>
           </div>
         </div>
         <div class="card">
@@ -140,13 +156,45 @@
             <svg class="spark" id="spark-risk"></svg>
           </div>
         </div>
+        
+        <!-- Row 2: Request Metrics -->
         <div class="card">
           <div class="kpi">
             <div>
-              <h3>Queue Lag</h3>
-              <div class="big" id="kpi-lag">—</div>
+              <h3>Requests (15m)</h3>
+              <div class="big" id="kpi-requests">—</div>
             </div>
-            <svg class="spark" id="spark-lag"></svg>
+            <svg class="spark" id="spark-requests"></svg>
+          </div>
+        </div>
+        <div class="card">
+          <div class="kpi">
+            <div>
+              <h3>Status Codes</h3>
+              <div class="status-codes" id="status-codes">
+                <span class="status-2xx">2xx: —</span>
+                <span class="status-4xx">4xx: —</span>
+                <span class="status-5xx">5xx: —</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="kpi">
+            <div>
+              <h3>P95 Latency</h3>
+              <div class="big" id="kpi-latency">—</div>
+            </div>
+            <svg class="spark" id="spark-latency"></svg>
+          </div>
+        </div>
+        <div class="card">
+          <div class="kpi">
+            <div>
+              <h3>Active Clients</h3>
+              <div class="big" id="kpi-clients">—</div>
+            </div>
+            <svg class="spark" id="spark-clients"></svg>
           </div>
         </div>
       </div>
@@ -157,6 +205,78 @@
           <div class="small">Auto-refresh every 5s</div>
         </div>
         <canvas id="eventsChart" height="100"></canvas>
+      </div>
+    </div>
+
+    <!-- REQUESTS -->
+    <div class="panel" id="panel-requests">
+      <div class="card">
+        <div class="inline" style="justify-content:space-between;margin-bottom:16px">
+          <h3 style="color:var(--muted);margin:0">Request Audit Log</h3>
+          <div class="inline">
+            <button id="btnLiveTail" class="mutebtn">Live Tail</button>
+            <button id="btnExportCSV" class="mutebtn">Export CSV</button>
+            <div class="small">Auto-refresh every 5s</div>
+          </div>
+        </div>
+        
+        <!-- Filters -->
+        <div class="filters" style="margin-bottom:16px">
+          <select id="filterMethod" class="filter">
+            <option value="">All Methods</option>
+            <option value="GET">GET</option>
+            <option value="POST">POST</option>
+            <option value="PUT">PUT</option>
+            <option value="DELETE">DELETE</option>
+          </select>
+          <select id="filterStatus" class="filter">
+            <option value="">All Status</option>
+            <option value="200">200 OK</option>
+            <option value="400">400 Bad Request</option>
+            <option value="401">401 Unauthorized</option>
+            <option value="429">429 Rate Limited</option>
+            <option value="500">500 Server Error</option>
+          </select>
+          <select id="filterEndpoint" class="filter">
+            <option value="">All Endpoints</option>
+            <option value="/v1/ingest">/v1/ingest</option>
+            <option value="/v1/metrics">/v1/metrics</option>
+            <option value="/v1/health">/v1/health</option>
+            <option value="/v1/lookup">/v1/lookup</option>
+          </select>
+          <input id="filterIP" class="filter" placeholder="Client IP" />
+          <input id="filterAPIKey" class="filter" placeholder="API Key prefix" />
+        </div>
+        
+        <!-- Requests Table -->
+        <div class="table-container">
+          <table id="requestsTable" class="data-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Client IP</th>
+                <th>API Key</th>
+                <th>Method</th>
+                <th>Path</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Bytes In/Out</th>
+                <th>Result</th>
+                <th>Trace ID</th>
+              </tr>
+            </thead>
+            <tbody id="requestsTableBody">
+              <!-- Data will be populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Pagination -->
+        <div class="pagination" style="margin-top:16px">
+          <button id="btnPrevPage" class="mutebtn">Previous</button>
+          <span id="pageInfo">Page 1 of 1</span>
+          <button id="btnNextPage" class="mutebtn">Next</button>
+        </div>
       </div>
     </div>
 
@@ -265,19 +385,23 @@
     <div class="panel" id="panel-system">
       <div class="split">
         <div class="card">
-          <h3 style="color:var(--muted);margin-top:0">/metrics</h3>
+          <h3 style="color:var(--muted);margin-top:0">System Info</h3>
+          <pre class="log" id="systemLog" style="max-height:380px;overflow:auto;white-space:pre-wrap;word-break:break-word;">Loading system info...</pre>
+          <div class="row" style="margin-top:10px">
+            <button id="btnSystem">Refresh</button>
+            <button class="mutebtn" id="btnCopySystem">Copy</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="color:var(--muted);margin-top:0">Raw Metrics</h3>
           <pre class="log" id="metricsLog">Ready.</pre>
           <div class="row" style="margin-top:10px">
             <button class="mutebtn" id="btnMetrics">Fetch /metrics</button>
           </div>
         </div>
-        <div class="card">
-          <h3 style="color:var(--muted);margin-top:0">/v1/health</h3>
-          <pre class="log" id="healthLog">Ready.</pre>
-        </div>
       </div>
       <div class="small" id="diagLine" style="margin-top:8px;color:#9fb3c8"></div>
-      <div class="footer">Need help? Check README for curl tests. Values show "—" until metrics are available.</div>
+      <div class="footer">System info shows bounded JSON. Raw metrics available for debugging.</div>
     </div>
   </div>
 

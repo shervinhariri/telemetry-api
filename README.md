@@ -18,10 +18,12 @@ Local-first MVP to ingest NetFlow/IPFIX and Zeek JSON, enrich with GeoIP/ASN + t
 
 - ✅ **Step 5.1: Version Management & Output Connectors** — Version badge with update notifications, Docker Hub integration, Stage 5.1 output connector configuration endpoints (Splunk HEC, Elastic bulk), and dev-safe update mechanism. Foundation for Stage 5.2 dispatcher wiring.
 
-- 🟣 **Step 6: Deploy & Host MVP (current)** — Activated processing pipeline workers, file sink for daily NDJSON, stats/events/download endpoints, Logs tab with live tail and file upload, minimal version indicator, and clean header design.
+- ✅ **Step 6: Deploy & Host MVP** — Activated processing pipeline workers, file sink for daily NDJSON, stats/events/download endpoints, Logs tab with live tail and file upload, minimal version indicator, and clean header design.
 
-> Current version: **v0.6.0** (Stage 6 - deploy & host MVP).  
-> Docs for Steps 1–2 are in `/docs/` and PDFs.
+- ✅ **Step 7: Request Observability (v0.7.2)** — Professional minimal dashboard (6 cards), request audit system with operations tracking, system info endpoint, enhanced UI with status codes and sparklines, performance optimizations.
+
+> Current version: **v0.7.2** (Professional Dashboard & Request Observability).  
+> Docs for Steps 1–7 are in `/docs/` and PDFs.
 
 ## Quickstart
 ```bash
@@ -57,9 +59,9 @@ echo '[{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1"}]' | gzip | c
 ```
 
 ## Release & Images
-Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.6.0
+Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.7.2
 
-GitHub Tags: v0.6.0 (Stage 6)
+GitHub Tags: v0.7.2 (Step 7 - Request Observability)
 
 ### Validation
 ```bash
@@ -166,6 +168,61 @@ curl -s -o app_tail.log 'http://localhost:8080/v1/logs/download?max_bytes=200000
 
 # 7. Upload a file for support
 curl -s -F 'file=@app_tail.log' http://localhost:8080/v1/logs/upload | jq
+```
+
+## 🚀 Step 7 Features (v0.7.2)
+
+### Professional Minimal Dashboard
+- **6 KPI Cards**: Events, Threats, Risk, Requests (15m), Status Codes, P95 Latency
+- **Live Sparklines**: Real-time trend visualization for each metric
+- **Status Code Pills**: 2xx/4xx/5xx breakdown with color coding
+- **Clean Design**: Removed clutter, focused on essential metrics
+- **Auto-refresh**: Updates every 5 seconds with smooth animations
+
+### Request Observability System
+- **Audit Trail**: Complete request logging with operations data
+- **Operations Tracking**: Detailed breakdown of what happened per request
+- **System Info**: Structured `/v1/system` endpoint with bounded JSON
+- **Request Details**: Individual request inspection with full context
+- **Live Tail**: Real-time request monitoring with filters
+
+### Enhanced API Endpoints
+- **`/v1/system`**: Structured system information (version, uptime, workers, metrics)
+- **`/v1/admin/requests`**: Paginated request audit log
+- **`/v1/admin/requests/summary`**: Request summary metrics (15m window)
+- **`/v1/admin/requests/{id}`**: Detailed request information with operations
+
+### Performance Optimizations
+- **Lightweight Dependencies**: Removed unnecessary packages (pytest, jsonschema, reportlab)
+- **Faster Startup**: Optimized container build and initialization
+- **Memory Efficient**: In-memory audit with 7-day retention
+- **Async Processing**: Non-blocking request handling
+
+### Professional UI Enhancements
+- **System Tab Fix**: No more overflow, bounded JSON display
+- **Copy Functionality**: One-click copying of system information
+- **Status Indicators**: Color-coded status badges and result indicators
+- **Responsive Design**: Maintains professional appearance on all devices
+
+### Quick Test Steps for v0.7.2
+```bash
+# 1. Check system information
+curl -s http://localhost:8080/v1/system | jq
+
+# 2. View request summary
+curl -s http://localhost:8080/v1/admin/requests/summary | jq
+
+# 3. Check request audit log
+curl -s http://localhost:8080/v1/admin/requests | jq '.items | length'
+
+# 4. Send test requests
+curl -X POST http://localhost:8080/v1/lookup \
+  -H "Authorization: Bearer TEST_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"ip":"8.8.8.8"}'
+
+# 5. View updated dashboard metrics
+curl -s http://localhost:8080/v1/metrics | jq '.totals'
 ```
 
 ## 🚀 Patch 5.1 Features
@@ -277,6 +334,7 @@ python tests/validate_schemas.py
 
 ## 🔗 API Endpoints
 
+### Core Endpoints
 - `GET /v1/health` - Health check
 - `GET /v1/version` - API version info
 - `GET /v1/schema` - Available schemas
@@ -286,6 +344,12 @@ python tests/validate_schemas.py
 - `POST /v1/outputs/elastic` - Configure Elasticsearch
 - `POST /v1/alerts/rules` - Configure alert rules
 - `GET /v1/metrics` - Prometheus metrics (basic auth)
+
+### Observability Endpoints (v0.7.2)
+- `GET /v1/system` - Structured system information
+- `GET /v1/admin/requests` - Request audit log (paginated)
+- `GET /v1/admin/requests/summary` - Request summary metrics
+- `GET /v1/admin/requests/{id}` - Detailed request information
 
 ## 📊 Limits & Errors
 

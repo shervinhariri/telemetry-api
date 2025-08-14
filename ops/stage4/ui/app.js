@@ -68,7 +68,17 @@ const state = {
     batches: Array(30).fill(0),
     threats: Array(30).fill(0),
     risk: Array(30).fill(0),
-    lag: Array(30).fill(0)
+    lag: Array(30).fill(0),
+    requests: Array(30).fill(0),
+    latency: Array(30).fill(0),
+    clients: Array(30).fill(0)
+  },
+  requests: {
+    currentPage: 1,
+    pageSize: 50,
+    totalPages: 1,
+    liveTail: false,
+    eventSource: null
   }
 };
 
@@ -134,32 +144,43 @@ async function refresh(){
   const batchesTotal = metrics.totals?.batches || 0;
   const eps = metrics.rates?.eps_1m || 0; // Events per second (1m window)
 
-  // KPIs
+  // Get requests summary for dashboard
+  const requestsSummary = await refreshRequestsSummary();
+
+  // KPIs - Minimal Dashboard (6 cards)
   $("kpi-events").textContent  = n(ingestTotal);
   $("kpi-threats").textContent = n(threatsTotal);
   $("kpi-risk").textContent    = (riskCount > 0) ? f2(riskSum / riskCount) : "—";
-  $("kpi-lag").textContent     = n(lag);
-  $("kpi-sources").textContent = n(sourcesActive);
-  $("kpi-batches").textContent = n(batchesTotal);
+  $("kpi-requests").textContent = n(requestsSummary?.requests || 0);
+  $("kpi-latency").textContent = n(requestsSummary?.p95_latency_ms || 0);
+  $("kpi-clients").textContent = n(requestsSummary?.active_clients || 0);
 
   // Sparklines (push current)
   pushSpark(state.sparkData.events, ingestTotal || 0);
-  pushSpark(state.sparkData.sources, sourcesActive || 0);
-  pushSpark(state.sparkData.batches, batchesTotal || 0);
   pushSpark(state.sparkData.threats, threatsTotal || 0);
   pushSpark(state.sparkData.risk, (riskCount > 0) ? (riskSum / riskCount) : 0);
-  pushSpark(state.sparkData.lag, lag || 0);
+  pushSpark(state.sparkData.requests, requestsSummary?.requests || 0);
+  pushSpark(state.sparkData.latency, requestsSummary?.p95_latency_ms || 0);
+  pushSpark(state.sparkData.clients, requestsSummary?.active_clients || 0);
 
   renderSpark("spark-events", state.sparkData.events);
-  renderSpark("spark-sources", state.sparkData.sources, "#60a5fa");
-  renderSpark("spark-batches", state.sparkData.batches, "#34d399");
   renderSpark("spark-threats", state.sparkData.threats, "#fb7185");
   renderSpark("spark-risk", state.sparkData.risk, "#f59e0b");
-  renderSpark("spark-lag", state.sparkData.lag, "#9fb3c8");
+  renderSpark("spark-requests", state.sparkData.requests, "#8b5cf6");
+  renderSpark("spark-latency", state.sparkData.latency, "#10b981");
+  renderSpark("spark-clients", state.sparkData.clients, "#3b82f6");
 
   // Events/min - use the eps rate from metrics
   const ratePerMin = eps * 60; // Convert eps to epm
   updateChart(ratePerMin);
+  
+  // Update status codes display
+  if (requestsSummary?.codes) {
+    const codes = requestsSummary.codes;
+    document.querySelector('.status-2xx').textContent = `2xx: ${codes['2xx'] || 0}`;
+    document.querySelector('.status-4xx').textContent = `4xx: ${codes['4xx'] || 0}`;
+    document.querySelector('.status-5xx').textContent = `5xx: ${codes['5xx'] || 0}`;
+  }
 }
 
 // ---------- Button Handlers ----------
@@ -172,6 +193,15 @@ function initHandlers(){
   $("btnMetrics").onclick = async () => {
     const r = await call("/v1/metrics");
     $("metricsLog").textContent = `[${r.status}]\n${r.raw}`;
+  };
+
+  $("btnSystem").onclick = async () => {
+    const r = await call("/v1/system");
+    $("systemLog").textContent = `[${r.status}]\n${r.body}`;
+  };
+
+  $("btnCopySystem").onclick = () => {
+    navigator.clipboard.writeText($("systemLog").textContent);
   };
 
   $("btnIngest").onclick = async () => {
@@ -217,6 +247,19 @@ function initHandlers(){
   $("btnDownloadLogs").onclick = downloadLogs;
   $("btnUploadLogs").onclick = () => { $("logFileInput").click(); };
   
+  // Requests handlers
+  $("btnLiveTail").onclick = toggleLiveTail;
+  $("btnExportCSV").onclick = exportCSV;
+  $("btnPrevPage").onclick = () => loadRequests(state.requests.currentPage - 1);
+  $("btnNextPage").onclick = () => loadRequests(state.requests.currentPage + 1);
+  
+  // Filter change handlers
+  $("filterMethod").onchange = () => loadRequests(1);
+  $("filterStatus").onchange = () => loadRequests(1);
+  $("filterEndpoint").onchange = () => loadRequests(1);
+  $("filterIP").onchange = () => loadRequests(1);
+  $("filterAPIKey").onchange = () => loadRequests(1);
+  
   $("logFileInput").onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -236,6 +279,245 @@ function initHandlers(){
       $("logsUpload").textContent = `Upload failed: ${e.message}`;
     }
   };
+}
+
+// ---------- Requests Functions ----------
+async function refreshRequestsSummary() {
+  try {
+    const res = await fetch("/v1/admin/requests/summary?window=15");
+    const data = await res.json();
+    
+    // Update dashboard cards
+    $("kpi-requests").textContent = n(data.requests);
+    $("kpi-latency").textContent = data.p95_latency_ms ? `${data.p95_latency_ms}ms` : "—";
+    $("kpi-clients").textContent = n(data.active_clients);
+    
+    // Update status codes
+    $("status-codes").innerHTML = `
+      <span class="status-2xx">2xx: ${n(data.codes['2xx'] || 0)}</span>
+      <span class="status-4xx">4xx: ${n(data.codes['4xx'] || 0)}</span>
+      <span class="status-5xx">5xx: ${n(data.codes['5xx'] || 0)}</span>
+    `;
+    
+    // Update sparklines
+    pushSpark(state.sparkData.requests, data.requests);
+    pushSpark(state.sparkData.latency, data.p95_latency_ms);
+    pushSpark(state.sparkData.clients, data.active_clients);
+    
+    renderSpark("spark-requests", state.sparkData.requests, "#8b5cf6");
+    renderSpark("spark-latency", state.sparkData.latency, "#f59e0b");
+    renderSpark("spark-clients", state.sparkData.clients, "#10b981");
+    
+  } catch (e) {
+    console.error("Failed to load requests summary:", e);
+  }
+}
+
+// ---------- Requests Summary Function ----------
+async function refreshRequestsSummary() {
+  try {
+    const response = await fetch('/v1/admin/requests/summary?window=15');
+    if (response.ok) {
+      const summary = await response.json();
+      return summary;
+    }
+  } catch (error) {
+    console.error('Failed to fetch requests summary:', error);
+  }
+  return null;
+}
+
+async function loadRequests(page = 1) {
+  try {
+    const filters = getRequestFilters();
+    const params = new URLSearchParams({
+      page: page,
+      page_size: state.requests.pageSize,
+      ...filters
+    });
+    
+    const res = await fetch(`/v1/admin/requests?${params}`);
+    const data = await res.json();
+    
+    // Update pagination
+    state.requests.currentPage = data.page;
+    state.requests.totalPages = data.pages;
+    $("pageInfo").textContent = `Page ${data.page} of ${data.pages}`;
+    $("btnPrevPage").disabled = data.page <= 1;
+    $("btnNextPage").disabled = data.page >= data.pages;
+    
+    // Render table
+    renderRequestsTable(data.items);
+    
+  } catch (e) {
+    console.error("Failed to load requests:", e);
+    $("requestsTableBody").innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--err)">Failed to load requests: ${e.message}</td></tr>`;
+  }
+}
+
+function getRequestFilters() {
+  const filters = {};
+  const method = $("filterMethod").value;
+  const status = $("filterStatus").value;
+  const endpoint = $("filterEndpoint").value;
+  const ip = $("filterIP").value;
+  const apiKey = $("filterAPIKey").value;
+  
+  if (method) filters.method = method;
+  if (status) filters.status = parseInt(status);
+  if (endpoint) filters.endpoint = endpoint;
+  if (ip) filters.client_ip = ip;
+  if (apiKey) filters.api_key_prefix = apiKey;
+  
+  return filters;
+}
+
+function renderRequestsTable(requests) {
+  const tbody = $("requestsTableBody");
+  tbody.innerHTML = "";
+  
+  if (requests.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--muted)">No requests found</td></tr>`;
+    return;
+  }
+  
+  requests.forEach(req => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${formatTime(req.ts)}</td>
+      <td>${req.client_ip} ${req.geo_country ? `🇺🇸` : ''}</td>
+      <td>${req.api_key_masked || 'anonymous'}</td>
+      <td>${req.method}</td>
+      <td>${req.path}</td>
+      <td><span class="status-badge status-${req.status}">${req.status}</span></td>
+      <td style="text-align:right;font-family:monospace">${req.duration_ms}ms</td>
+      <td style="text-align:right;font-family:monospace">${req.bytes_in}/${req.bytes_out}</td>
+      <td><span class="status-badge result-${req.result}">${req.result}</span></td>
+      <td style="font-family:monospace;font-size:11px">${req.trace_id?.substring(0, 8)}...</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+function formatTime(ts) {
+  if (!ts) return "—";
+  const date = new Date(ts);
+  return date.toLocaleTimeString();
+}
+
+function toggleLiveTail() {
+  if (state.requests.liveTail) {
+    stopLiveTail();
+  } else {
+    startLiveTail();
+  }
+}
+
+function startLiveTail() {
+  if (state.requests.eventSource) {
+    state.requests.eventSource.close();
+  }
+  
+  const filters = getRequestFilters();
+  const params = new URLSearchParams(filters);
+  
+  state.requests.eventSource = new EventSource(`/v1/admin/requests/stream?${params}`);
+  
+  state.requests.eventSource.onmessage = function(event) {
+    if (event.type === 'message') {
+      try {
+        const data = JSON.parse(event.data);
+        // Add new request to table
+        const tbody = $("requestsTableBody");
+        const row = document.createElement("tr");
+        row.style.animation = "pulse 0.5s ease-in-out";
+        row.innerHTML = `
+          <td>${formatTime(data.ts)}</td>
+          <td>${data.client_ip} ${data.geo_country ? `🇺🇸` : ''}</td>
+          <td>${data.api_key_masked || 'anonymous'}</td>
+          <td>${data.method}</td>
+          <td>${data.path}</td>
+          <td><span class="status-badge status-${data.status}">${data.status}</span></td>
+          <td style="text-align:right;font-family:monospace">${data.duration_ms}ms</td>
+          <td style="text-align:right;font-family:monospace">${data.bytes_in}/${data.bytes_out}</td>
+          <td><span class="status-badge result-${data.result}">${data.result}</span></td>
+          <td style="font-family:monospace;font-size:11px">${data.trace_id?.substring(0, 8)}...</td>
+        `;
+        tbody.insertBefore(row, tbody.firstChild);
+        
+        // Remove old rows if too many
+        while (tbody.children.length > 100) {
+          tbody.removeChild(tbody.lastChild);
+        }
+      } catch (e) {
+        console.error("Failed to parse SSE data:", e);
+      }
+    }
+  };
+  
+  state.requests.eventSource.onerror = function(event) {
+    console.error("SSE error:", event);
+    stopLiveTail();
+  };
+  
+  state.requests.liveTail = true;
+  $("btnLiveTail").textContent = "Stop Live Tail";
+  $("btnLiveTail").classList.add("active");
+}
+
+function stopLiveTail() {
+  if (state.requests.eventSource) {
+    state.requests.eventSource.close();
+    state.requests.eventSource = null;
+  }
+  
+  state.requests.liveTail = false;
+  $("btnLiveTail").textContent = "Live Tail";
+  $("btnLiveTail").classList.remove("active");
+}
+
+async function exportCSV() {
+  try {
+    const filters = getRequestFilters();
+    const params = new URLSearchParams({
+      page_size: 1000, // Get more data for export
+      ...filters
+    });
+    
+    const res = await fetch(`/v1/admin/requests?${params}`);
+    const data = await res.json();
+    
+    // Create CSV content
+    const csv = [
+      "Time,Client IP,API Key,Method,Path,Status,Duration (ms),Bytes In,Bytes Out,Result,Trace ID",
+      ...data.items.map(req => [
+        req.ts,
+        req.client_ip,
+        req.api_key_masked || 'anonymous',
+        req.method,
+        req.path,
+        req.status,
+        req.duration_ms,
+        req.bytes_in,
+        req.bytes_out,
+        req.result,
+        req.trace_id
+      ].join(","))
+    ].join("\n");
+    
+    // Download file
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `requests-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+  } catch (e) {
+    console.error("Failed to export CSV:", e);
+    alert("Failed to export CSV: " + e.message);
+  }
 }
 
 // ---------- Logs Functions ----------
@@ -276,6 +558,9 @@ function startRefresh(){
   ensureChart();
   refresh();
   setInterval(refresh, 5000);
+  
+  // Load initial requests data
+  loadRequests(1);
 }
 
 // ---------- Minimal Version Dot ----------
