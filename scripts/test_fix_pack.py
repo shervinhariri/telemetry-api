@@ -36,7 +36,7 @@ def test_ingest():
     events = [create_event() for _ in range(100)]
     
     response = requests.post(
-        "http://localhost:8080/v1/ingest",
+        "http://localhost/v1/ingest",
         headers={"Authorization": "Bearer TEST_KEY"},
         json={"records": events}
     )
@@ -53,7 +53,7 @@ def test_metrics():
     """Test the metrics endpoint"""
     print("\n📊 Testing /v1/metrics...")
     
-    response = requests.get("http://localhost:8080/v1/metrics")
+    response = requests.get("http://localhost/v1/metrics")
     
     if response.status_code == 200:
         metrics = response.json()
@@ -80,7 +80,7 @@ def test_lookup():
     print("\n🔍 Testing /v1/lookup...")
     
     response = requests.post(
-        "http://localhost:8080/v1/lookup",
+        "http://localhost/v1/lookup",
         headers={"Authorization": "Bearer TEST_KEY", "Content-Type": "application/json"},
         json={"ip": "8.8.8.8"}
     )
@@ -103,7 +103,7 @@ def test_threat_matching():
     
     # Test with IP in our threat list
     response = requests.post(
-        "http://localhost:8080/v1/lookup",
+        "http://localhost/v1/lookup",
         headers={"Authorization": "Bearer TEST_KEY", "Content-Type": "application/json"},
         json={"ip": "45.149.3.100"}
     )

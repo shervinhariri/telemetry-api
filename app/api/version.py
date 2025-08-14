@@ -6,7 +6,7 @@ from packaging import version as semver
 router = APIRouter()
 
 APP_NAME = os.getenv("APP_NAME", "telemetry-api")
-APP_VERSION = os.getenv("APP_VERSION", "0.0.0")
+APP_VERSION = os.getenv("APP_VERSION", "0.6.1")
 GIT_SHA = os.getenv("GIT_SHA", "unknown")
 IMAGE = os.getenv("IMAGE", "shvin/telemetry-api")
 UPDATE_CHECK_ENABLED = os.getenv("UPDATE_CHECK_ENABLED", "true").lower() == "true"

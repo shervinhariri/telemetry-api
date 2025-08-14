@@ -1,13 +1,9 @@
 # Production Caddyfile for Telemetry API
 # Automatic HTTPS with Let's Encrypt
-# Rate limiting and security headers
+# Security headers
 
-{$DOMAIN:api.yourdomain.com} {
-    # Enable automatic HTTPS
-    tls {
-        on_demand
-    }
-
+# Local development configuration
+localhost:80 {
     # Security headers
     header {
         # Security headers
@@ -27,36 +23,6 @@
     }
     respond @options 200
 
-    # Rate limiting for ingest endpoint
-    @ingest {
-        path /v1/ingest
-    }
-    rate_limit @ingest {
-        zone ingest
-        rate {$RATE_LIMIT_INGEST_RPM:120}r/m
-        burst 10
-    }
-
-    # Rate limiting for other endpoints
-    @api {
-        path /v1/*
-        not path /v1/health
-        not path /v1/metrics
-    }
-    rate_limit @api {
-        zone api
-        rate {$RATE_LIMIT_DEFAULT_RPM:600}r/m
-        burst 50
-    }
-
-    # Basic auth for metrics endpoint
-    @metrics {
-        path /v1/metrics
-    }
-    basicauth @metrics {
-        {$BASIC_AUTH_USER:metrics} {$BASIC_AUTH_PASS:changeme}
-    }
-
     # Reverse proxy to API
     reverse_proxy api:8080 {
         # Health check
@@ -71,9 +37,4 @@
         output file /var/log/caddy/access.log
         format json
     }
-}
-
-# Handle HTTP to HTTPS redirect
-:80 {
-    redir https://{$DOMAIN}{uri} permanent
 }

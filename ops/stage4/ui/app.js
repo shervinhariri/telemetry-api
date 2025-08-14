@@ -115,21 +115,29 @@ async function refresh(){
   if (!mres.ok) { $("metricsLog").textContent = `[${mres.status}] Failed to fetch`; return; }
   $("metricsLog").textContent = mres.raw;
 
-  const m = parseProm(mres.raw);
+  // Parse JSON response instead of Prometheus format
+  let metrics;
+  try {
+    metrics = JSON.parse(mres.raw);
+  } catch (e) {
+    console.error("Failed to parse metrics JSON:", e);
+    return;
+  }
 
-  // Expected metric names (fallbacks safe)
-  const ingestTotal = m.get("telemetry_ingest_total") ?? m.get("ingest_total");
-  const threatsTotal = m.get("telemetry_threat_matches_total") ?? m.get("threat_matches_total");
-  const riskSum = m.get("telemetry_risk_score_sum");
-  const riskCount = m.get("telemetry_risk_score_count");
-  const lag = m.get("telemetry_queue_lag_gauge") ?? m.get("queue_lag");
-  const sourcesActive = m.get("telemetry_sources_active") ?? m.get("sources_active");
-  const batchesTotal = m.get("telemetry_batches_total") ?? m.get("ingest_batches_total");
+  // Extract values from new JSON structure
+  const ingestTotal = metrics.records_processed || 0;
+  const threatsTotal = metrics.totals?.threat_matches || 0;
+  const riskSum = metrics.totals?.risk_sum || 0;
+  const riskCount = metrics.totals?.risk_count || 0;
+  const lag = metrics.queue?.lag_ms_p95 || 0; // Use p95 lag
+  const sourcesActive = metrics.totals?.unique_sources || 0;
+  const batchesTotal = metrics.totals?.batches || 0;
+  const eps = metrics.rates?.eps_1m || 0; // Events per second (1m window)
 
   // KPIs
   $("kpi-events").textContent  = n(ingestTotal);
   $("kpi-threats").textContent = n(threatsTotal);
-  $("kpi-risk").textContent    = (riskSum!==undefined && riskCount>0) ? f2(riskSum / riskCount) : "—";
+  $("kpi-risk").textContent    = (riskCount > 0) ? f2(riskSum / riskCount) : "—";
   $("kpi-lag").textContent     = n(lag);
   $("kpi-sources").textContent = n(sourcesActive);
   $("kpi-batches").textContent = n(batchesTotal);
@@ -139,7 +147,7 @@ async function refresh(){
   pushSpark(state.sparkData.sources, sourcesActive || 0);
   pushSpark(state.sparkData.batches, batchesTotal || 0);
   pushSpark(state.sparkData.threats, threatsTotal || 0);
-  pushSpark(state.sparkData.risk, (riskSum!==undefined&&riskCount>0)?(riskSum/riskCount):0);
+  pushSpark(state.sparkData.risk, (riskCount > 0) ? (riskSum / riskCount) : 0);
   pushSpark(state.sparkData.lag, lag || 0);
 
   renderSpark("spark-events", state.sparkData.events);
@@ -149,13 +157,9 @@ async function refresh(){
   renderSpark("spark-risk", state.sparkData.risk, "#f59e0b");
   renderSpark("spark-lag", state.sparkData.lag, "#9fb3c8");
 
-  // Events/min
-  if (state.prevIngest !== undefined && ingestTotal !== undefined) {
-    const delta = Math.max(0, ingestTotal - state.prevIngest);
-    const ratePerMin = (delta / 5) * 60; // 5s interval
-    updateChart(ratePerMin);
-  }
-  state.prevIngest = ingestTotal;
+  // Events/min - use the eps rate from metrics
+  const ratePerMin = eps * 60; // Convert eps to epm
+  updateChart(ratePerMin);
 }
 
 // ---------- Button Handlers ----------
@@ -237,7 +241,7 @@ function initHandlers(){
 // ---------- Logs Functions ----------
 async function refreshLogs() {
   try {
-    const res = await fetch("/v1/logs/tail?max_bytes=65536&format=text");
+    const res = await fetch("/v1/logs/tail?max_bytes=1024&format=text");
     const text = await res.text();
     $("logsTail").textContent = text;
     

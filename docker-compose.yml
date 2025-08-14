@@ -5,6 +5,7 @@ services:
     image: ${API_IMAGE:-telemetry-api:latest}
     env_file: .env
     environment:
+      - APP_VERSION=0.6.1
       - GEOIP_CITY_DB=/data/geo/GeoLite2-City.mmdb
       - GEOIP_ASN_DB=/data/geo/GeoLite2-ASN.mmdb
       - TI_PATH=/data/ti/indicators.txt

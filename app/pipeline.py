@@ -138,10 +138,6 @@ def _update_stats():
         STATS["eps"] = STATS["records_processed"] / elapsed
     STATS["queue_depth"] = ingest_queue.qsize()
     STATS["last_processed"] = datetime.now().isoformat()
-    
-    # Also update new metrics system
-    from .metrics import record_event
-    record_event(0, 0)  # risk_score, threat_matches
 
 async def worker_loop():
     """Background worker that processes records from the ingest queue"""
@@ -161,11 +157,10 @@ async def worker_loop():
                 enriched = _enrich_record(record)
                 
                 # Extract data for metrics
-                src_ip = record.get('src_ip') or record.get('id_orig_h')
                 ti_matches = enriched.get('ti', {}).get('matches', [])
                 risk_score = enriched.get('risk_score', 0)
                 
-                # Record event for metrics
+                # Record event for metrics (only once)
                 record_event(risk_score, len(ti_matches))
                 
                 # Append to daily NDJSON
@@ -176,12 +171,6 @@ async def worker_loop():
                 
                 # Update statistics
                 STATS["records_processed"] += 1
-                
-                # Record metrics for this event
-                from .metrics import record_event
-                risk_score = enriched.get('risk_score', 0)
-                ti_matches = enriched.get('ti', {}).get('matches', [])
-                record_event(risk_score, len(ti_matches))
                 
                 _update_stats()
                 
