@@ -172,8 +172,16 @@ async def store_audit_record(record: dict):
         # Add to in-memory audit logs
         in_memory_audit_logs.append(record)
         
-        # Log it
-        logging.info(f"AUDIT: {record['method']} {record['path']} - {record['client_ip']} - {record['duration_ms']}ms")
+        # Use new readable logging format
+        from .logging_config import log_request
+        log_request(
+            method=record['method'],
+            path=record['path'],
+            status=record.get('status', 0),
+            duration_ms=record['duration_ms'],
+            client_ip=record['client_ip'],
+            trace_id=record['trace_id']
+        )
     except Exception as e:
         logging.error(f"Failed to store audit record: {e}")
 

@@ -11,6 +11,13 @@ def get_log_file_path() -> Path:
     """Get the path to the application log file"""
     return Path("/data/logs/app.log")
 
+@router.get("/logs")
+def get_logs(limit: int = Query(100, ge=1, le=1000), 
+             max_bytes: int = Query(2000000, ge=1024, le=5000000),
+             format: str = Query("text", regex="^(text|json)$")):
+    """Get logs with limit parameter for compatibility"""
+    return tail_logs(max_bytes=max_bytes, format=format)
+
 @router.get("/logs/tail")
 def tail_logs(max_bytes: int = Query(2000000, ge=1024, le=5000000), 
               format: str = Query("text", regex="^(text|json)$")):

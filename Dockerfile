@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app /app/app
 
 # Copy UI files
-COPY ops/stage4/ui /app/ui
+COPY ops/ui/ui /app/ui
 
 # Copy OpenAPI spec and docs
 COPY openapi.yaml /app/openapi.yaml

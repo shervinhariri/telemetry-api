@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telemetry API Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#0B0C10',
+                        surface: '#111218',
+                        surfaceHover: '#14151B',
+                        border: 'rgba(255,255,255,0.05)',
+                        borderHover: 'rgba(255,255,255,0.1)',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        html { 
+            -webkit-font-smoothing: antialiased; 
+            -moz-osx-font-smoothing: grayscale; 
+        }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        .success-ring {
+            background: conic-gradient(from 0deg, #22e3b0 0%, #22e3b0 var(--progress), #20252d var(--progress) 100%);
+        }
+        .slide-over {
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in-out;
+        }
+        .slide-over.open {
+            transform: translateX(0);
+        }
+        .backdrop {
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .backdrop.open {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="min-h-screen w-full bg-[#0B0C10] text-zinc-100 antialiased">
+    <div class="max-w-7xl mx-auto px-5 pb-24">
+        <!-- Top Bar -->
+        <div class="sticky top-0 z-30 backdrop-blur bg-[#0B0C10]/70">
+            <div class="max-w-7xl mx-auto px-5 py-4 flex items-center gap-3">
+                <div class="text-xl font-semibold tracking-tight">Telemetry</div>
+                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40">
+                    <span class="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                    Online
+                </span>
+                <div class="ml-auto flex items-center gap-2">
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-500/40">
+                        <span class="mr-1 h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
+                        API Key: TEST_KEY
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="mt-4 flex gap-2 flex-wrap">
+            <button id="tab-dashboard" class="tab-btn active px-4 py-2 rounded-2xl text-sm ring-1 bg-[#14151B] ring-indigo-500/40 text-zinc-100">Dashboard</button>
+            <button id="tab-requests" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Requests</button>
+            <button id="tab-logs" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Logs</button>
+            <button id="tab-api" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">API</button>
+        </div>
+
+        <!-- Dashboard Panel -->
+        <div id="panel-dashboard" class="panel active mt-6 space-y-4">
+            <div id="dashboard-error" class="text-xs text-red-400 hidden"></div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="metric-tile rounded-2xl bg-[#111218] ring-1 ring-white/5 p-4 flex flex-col gap-2 hover:bg-[#14151B] hover:ring-indigo-500/40 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/10">
+                    <div class="text-xs uppercase tracking-wide text-zinc-400 text-center">Queue Lag</div>
+                    <div id="queue-lag" class="text-2xl font-semibold leading-none text-center">—</div>
+                    <div class="text-xs text-zinc-500 text-center">ms (p50)</div>
+                </div>
+                <div class="metric-tile rounded-2xl bg-[#111218] ring-1 ring-white/5 p-4 flex flex-col gap-2 hover:bg-[#14151B] hover:ring-emerald-500/40 transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/10">
+                    <div class="text-xs uppercase tracking-wide text-zinc-400 text-center">Average Risk</div>
+                    <div id="avg-risk" class="text-2xl font-semibold leading-none text-center">—</div>
+                    <div class="text-xs text-zinc-500 text-center">0–100 scale</div>
+                </div>
+                <div class="metric-tile rounded-2xl bg-[#111218] ring-1 ring-white/5 p-4 flex flex-col gap-2 hover:bg-[#14151B] hover:ring-purple-500/40 transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/10">
+                    <div class="text-xs uppercase tracking-wide text-zinc-400 text-center">Threat Matches</div>
+                    <div id="threat-matches" class="text-2xl font-semibold leading-none text-center">—</div>
+                    <div class="text-xs text-zinc-500 text-center">last 15m</div>
+                </div>
+                <div class="metric-tile rounded-2xl bg-[#111218] ring-1 ring-white/5 p-4 flex flex-col gap-2 hover:bg-[#14151B] hover:ring-rose-500/40 transition-all duration-200 hover:shadow-lg hover:shadow-rose-500/10">
+                    <div class="text-xs uppercase tracking-wide text-zinc-400 text-center">Error Rate</div>
+                    <div id="error-rate" class="text-2xl font-semibold leading-none text-center">—</div>
+                    <div class="text-xs text-zinc-500 text-center">overall</div>
+                </div>
+            </div>
+
+            <div class="rounded-2xl bg-[#111218] ring-1 ring-white/5 p-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <div class="text-sm text-zinc-300">System Information</div>
+                    <div class="flex items-center gap-3 text-xs text-zinc-400">
+                        <label class="flex items-center gap-1 cursor-pointer select-none">
+                            <input id="auto-refresh" type="checkbox" class="accent-indigo-400" checked>
+                            Auto-refresh 5s
+                        </label>
+                        <button onclick="window.location.reload()" class="rounded-lg px-2 py-1 ring-1 ring-white/10 hover:ring-indigo-400/40">Hard refresh</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-2 gap-4">
+                    <div class="metric-tile rounded-2xl bg-[#111218] ring-1 ring-white/5 p-4 flex flex-col gap-2 hover:bg-[#14151B] hover:ring-indigo-500/40 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/10">
+                        <div class="text-xs uppercase tracking-wide text-zinc-400 text-center">Version</div>
+                        <div id="version" class="text-2xl font-semibold leading-none cursor-pointer hover:text-indigo-300 transition-colors text-center" onclick="window.open('/docs', '_blank')" title="Click to open Swagger UI documentation"></div>
+                    </div>
+                    <div class="metric-tile rounded-2xl bg-[#111218] ring-1 ring-white/5 p-4 flex flex-col gap-2 hover:bg-[#14151B] hover:ring-emerald-500/40 transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/10">
+                        <div class="text-xs uppercase tracking-wide text-zinc-400 text-center">Uptime</div>
+                        <div id="uptime" class="text-2xl font-semibold leading-none text-center">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Requests Panel -->
+        <div id="panel-requests" class="panel hidden mx-auto max-w-7xl px-6 md:px-10 pb-16">
+            <div id="requests-error" class="text-xs text-red-400 hidden"></div>
+            
+            <!-- Top stats -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-6">
+                    <div class="flex flex-col items-center">
+                        <div class="relative grid place-items-center">
+                            <svg class="w-[148px] h-[148px] transform -rotate-90" viewBox="0 0 148 148">
+                                <circle cx="74" cy="74" r="70" stroke="rgba(255,255,255,0.1)" stroke-width="8" fill="none"/>
+                                <circle id="success-ring" cx="74" cy="74" r="70" stroke="#22c55e" stroke-width="8" fill="none" 
+                                        stroke-linecap="round" stroke-dasharray="0 440" stroke-dashoffset="0"/>
+                            </svg>
+                            <div class="absolute rounded-full grid place-items-center bg-[#111218] ring-1 ring-white/10" style="width: 124px; height: 124px;">
+                                <div id="success-percentage" class="text-2xl font-semibold tabular-nums">—</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-sm text-zinc-400">Success Rate</div>
+                    </div>
+                </div>
+                <div class="rounded-2xl bg-[#111218] ring-1 ring-white/5 p-6">
+                    <div class="h-full grid place-items-center">
+                        <div class="text-center">
+                            <div id="avg-latency" class="text-2xl font-semibold leading-none">—</div>
+                            <div class="text-xs text-zinc-500 mt-1">Avg Latency</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent requests toolbar -->
+            <div class="mt-10 mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold text-white">Recent Requests</h2>
+                <div class="flex items-center gap-3">
+                    <button id="refresh-requests" class="rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 px-4 py-2 border border-emerald-400/20">
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02]">
+                <table class="w-full text-left">
+                    <thead class="text-zinc-400 text-sm border-b border-white/5">
+                        <tr>
+                            <th class="px-5 py-3">Time</th>
+                            <th class="px-5 py-3">Endpoint</th>
+                            <th class="px-5 py-3">Status</th>
+                            <th class="px-5 py-3">Latency</th>
+                            <th class="px-5 py-3">Records</th>
+                            <th class="px-5 py-3">Client</th>
+                        </tr>
+                    </thead>
+                    <tbody id="requests-table" class="divide-y divide-white/5">
+                        <tr>
+                            <td colspan="6" class="px-5 py-6 text-center text-zinc-500">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Logs Panel -->
+        <div id="panel-logs" class="panel hidden mt-6 space-y-4">
+            <div id="logs-error" class="text-xs text-red-400 hidden"></div>
+            <div class="flex items-center gap-3">
+                <button id="start-logs" class="rounded-xl px-3 py-2 text-sm ring-1 bg-emerald-500/15 ring-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20">Start Live</button>
+                <button id="stop-logs" class="rounded-xl px-3 py-2 text-sm bg-rose-500/15 text-rose-200 ring-1 ring-rose-500/30 hover:bg-rose-500/20">Stop Live</button>
+                <button id="download-logs" class="rounded-xl px-3 py-2 text-sm bg-indigo-500/15 text-indigo-200 ring-1 ring-indigo-500/30 hover:bg-indigo-500/20">Download (2MB)</button>
+            </div>
+            <div class="rounded-2xl bg-[#111218] ring-1 ring-white/5 p-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <div class="text-sm text-zinc-300">Live Logs</div>
+                </div>
+                <div id="logs-content" class="h-[60vh] overflow-auto font-mono text-[11px] leading-relaxed">
+                    <div class="text-zinc-500">No logs yet.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Panel -->
+        <div id="panel-api" class="panel hidden mt-6 space-y-4">
+            <div id="api-error" class="text-xs text-red-400 hidden"></div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="rounded-2xl bg-[#111218] ring-1 ring-white/5 p-6">
+                    <div class="mb-4 flex items-center justify-between">
+                        <div class="text-sm text-zinc-300">System Info</div>
+                        <button id="fetch-system" class="text-xs rounded-lg ring-1 ring-white/10 px-2 py-1 hover:ring-indigo-400/40">Fetch</button>
+                    </div>
+                    <pre id="system-response" class="text-xs leading-relaxed overflow-auto rounded-xl bg-black/40 p-4 ring-1 ring-white/5 h-64 max-h-64">—</pre>
+                </div>
+                <div class="rounded-2xl bg-[#111218] ring-1 ring-white/5 p-6">
+                    <div class="mb-4 flex items-center justify-between">
+                        <div class="text-sm text-zinc-300">Metrics</div>
+                        <button id="fetch-metrics" class="text-xs rounded-lg ring-1 ring-white/10 px-2 py-1 hover:ring-indigo-400/40">Fetch</button>
+                    </div>
+                    <pre id="metrics-response" class="text-xs leading-relaxed overflow-auto rounded-xl bg-black/40 p-4 ring-1 ring-white/5 h-64 max-h-64">—</pre>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="rounded-2xl bg-[#111218] ring-1 ring-white/5 p-6">
+                    <div class="mb-4 flex items-center justify-between">
+                        <div class="text-sm text-zinc-300">Ingest (JSON)</div>
+                    </div>
+                    <textarea id="ingest-data" rows="10" class="w-full rounded-xl bg-black/40 p-3 text-xs ring-1 ring-white/5 outline-none">{
+  "records": []
+}</textarea>
+                    <div class="mt-2 flex justify-end">
+                        <button id="send-ingest" class="text-xs rounded-lg ring-1 ring-white/10 px-2 py-1 hover:ring-indigo-400/40">Send</button>
+                    </div>
+                </div>
+                <div class="rounded-2xl bg-[#111218] ring-1 ring-white/5 p-6">
+                    <div class="mb-4 flex items-center justify-between">
+                        <div class="text-sm text-zinc-300">Lookup</div>
+                    </div>
+                    <input id="lookup-value" placeholder="ip, domain, hash…" class="w-full rounded-xl bg-black/40 p-3 text-sm ring-1 ring-white/5 outline-none">
+                    <div class="mt-2 flex justify-end">
+                        <button id="run-lookup" class="text-xs rounded-lg ring-1 ring-white/10 px-2 py-1 hover:ring-indigo-400/40">Run</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-2xl bg-[#111218] ring-1 ring-white/5 p-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <div class="text-sm text-zinc-300">Output</div>
+                </div>
+                <pre id="api-output" class="text-xs leading-relaxed overflow-auto rounded-xl bg-black/40 p-4 ring-1 ring-white/5">—</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide-over for request details -->
+    <div id="slide-over-backdrop" class="backdrop fixed inset-0 z-50 bg-black/50 pointer-events-none"></div>
+    <div id="slide-over" class="slide-over fixed top-0 right-0 h-full bg-[#121316] w-full sm:w-[560px] shadow-2xl z-50">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+            <h3 class="text-lg font-semibold text-white">Request Details</h3>
+            <button id="close-slide-over" class="rounded-md px-2 py-1 text-zinc-400 hover:text-white hover:bg-white/5">✕</button>
+        </div>
+        <div id="slide-over-content" class="h-[calc(100%-56px)] overflow-y-auto p-6">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <script src="/ui/app.js"></script>
+</body>
+</html>

@@ -30,7 +30,7 @@ from .pipeline import ingest_queue, record_batch_accepted, enqueue
 from .logging_config import setup_logging, log_heartbeat
 
 API_PREFIX = "/v1"
-API_VERSION = "1.0.0"
+API_VERSION = "0.7.9"
 
 API_KEY = os.getenv("API_KEY", "TEST_KEY")
 GEOIP_DB_CITY = os.getenv("GEOIP_DB_CITY", "/data/GeoLite2-City.mmdb")
@@ -51,6 +51,9 @@ setup_logging()
 async def lifespan(app: FastAPI):
     # Startup
     from .pipeline import worker_loop
+    from .logging_config import log_system_event
+    
+    log_system_event("startup", "Telemetry API starting up", "Initializing pipeline workers and metrics")
     
     # Start two worker processes
     asyncio.create_task(worker_loop())
@@ -66,8 +69,11 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(metrics_ticker())
     logging.info("Metrics ticker started")
     
+    log_system_event("success", "Telemetry API ready", "All services started successfully")
+    
     yield
     # Shutdown
+    log_system_event("shutdown", "Telemetry API shutting down", "Stopping pipeline workers")
     logging.info("Shutting down pipeline workers")
 
 app = FastAPI(title="Live Network Threat Telemetry API (MVP)", lifespan=lifespan)
@@ -179,8 +185,6 @@ async def track_requests(request: Request, call_next):
                 # Sanitize audit data for privacy
                 from .security import sanitize_log_data
                 latest_record = sanitize_log_data(latest_record)
-        
-        logging.info(f"AUDIT_COMPLETE: {request.method} {request.url.path} - {response.status_code} - {trace_id}")
         
         increment_requests(response.status_code >= 400)
         return response
@@ -323,6 +327,16 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
         
         if accepted < len(records):
             raise HTTPException(status_code=429, detail="Ingest temporarily overloaded, please retry.")
+
+        # Log ingest operation
+        duration_ms = int((time.time() - start_time) * 1000)
+        from .logging_config import log_ingest
+        log_ingest(
+            records_count=len(records),
+            success_count=accepted,
+            failed_count=len(records) - accepted,
+            duration_ms=duration_ms
+        )
 
         # Track operations for audit
         if trace_id:

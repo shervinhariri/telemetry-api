@@ -25,7 +25,7 @@ def setup_logging():
     # Console handler
     console_handler = logging.StreamHandler()
     console_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        '%(asctime)s | %(levelname)-8s | %(message)s'
     )
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
@@ -37,13 +37,19 @@ def setup_logging():
         backupCount=3
     )
     file_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        '%(asctime)s | %(levelname)-8s | %(message)s'
     )
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
     
     # Log startup
-    logging.info(f"Logging configured - level: {log_level}, file: {data_dir}/logs/app.log")
+    logging.info("=" * 60)
+    logging.info("🚀 TELEMETRY API STARTING UP")
+    logging.info("=" * 60)
+    logging.info(f"📊 Log Level: {log_level}")
+    logging.info(f"📁 Log File: {data_dir}/logs/app.log")
+    logging.info(f"⏰ Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info("=" * 60)
 
 def log_heartbeat():
     """Log system heartbeat with basic metrics"""
@@ -53,11 +59,52 @@ def log_heartbeat():
         memory = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
         
-        logging.info(
-            f"HEARTBEAT - CPU: {cpu_percent:.1f}%, "
-            f"Memory: {memory.percent:.1f}%, "
-            f"Disk: {disk.percent:.1f}%"
-        )
+        logging.info("💓 SYSTEM HEARTBEAT")
+        logging.info(f"   CPU Usage: {cpu_percent:.1f}%")
+        logging.info(f"   Memory: {memory.percent:.1f}% ({memory.used // (1024**3):.1f}GB / {memory.total // (1024**3):.1f}GB)")
+        logging.info(f"   Disk: {disk.percent:.1f}% ({disk.used // (1024**3):.1f}GB / {disk.total // (1024**3):.1f}GB)")
+        logging.info("-" * 40)
     except ImportError:
         # Fallback without psutil
-        logging.info("HEARTBEAT - psutil not available")
+        logging.info("💓 HEARTBEAT - psutil not available")
+        logging.info("-" * 40)
+
+def log_request(method, path, status, duration_ms, client_ip, trace_id):
+    """Log HTTP request in a readable format"""
+    status_emoji = "✅" if status < 400 else "❌" if status >= 500 else "⚠️"
+    duration_color = "🟢" if duration_ms < 100 else "🟡" if duration_ms < 500 else "🔴"
+    
+    logging.info(f"🌐 HTTP REQUEST")
+    logging.info(f"   {status_emoji} {method} {path} → {status}")
+    logging.info(f"   {duration_color} Duration: {duration_ms}ms")
+    logging.info(f"   📍 Client: {client_ip}")
+    logging.info(f"   🔍 Trace ID: {trace_id}")
+    logging.info("-" * 40)
+
+def log_ingest(records_count, success_count, failed_count, duration_ms):
+    """Log ingest operation in a readable format"""
+    success_rate = (success_count / records_count * 100) if records_count > 0 else 0
+    status_emoji = "✅" if failed_count == 0 else "⚠️" if failed_count < records_count else "❌"
+    
+    logging.info(f"📥 INGEST OPERATION")
+    logging.info(f"   {status_emoji} Records: {records_count} | Success: {success_count} | Failed: {failed_count}")
+    logging.info(f"   📊 Success Rate: {success_rate:.1f}%")
+    logging.info(f"   ⏱️  Duration: {duration_ms}ms")
+    logging.info("-" * 40)
+
+def log_system_event(event_type, message, details=None):
+    """Log system events in a readable format"""
+    emoji_map = {
+        "startup": "🚀",
+        "shutdown": "🛑", 
+        "error": "❌",
+        "warning": "⚠️",
+        "info": "ℹ️",
+        "success": "✅"
+    }
+    
+    emoji = emoji_map.get(event_type, "📝")
+    logging.info(f"{emoji} SYSTEM EVENT: {message}")
+    if details:
+        logging.info(f"   📋 Details: {details}")
+    logging.info("-" * 40)

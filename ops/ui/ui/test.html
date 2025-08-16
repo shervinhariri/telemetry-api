@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Dashboard JavaScript Test</h1>
+    
+    <div class="test">
+        <h3>Test API Calls</h3>
+        <button onclick="testSystem()">Test System API</button>
+        <button onclick="testMetrics()">Test Metrics API</button>
+        <button onclick="testDashboard()">Test Dashboard Class</button>
+    </div>
+    
+    <div class="test">
+        <h3>Results</h3>
+        <pre id="results">Click buttons to test...</pre>
+    </div>
+
+    <script>
+        async function testSystem() {
+            const results = document.getElementById('results');
+            results.textContent = 'Testing System API...\n';
+            
+            try {
+                const response = await fetch('http://localhost:8080/v1/system', {
+                    headers: {
+                        'Authorization': 'Bearer TEST_KEY',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    results.textContent += `✅ System API successful\n`;
+                    results.textContent += `Version: ${data.version}\n`;
+                    results.textContent += `Uptime: ${data.uptime_s}s\n`;
+                } else {
+                    results.textContent += `❌ System API failed: ${response.status}\n`;
+                }
+            } catch (error) {
+                results.textContent += `❌ System API error: ${error.message}\n`;
+            }
+        }
+        
+        async function testMetrics() {
+            const results = document.getElementById('results');
+            results.textContent = 'Testing Metrics API...\n';
+            
+            try {
+                const response = await fetch('http://localhost:8080/v1/metrics', {
+                    headers: {
+                        'Authorization': 'Bearer TEST_KEY',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    results.textContent += `✅ Metrics API successful\n`;
+                    results.textContent += `Queue Lag: ${data.queue?.lag_ms_p50 || 0}ms\n`;
+                    results.textContent += `Risk Sum: ${data.totals?.risk_sum || 0}\n`;
+                    results.textContent += `Risk Count: ${data.totals?.risk_count || 0}\n`;
+                    results.textContent += `Threat Matches: ${data.totals?.threat_matches || 0}\n`;
+                    results.textContent += `Total Requests: ${data.requests_total || 0}\n`;
+                    results.textContent += `Failed Requests: ${data.requests_failed || 0}\n`;
+                } else {
+                    results.textContent += `❌ Metrics API failed: ${response.status}\n`;
+                }
+            } catch (error) {
+                results.textContent += `❌ Metrics API error: ${error.message}\n`;
+            }
+        }
+        
+        async function testDashboard() {
+            const results = document.getElementById('results');
+            results.textContent = 'Testing Dashboard Class...\n';
+            
+            try {
+                // Test if the dashboard class exists
+                if (typeof TelemetryDashboard !== 'undefined') {
+                    results.textContent += `✅ TelemetryDashboard class exists\n`;
+                    
+                    // Test API call method
+                    const dashboard = new TelemetryDashboard();
+                    results.textContent += `✅ Dashboard instance created\n`;
+                    
+                    // Test API call
+                    const systemData = await dashboard.apiCall('/system');
+                    results.textContent += `✅ Dashboard API call successful\n`;
+                    results.textContent += `Version: ${systemData.version}\n`;
+                    
+                } else {
+                    results.textContent += `❌ TelemetryDashboard class not found\n`;
+                }
+            } catch (error) {
+                results.textContent += `❌ Dashboard test error: ${error.message}\n`;
+            }
+        }
+    </script>
+</body>
+</html>

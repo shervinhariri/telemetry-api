@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Requests Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #0B0C10; color: white; }
+        .test { background: #111218; padding: 15px; margin: 10px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; background: #1f2937; color: white; border: none; border-radius: 5px; }
+        button:hover { background: #374151; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        th { background: rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body>
+    <h1>Requests Test</h1>
+    
+    <div class="test">
+        <h3>Test API Calls</h3>
+        <button onclick="testRequests()">Test Requests API</button>
+        <button onclick="testAdminRequests()">Test Admin Requests</button>
+        <button onclick="testApiRequests()">Test API Requests</button>
+    </div>
+    
+    <div class="test">
+        <h3>Results</h3>
+        <div id="results">Click buttons to test...</div>
+    </div>
+    
+    <div class="test">
+        <h3>Requests Data</h3>
+        <div id="requests-data">No data yet...</div>
+    </div>
+
+    <script>
+        async function testRequests() {
+            const results = document.getElementById('results');
+            results.innerHTML = 'Testing /v1/requests...<br>';
+            
+            try {
+                const response = await fetch('/v1/requests', {
+                    headers: {
+                        'Authorization': 'Bearer TEST_KEY',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    results.innerHTML += `✅ /v1/requests working! Items: ${data.items?.length || 0}<br>`;
+                } else {
+                    results.innerHTML += `❌ /v1/requests failed: ${response.status}<br>`;
+                }
+            } catch (error) {
+                results.innerHTML += `❌ /v1/requests error: ${error.message}<br>`;
+            }
+        }
+        
+        async function testAdminRequests() {
+            const results = document.getElementById('results');
+            results.innerHTML += 'Testing /v1/admin/requests...<br>';
+            
+            try {
+                const response = await fetch('/v1/admin/requests', {
+                    headers: {
+                        'Authorization': 'Bearer TEST_KEY',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    results.innerHTML += `✅ Admin requests working! Items: ${data.items?.length || 0}<br>`;
+                } else {
+                    results.innerHTML += `❌ Admin requests failed: ${response.status}<br>`;
+                }
+            } catch (error) {
+                results.innerHTML += `❌ Admin requests error: ${error.message}<br>`;
+            }
+        }
+        
+        async function testApiRequests() {
+            const results = document.getElementById('results');
+            results.innerHTML += 'Testing /v1/api/requests...<br>';
+            
+            try {
+                const response = await fetch('/v1/api/requests', {
+                    headers: {
+                        'Authorization': 'Bearer TEST_KEY',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    results.innerHTML += `✅ API requests working! Items: ${data.items?.length || 0}<br>`;
+                    
+                    // Display the data
+                    const requestsData = document.getElementById('requests-data');
+                    if (data.items && data.items.length > 0) {
+                        const table = `
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Method</th>
+                                        <th>Path</th>
+                                        <th>Status</th>
+                                        <th>Duration</th>
+                                        <th>Client IP</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.items.slice(0, 5).map(item => `
+                                        <tr>
+                                            <td>${item.method || '—'}</td>
+                                            <td>${item.path || '—'}</td>
+                                            <td>${item.status || '—'}</td>
+                                            <td>${item.duration_ms || 0}ms</td>
+                                            <td>${item.client_ip || '—'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                        requestsData.innerHTML = table;
+                    } else {
+                        requestsData.innerHTML = 'No requests data found';
+                    }
+                } else {
+                    results.innerHTML += `❌ API requests failed: ${response.status}<br>`;
+                }
+            } catch (error) {
+                results.innerHTML += `❌ API requests error: ${error.message}<br>`;
+            }
+        }
+    </script>
+</body>
+</html>

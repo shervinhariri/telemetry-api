@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .active { background: #007bff; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Dashboard Debug</h1>
+    
+    <div class="debug">
+        <h3>Test Navigation</h3>
+        <button onclick="testTab('dashboard')">Dashboard</button>
+        <button onclick="testTab('requests')">Requests</button>
+        <button onclick="testTab('logs')">Logs</button>
+        <button onclick="testTab('api')">API</button>
+    </div>
+    
+    <div class="debug">
+        <h3>Test API Calls</h3>
+        <button onclick="testAPI('/version')">Test Version</button>
+        <button onclick="testAPI('/metrics')">Test Metrics</button>
+        <button onclick="testAPI('/system')">Test System</button>
+    </div>
+    
+    <div class="debug">
+        <h3>Results</h3>
+        <pre id="results">Click buttons to test...</pre>
+    </div>
+
+    <script>
+        async function testTab(tabName) {
+            const results = document.getElementById('results');
+            results.textContent = `Testing tab: ${tabName}\n`;
+            
+            // Test if elements exist
+            const tabBtn = document.getElementById(`tab-${tabName}`);
+            const panel = document.getElementById(`panel-${tabName}`);
+            
+            results.textContent += `Tab button exists: ${!!tabBtn}\n`;
+            results.textContent += `Panel exists: ${!!panel}\n`;
+            
+            if (tabBtn && panel) {
+                results.textContent += `✅ Both elements found for ${tabName}\n`;
+            } else {
+                results.textContent += `❌ Missing elements for ${tabName}\n`;
+            }
+        }
+        
+        async function testAPI(endpoint) {
+            const results = document.getElementById('results');
+            results.textContent = `Testing API: ${endpoint}\n`;
+            
+            try {
+                const response = await fetch(`http://localhost:8080/v1${endpoint}`, {
+                    headers: {
+                        'Authorization': 'Bearer TEST_KEY',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    results.textContent += `✅ API call successful\n`;
+                    results.textContent += `Response: ${JSON.stringify(data, null, 2)}\n`;
+                } else {
+                    results.textContent += `❌ API call failed: ${response.status}\n`;
+                }
+            } catch (error) {
+                results.textContent += `❌ API call error: ${error.message}\n`;
+            }
+        }
+    </script>
+</body>
+</html>
