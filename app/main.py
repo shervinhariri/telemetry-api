@@ -26,23 +26,21 @@ from .api.logs import router as logs_router
 from .api.requests import router as requests_router
 from .api.system import router as system_router
 from .api.keys import router as keys_router
+from .api.demo import router as demo_router
+from .api.prometheus import router as prometheus_router
 from .pipeline import ingest_queue, record_batch_accepted, enqueue
 from .logging_config import setup_logging, log_heartbeat
 
-API_PREFIX = "/v1"
-API_VERSION = "0.7.9"
+API_VERSION = "0.8.0"
 
-API_KEY = os.getenv("API_KEY", "TEST_KEY")
-GEOIP_DB_CITY = os.getenv("GEOIP_DB_CITY", "/data/GeoLite2-City.mmdb")
-GEOIP_DB_ASN = os.getenv("GEOIP_DB_ASN", "/data/GeoLite2-ASN.mmdb")
-THREATLIST_CSV = os.getenv("THREATLIST_CSV", "/data/threats.csv")
-
-# Output configurations
-SPLUNK_HEC_URL = os.getenv("SPLUNK_HEC_URL")
-SPLUNK_HEC_TOKEN = os.getenv("SPLUNK_HEC_TOKEN")
-ELASTIC_URL = os.getenv("ELASTIC_URL")
-ELASTIC_USERNAME = os.getenv("ELASTIC_USERNAME")
-ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD")
+# Import configuration
+from .config import (
+    DEMO_MODE, DEMO_EPS, DEMO_DURATION_SEC, DEMO_VARIANTS,
+    API_PREFIX, API_KEY, DATABASE_URL, GEOIP_DB_CITY, GEOIP_DB_ASN,
+    THREATLIST_CSV, SPLUNK_HEC_URL, SPLUNK_HEC_TOKEN,
+    ELASTIC_URL, ELASTIC_USERNAME, ELASTIC_PASSWORD,
+    LOG_LEVEL, LOG_FILE, RETENTION_DAYS
+)
 
 # Configure logging with rotating file handler
 setup_logging()
@@ -97,6 +95,8 @@ app.include_router(logs_router, prefix=API_PREFIX)
 app.include_router(requests_router, prefix=API_PREFIX)
 app.include_router(system_router, prefix=API_PREFIX)
 app.include_router(keys_router, prefix=API_PREFIX)
+app.include_router(demo_router, prefix=API_PREFIX)
+app.include_router(prometheus_router, prefix=API_PREFIX)
 
 # Compatibility route for old UI paths
 @app.get("/api/requests")

@@ -3,6 +3,7 @@ import threading
 from collections import deque
 from typing import Dict, Any, List, Optional
 import statistics
+from .services.prometheus_metrics import prometheus_metrics
 
 class MetricsAggregator:
     def __init__(self):
@@ -53,6 +54,10 @@ class MetricsAggregator:
             self.requests_total += 1
             if failed:
                 self.requests_failed += 1
+            
+            # Update Prometheus metrics
+            status_code = 500 if failed else 200
+            prometheus_metrics.increment_requests(status_code)
                 
     def record_batch(self, record_count: int, threat_matches: int, risk_scores: List[int], sources: List[str]):
         """Record a processed batch"""
@@ -72,10 +77,18 @@ class MetricsAggregator:
             # Update current minute batch counter
             self.current_minute_batches += 1
             
+            # Update Prometheus metrics
+            prometheus_metrics.increment_records_processed(record_count)
+            if threat_matches > 0:
+                prometheus_metrics.increment_threat_matches(threat_matches)
+            
     def record_queue_lag(self, lag_ms: int):
         """Record queue lag measurement"""
         with self.lock:
             self.lag_samples.append(lag_ms)
+            
+        # Update Prometheus metrics
+        prometheus_metrics.set_queue_lag(lag_ms)
             
     def tick(self):
         """Background tick to roll windows and update time series"""
@@ -119,6 +132,9 @@ class MetricsAggregator:
         for key in self.timeseries:
             if len(self.timeseries[key]) > 60:
                 self.timeseries[key] = self.timeseries[key][-60:]
+        
+        # Update Prometheus EPS gauge
+        prometheus_metrics.set_eps(eps)
                 
     def get_metrics(self) -> Dict[str, Any]:
         """Get current metrics"""

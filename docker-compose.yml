@@ -5,7 +5,8 @@ services:
     build: .
     env_file: .env
     environment:
-      - APP_VERSION=0.7.9
+      - APP_VERSION=0.8.0
+      - DOCKERHUB_TAG=0.8.0
       - GEOIP_CITY_DB=/data/geo/GeoLite2-City.mmdb
       - GEOIP_ASN_DB=/data/geo/GeoLite2-ASN.mmdb
       - TI_PATH=/data/ti/indicators.txt
@@ -14,6 +15,10 @@ services:
       - ENRICH_ENABLE_TI=true
       - EXPORT_ELASTIC_ENABLED=false
       - EXPORT_SPLUNK_ENABLED=false
+      - DEMO_MODE=true
+      - DEMO_EPS=50
+      - DEMO_DURATION_SEC=120
+      - DEMO_VARIANTS=netflow,zeek
     ports:
       - "80:8080"
     healthcheck:

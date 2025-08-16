@@ -53,6 +53,56 @@ curl -s -X POST http://localhost:8080/v1/ingest/zeek \
   --data @samples/zeek_conn_small.json | jq
 ```
 
+## 🎯 Quickstart (Demo Mode + Prometheus)
+
+Get up and running with demo data and monitoring in 5 minutes:
+
+```bash
+# 1) Run with demo mode enabled
+docker run -d -p 8080:8080 \
+  -e API_KEY=TEST_KEY \
+  -e DEMO_MODE=true \
+  -e DEMO_EPS=50 \
+  -e DEMO_DURATION_SEC=120 \
+  --name telemetry-api-demo shvin/telemetry-api:latest
+
+# 2) Start demo generator
+curl -s -X POST http://localhost:8080/v1/demo/start \
+  -H "Authorization: Bearer TEST_KEY" | jq
+
+# 3) Check Prometheus metrics
+curl -s http://localhost:8080/v1/metrics/prometheus | head -20
+
+# 4) View dashboard
+open http://localhost:8080
+
+# 5) Stop demo when done
+curl -s -X POST http://localhost:8080/v1/demo/stop \
+  -H "Authorization: Bearer TEST_KEY" | jq
+```
+
+### Grafana Dashboard
+
+1. **Import Dashboard**: Use `dashboards/grafana/telemetry-api.json`
+2. **Configure Prometheus**: Add Prometheus data source pointing to `http://localhost:8080/v1/metrics/prometheus`
+3. **View Metrics**: Dashboard shows EPS, latency, threat matches, and more
+
+### Demo Configuration
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `DEMO_MODE` | `false` | Enable demo mode |
+| `DEMO_EPS` | `50` | Events per second |
+| `DEMO_DURATION_SEC` | `120` | Demo duration in seconds |
+| `DEMO_VARIANTS` | `netflow,zeek` | Event types to generate |
+
+### Troubleshooting
+
+- **Demo not starting**: Check `DEMO_MODE=true` and API key has admin scope
+- **No metrics**: Verify `/v1/metrics/prometheus` endpoint is accessible
+- **Grafana import fails**: Ensure Prometheus data source is configured correctly
+```
+
 ## 📊 Features
 
 ### Supported Inputs
