@@ -1,2 +1,4 @@
 .env
 data/*.mmdb
+data/logs/*.log
+data/events-*.ndjson
