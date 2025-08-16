@@ -65,6 +65,13 @@
     .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .right{margin-left:auto}
     
+    /* Status chip styling */
+    .status-chip{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:#0c1324;border:1px solid #1d2842;font-size:12px}
+    .status-dot{width:6px;height:6px;border-radius:50%;background:#9fb3c8}
+    .status-dot.online{background:#34d399}
+    .status-dot.offline{background:#fb7185}
+    .version-text{font-size:12px;color:var(--muted);margin-left:12px}
+    
     /* Status codes styling */
     .status-codes{display:flex;gap:8px;font-size:12px}
     .status-2xx{color:#10b981}
@@ -98,6 +105,95 @@
     .pagination{display:flex;align-items:center;justify-content:center;gap:12px}
     
     /* Drawer styling */
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: -400px;
+      width: 400px;
+      height: 100vh;
+      background: var(--card);
+      border-left: 1px solid var(--line);
+      transition: right 0.3s ease;
+      z-index: 1000;
+      overflow-y: auto;
+    }
+    .drawer.open {
+      right: 0;
+    }
+    .drawer-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .drawer-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+    }
+    .drawer-content {
+      padding: 16px;
+    }
+    .drawer-section {
+      margin-bottom: 20px;
+    }
+    .drawer-section h4 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .drawer-section pre {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 11px;
+      overflow-x: auto;
+      margin: 0;
+    }
+    
+    /* State cards styling */
+    .state-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .state-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+    .state-card .value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .state-card .label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    
+    /* Performance chart styling */
+    .performance-chart {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .chart-container {
+      height: 200px;
+      position: relative;
+    }
     .drawer{position:fixed;top:0;right:0;width:400px;height:100vh;background:var(--card);border-left:1px solid #1d2842;z-index:1000;transform:translateX(100%);transition:transform 0.3s ease}
     .drawer.open{transform:translateX(0)}
     .drawer-header{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid #1d2842}
@@ -109,19 +205,19 @@
 <body>
   <div class="wrap">
     <div class="topbar">
-      <div class="inline">
-        <div class="title">🚀 Telemetry</div>
-      </div>
-      <div class="inline right">
-        <div id="versionDot" class="version-dot">
-          <div class="dot"></div>
-                      <span id="versionText">v0.7.5</span>
-        </div>
-        <label for="key" class="small">API Key</label>
-        <input id="key" style="min-width:220px" value="TEST_KEY" />
-        <button id="btnHealth">Health</button>
-      </div>
+  <div class="inline">
+    <div class="title">🚀 Telemetry</div>
+  </div>
+  <div class="inline right">
+    <div id="statusChip" class="status-chip">
+      <div class="status-dot"></div>
+      <span id="statusText">Checking...</span>
     </div>
+    <label for="key" class="small">API Key</label>
+    <input id="key" style="min-width:220px" placeholder="Enter API key" />
+    <div id="versionText" class="version-text">Version: Loading...</div>
+  </div>
+</div>
 
     <div class="tabs">
       <div class="tab active" data-tab="dashboard">Dashboard</div>
@@ -135,7 +231,36 @@
 
     <!-- DASHBOARD -->
     <div class="panel active" id="panel-dashboard">
-      <div class="grid">
+      <!-- Performance Chart -->
+      <div class="performance-chart">
+        <h3>Throughput (events/sec) - Last 15 minutes</h3>
+        <div class="chart-container">
+          <canvas id="throughput-chart"></canvas>
+        </div>
+      </div>
+      
+      <!-- State Cards -->
+      <div class="state-cards">
+        <div class="state-card">
+          <div class="value" id="queue-lag">—</div>
+          <div class="label">Queue Lag (records)</div>
+        </div>
+        <div class="state-card">
+          <div class="value" id="avg-risk">—</div>
+          <div class="label">Avg Risk (0-10)</div>
+        </div>
+        <div class="state-card">
+          <div class="value" id="threat-matches">—</div>
+          <div class="label">Threat Matches (15m)</div>
+        </div>
+        <div class="state-card">
+          <div class="value" id="error-rate">—</div>
+          <div class="label">Error Rate (%)</div>
+        </div>
+      </div>
+      
+      <!-- Legacy Grid (hidden by default) -->
+      <div class="grid" style="display: none;">
         <!-- Row 1: Core Metrics -->
         <div class="card">
           <div class="kpi">
@@ -218,14 +343,46 @@
 
     <!-- REQUESTS -->
     <div class="panel" id="panel-requests">
+      <!-- State Cards -->
+      <div class="state-cards">
+        <div class="state-card">
+          <div class="value" id="total-requests">—</div>
+          <div class="label">Total Requests (15m)</div>
+        </div>
+        <div class="state-card">
+          <div class="value" id="succeeded-requests">—</div>
+          <div class="label">Succeeded (2xx)</div>
+        </div>
+        <div class="state-card">
+          <div class="value" id="failed-requests">—</div>
+          <div class="label">Failed (4xx/5xx)</div>
+        </div>
+        <div class="state-card">
+          <div class="value" id="avg-latency">—</div>
+          <div class="label">Avg Latency (ms)</div>
+        </div>
+      </div>
+      
       <div class="card">
         <div class="inline" style="justify-content:space-between;margin-bottom:16px">
           <h3 style="color:var(--muted);margin:0">Request Audit Log</h3>
           <div class="inline">
+            <select id="windowSelect" style="width:auto;padding:4px 8px;font-size:12px;margin-right:8px">
+              <option value="15m">15m</option>
+              <option value="1h">1h</option>
+              <option value="24h" selected>24h</option>
+            </select>
             <button id="btnLiveTail" class="mutebtn">Live Tail</button>
             <button id="btnExportCSV" class="mutebtn">Export CSV</button>
             <div class="small">Auto-refresh every 5s</div>
           </div>
+        </div>
+        
+        <!-- Empty state -->
+        <div id="emptyState" style="display:none;text-align:center;padding:40px;color:var(--muted)">
+          <h4>No requests in the selected window</h4>
+          <p>Send a sample from Ingest Test to see events here.</p>
+          <button class="mutebtn" onclick="showPanel('ingest')">Open Ingest Test</button>
         </div>
         
         <!-- Filters -->
@@ -262,15 +419,14 @@
             <thead>
               <tr>
                 <th>Time</th>
-                <th>Client IP</th>
-                <th>API Key</th>
                 <th>Method</th>
                 <th>Path</th>
                 <th>Status</th>
-                <th>Duration</th>
-                <th>Bytes In/Out</th>
-                <th>Result</th>
-                <th>Trace ID</th>
+                <th>Latency (ms)</th>
+                <th>Source IP</th>
+                <th>Records</th>
+                <th>Risk Avg</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="requestsTableBody">
@@ -280,6 +436,54 @@
         </div>
         
         <!-- Pagination -->
+        
+        <!-- Right-side Drawer for Request Details -->
+        <div id="request-drawer" class="drawer">
+          <div class="drawer-header">
+            <h3>Request Details</h3>
+            <button class="drawer-close" onclick="closeRequestDrawer()">&times;</button>
+          </div>
+          <div class="drawer-content">
+            <div class="drawer-section">
+              <h4>Request ID</h4>
+              <div id="drawer-request-id">—</div>
+            </div>
+            
+            <div class="drawer-section">
+              <h4>Timestamps</h4>
+              <div id="drawer-timestamps">—</div>
+            </div>
+            
+            <div class="drawer-section">
+              <h4>Request Headers</h4>
+              <pre id="drawer-headers">—</pre>
+            </div>
+            
+            <div class="drawer-section">
+              <h4>Payload Summary</h4>
+              <pre id="drawer-payload">—</pre>
+            </div>
+            
+            <div class="drawer-section">
+              <h4>Enrichment Results</h4>
+              <pre id="drawer-enrichment">—</pre>
+            </div>
+            
+            <div class="drawer-section">
+              <h4>Export Actions</h4>
+              <pre id="drawer-exports">—</pre>
+            </div>
+            
+            <div class="drawer-section">
+              <h4>Errors/Exceptions</h4>
+              <pre id="drawer-errors">—</pre>
+            </div>
+            
+            <div class="drawer-section">
+              <button onclick="openRawJson()" class="mutebtn">Open Raw JSON</button>
+            </div>
+          </div>
+        </div>
         <div class="pagination" style="margin-top:16px">
           <button id="btnPrevPage" class="mutebtn">Previous</button>
           <span id="pageInfo">Page 1 of 1</span>
@@ -426,7 +630,17 @@
     </div>
   </div>
 
-      <script src="/ui/app.js?v=1.0.4" defer></script>
+              <script>
+          // Global configuration - single source of truth
+          window.__CFG__ = {
+            API_BASE_URL: 'http://localhost:8080',
+            API_PREFIX: '/v1',
+            API_KEY: 'TEST_KEY'
+          };
+        </script>
+                  <script src="/ui/lib/normalize.js?v=1.0.10"></script>
+          <script src="/ui/api-client.js?v=1.0.10"></script>
+          <script src="/ui/app.js?v=1.0.10" defer></script>
   <script>
     // Simple test to see if JavaScript is working
     console.log("Inline script loaded - testing basic functionality");

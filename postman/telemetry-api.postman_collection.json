@@ -1,0 +1,283 @@
+{
+  "info": {
+    "name": "Telemetry API v0.7.8",
+    "description": "Collection for testing Telemetry API endpoints with sample data",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "TEST_KEY",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{apiKey}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "health"]
+        },
+        "description": "Public health check endpoint (no auth required)"
+      },
+      "response": []
+    },
+    {
+      "name": "Version Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/version",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "version"]
+        },
+        "description": "Get API version information"
+      },
+      "response": []
+    },
+    {
+      "name": "Ingest Zeek",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"ts\": 1642176000.0,\n    \"uid\": \"C1234567890abcdef\",\n    \"id.orig_h\": \"192.168.1.100\",\n    \"id.orig_p\": 54321,\n    \"id.resp_h\": \"8.8.8.8\",\n    \"id.resp_p\": 53,\n    \"proto\": \"udp\",\n    \"service\": \"dns\",\n    \"duration\": 0.123,\n    \"orig_bytes\": 64,\n    \"resp_bytes\": 128,\n    \"conn_state\": \"SF\"\n  }\n]"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/ingest/zeek",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "ingest", "zeek"]
+        },
+        "description": "Ingest Zeek conn.log JSON data"
+      },
+      "response": []
+    },
+    {
+      "name": "Ingest NetFlow",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"timestamp\": 1642176000,\n    \"src_ip\": \"192.168.1.100\",\n    \"dst_ip\": \"8.8.8.8\",\n    \"src_port\": 54321,\n    \"dst_port\": 53,\n    \"protocol\": 17,\n    \"bytes\": 192,\n    \"packets\": 2,\n    \"device\": \"router-01\",\n    \"exporter\": \"192.168.1.1\"\n  }\n]"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/ingest/netflow",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "ingest", "netflow"]
+        },
+        "description": "Ingest NetFlow/IPFIX JSON data"
+      },
+      "response": []
+    },
+    {
+      "name": "Ingest Bulk",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"zeek\",\n  \"records\": [\n    {\n      \"ts\": 1642176000.0,\n      \"uid\": \"C1234567890abcdef\",\n      \"id.orig_h\": \"192.168.1.100\",\n      \"id.orig_p\": 54321,\n      \"id.resp_h\": \"8.8.8.8\",\n      \"id.resp_p\": 53,\n      \"proto\": \"udp\",\n      \"service\": \"dns\",\n      \"duration\": 0.123,\n      \"orig_bytes\": 64,\n      \"resp_bytes\": 128,\n      \"conn_state\": \"SF\"\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/ingest/bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "ingest", "bulk"]
+        },
+        "description": "Ingest bulk records with type specification"
+      },
+      "response": []
+    },
+    {
+      "name": "Add Threat Indicator",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ip_or_cidr\": \"192.168.1.0/24\",\n  \"category\": \"test\",\n  \"confidence\": 90\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/indicators",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "indicators"]
+        },
+        "description": "Add a threat intelligence indicator"
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Threat Indicator",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/indicators/{{indicatorId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "indicators", "{{indicatorId}}"]
+        },
+        "description": "Delete a threat intelligence indicator by ID"
+      },
+      "response": []
+    },
+    {
+      "name": "Download JSON",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/download/json?limit=1000",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "download", "json"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "1000"
+            }
+          ]
+        },
+        "description": "Download latest enriched events as JSON lines"
+      },
+      "response": []
+    },
+    {
+      "name": "Export to Splunk HEC",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/export/splunk-hec",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "export", "splunk-hec"]
+        },
+        "description": "Export events to Splunk HEC (requires configuration)"
+      },
+      "response": []
+    },
+    {
+      "name": "Export to Elasticsearch",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/export/elastic",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "export", "elastic"]
+        },
+        "description": "Export events to Elasticsearch (requires configuration)"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Requests",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/requests?limit=500&window=15m",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "requests"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "500"
+            },
+            {
+              "key": "window",
+              "value": "15m"
+            }
+          ]
+        },
+        "description": "Get recent requests with enhanced aggregation"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Metrics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/metrics",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "metrics"]
+        },
+        "description": "Get system metrics and performance data"
+      },
+      "response": []
+    },
+    {
+      "name": "Get System Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/system",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "system"]
+        },
+        "description": "Get system information and status"
+      },
+      "response": []
+    }
+  ]
+}

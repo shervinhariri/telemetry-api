@@ -1,0 +1,222 @@
+openapi: 3.1.0
+info:
+  title: Telemetry API
+  version: 0.7.9
+  description: Pre-SIEM enrichment for NetFlow/IPFIX and Zeek with GeoIP, ASN, Threat Intel, and Risk scoring.
+servers:
+  - url: http://localhost:8080/v1
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    IngestResultMultiStatus:
+      type: object
+      properties:
+        status: { type: string, enum: [partial, ok, error] }
+        succeeded: { type: integer }
+        failed: { type: integer }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              index: { type: integer }
+              error: { type: string }
+    ZeekConn:
+      type: object
+      required: [ts, uid, id]
+      properties:
+        ts: { type: string }
+        uid: { type: string }
+        id:
+          type: object
+          properties:
+            orig_h: { type: string }
+            orig_p: { type: integer }
+            resp_h: { type: string }
+            resp_p: { type: integer }
+        proto: { type: string }
+        service: { type: string }
+        duration: { type: number }
+        orig_ip_bytes: { type: integer }
+        resp_ip_bytes: { type: integer }
+    NetflowRecord:
+      type: object
+      required: [ts, src_ip, dst_ip, proto]
+      properties:
+        ts: { type: string }
+        src_ip: { type: string }
+        dst_ip: { type: string }
+        src_port: { type: integer }
+        dst_port: { type: integer }
+        proto: { type: string }
+        bytes: { type: integer }
+        packets: { type: integer }
+        device: { type: string }
+        exporter: { type: string }
+    EnrichedEvent:
+      type: object
+      properties:
+        ts: { type: string }
+        src_ip: { type: string }
+        dst_ip: { type: string }
+        src_port: { type: integer }
+        dst_port: { type: integer }
+        proto: { type: string }
+        bytes: { type: integer }
+        packets: { type: integer }
+        geo:
+          type: object
+          properties:
+            country: { type: string }
+            city: { type: string }
+        asn:
+          type: object
+          properties:
+            asn: { type: integer }
+            org: { type: string }
+        ti_matches:
+          type: array
+          items:
+            type: object
+            properties:
+              indicator: { type: string }
+              category: { type: string }
+              confidence: { type: integer }
+        risk_score: { type: number }
+paths:
+  /health:
+    get:
+      summary: Health check
+      security: []
+      responses:
+        '200': { description: OK }
+  /metrics:
+    get:
+      summary: Metrics snapshot
+      responses:
+        '200':
+          description: OK
+  /ingest/zeek:
+    post:
+      summary: Ingest Zeek conn logs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: array
+                  items: { $ref: '#/components/schemas/ZeekConn' }
+                - $ref: '#/components/schemas/ZeekConn'
+      responses:
+        '200': { description: OK }
+        '207':
+          description: Partial errors
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IngestResultMultiStatus' }
+  /ingest/netflow:
+    post:
+      summary: Ingest NetFlow/IPFIX (canonical JSON)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: array
+                  items: { $ref: '#/components/schemas/NetflowRecord' }
+                - $ref: '#/components/schemas/NetflowRecord'
+      responses:
+        '200': { description: OK }
+        '207':
+          description: Partial errors
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IngestResultMultiStatus' }
+  /ingest/bulk:
+    post:
+      summary: Bulk ingest with type hint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, records]
+              properties:
+                type: { type: string, enum: [zeek, netflow] }
+                records:
+                  type: array
+                  items: { type: object }
+      responses:
+        '200': { description: OK }
+        '207':
+          description: Partial errors
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IngestResultMultiStatus' }
+  /download/json:
+    get:
+      summary: Stream latest enriched events
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 1000 }
+      responses:
+        '200':
+          description: NDJSON stream of EnrichedEvent
+  /export/splunk-hec:
+    post:
+      summary: Export buffered events to Splunk HEC
+      responses:
+        '200': { description: OK }
+  /export/elastic:
+    post:
+      summary: Export buffered events to Elasticsearch Bulk
+      responses:
+        '200': { description: OK }
+  /indicators:
+    put:
+      summary: Upsert threat indicators
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip_or_cidr, category, confidence]
+              properties:
+                ip_or_cidr: { type: string }
+                category: { type: string }
+                confidence: { type: integer, minimum: 0, maximum: 100 }
+      responses:
+        '200': { description: OK }
+  /indicators/{id}:
+    delete:
+      summary: Delete indicator by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/requests:
+    get:
+      summary: Recent requests (audit)
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 500 }
+        - in: query
+          name: window
+          schema: { type: string, example: "15m" }
+      responses:
+        '200': { description: OK }

@@ -1,271 +1,261 @@
-# Live Network Threat Telemetry API
+# Telemetry API — v0.7.9
 
-Local-first MVP to ingest NetFlow/IPFIX and Zeek JSON, enrich with GeoIP/ASN + threat intel, apply basic risk scoring, and ship SIEM-ready outputs.
+Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability.
 
 ![Build](https://github.com/shervinhariri/telemetry-api/actions/workflows/docker.yml/badge.svg)
 
-## Project Stages & Status
+## TL;DR
 
-- ✅ **Step 1: MVP Scope** — Inputs: NetFlow/IPFIX JSON (nfdump, pmacct, ntopng), Zeek JSON logs (conn.log, dns.log, ssl.log). Enrichments: GeoIP (MaxMind GeoLite2), ASN (Team Cymru), threat intel match, basic risk scoring (0–100). Outputs: Splunk HEC, Elastic bulk JSON, JSON download. Retention: 7 days. Exclusions: PCAP headers, TLS JA3, anomaly ML, QRadar, Datadog, Kafka.
+Ingest NetFlow/IPFIX and Zeek JSON → enrich with GeoIP/ASN/threat intel → apply risk scoring → export to Splunk/Elastic. All with request-level audit and performance dashboards.
 
-- ✅ **Step 2: Data Models & API Contract** — Base URL: `/v1`, Bearer auth, endpoints: `/health`, `/ingest`, `/lookup`, `/outputs/splunk`, `/outputs/elastic`, `/alerts/rules`, `/metrics`. Input schemas: flows.v1 JSON, zeek.conn.v1, zeek.dns.v1. Output schema: enriched JSON with src/dst IP, ASN, GeoIP, threat matches, risk score, tags. Limits: max batch 5MB gzipped, 10k records, 600 req/min.
+## 🚀 Validate in 60 seconds
 
-- ✅ **Step 3: Contract Alignment** — Containerized MVP build, verified API endpoints, schema validation, sample data ingestion working, CI pipeline added. Prepared for production deployment.
-
-- ✅ **Step 4: Open-Source Launch** — Single container (API + Dashboard UI) with health, metrics, ingest, lookup, and output configuration in GUI. On-prem/cloud ready, Docker Hub publishing with `latest` and version tags. Focus on adoption via free open-source release.
-
-- ✅ **Step 5: Production-Ready Ingest Pipeline** — Robust ingest endpoint with queue-based processing, gzip support, proper error handling (4xx/5xx), and background worker pipeline. Accepts raw JSON arrays and wrapped `{"records": [...]}` format. Backpressure handling with 429 responses.
-
-- ✅ **Step 5.1: Version Management & Output Connectors** — Version badge with update notifications, Docker Hub integration, Stage 5.1 output connector configuration endpoints (Splunk HEC, Elastic bulk), and dev-safe update mechanism. Foundation for Stage 5.2 dispatcher wiring.
-
-- ✅ **Step 6: Deploy & Host MVP** — Activated processing pipeline workers, file sink for daily NDJSON, stats/events/download endpoints, Logs tab with live tail and file upload, minimal version indicator, and clean header design.
-
-- 🟣 **Step 7: Request Observability (v0.7.5) - CURRENT** — Professional minimal dashboard (6 cards), request audit system with operations tracking, system info endpoint, enhanced UI with status codes and sparklines, performance optimizations.
-
-> Current version: **v0.7.5** (Professional Dashboard & Request Observability).  
-> Docs for Steps 1–7 are in `/docs/` and PDFs.
-
-## Quickstart
 ```bash
-# run single container (API + UI)
+# 1) Run container
 docker run -d -p 8080:8080 \
-  -e API_KEYS=TEST_KEY \
-  --name telemetry-api shvin/telemetry-api:latest
+  -e API_KEY=TEST_KEY \
+  -e REDACT_HEADERS=authorization \
+  --name telapi shvin/telemetry-api:0.7.9
 
-# open UI
+# 2) Ingest sample Zeek
+curl -s -X POST http://localhost:8080/v1/ingest/zeek \
+  -H "Authorization: Bearer TEST_KEY" -H "Content-Type: application/json" \
+  --data @samples/zeek_conn_small.json | jq
+
+# 3) See it live
+open http://localhost:8080/docs  # API documentation
+open http://localhost:8080       # Dashboard
+
+# 4) Download enriched output
+curl -s "http://localhost:8080/v1/download/json?limit=50" \
+  -H "Authorization: Bearer TEST_KEY" | head -n 5
+```
+
+## Quick Start
+
+```bash
+# Single container with MaxMind/TI data
+docker run -d -p 8080:8080 \
+  -e API_KEY=TEST_KEY \
+  -e GEOIP_DB_CITY=/data/GeoLite2-City.mmdb \
+  -e GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb \
+  -e THREATLIST_CSV=/data/threats.csv \
+  -v $PWD/data:/data:ro \
+  --name telemetry-api shvin/telemetry-api:0.7.9
+
+# Open dashboard
 open http://localhost:8080
 
-# health (no auth required)
-curl -s http://localhost:8080/v1/health | jq .
-
-# ingest - raw array format
-curl -s -X POST http://localhost:8080/v1/ingest \
+# Test ingest
+curl -s -X POST http://localhost:8080/v1/ingest/zeek \
   -H "Authorization: Bearer TEST_KEY" \
   -H "Content-Type: application/json" \
-  --data '[{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1", "src_port":12345, "dst_port":53, "proto":"udp", "bytes":84, "packets":1, "app":"dns"}]' | jq .
-
-# ingest - wrapped format (also supported)
-curl -s -X POST http://localhost:8080/v1/ingest \
-  -H "Authorization: Bearer TEST_KEY" \
-  -H "Content-Type: application/json" \
-  --data '{"records": [{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1", "src_port":12345, "dst_port":53, "proto":"udp", "bytes":84, "packets":1, "app":"dns"}]}' | jq .
-
-# ingest with gzip compression
-echo '[{"ts": 1723290000, "src_ip":"10.0.0.10", "dst_ip":"1.1.1.1"}]' | gzip | curl -s -X POST http://localhost:8080/v1/ingest \
-  -H "Authorization: Bearer TEST_KEY" \
-  -H "Content-Type: application/json" \
-  -H "Content-Encoding: gzip" \
-  --data-binary @- | jq .
+  --data @samples/zeek_conn_small.json | jq
 ```
 
-## Release & Images
-Docker Hub: shvin/telemetry-api:latest, shvin/telemetry-api:v0.7.5
+## 📊 Features
 
-GitHub Tags: v0.7.5 (Step 7 - Request Observability)
+### Supported Inputs
 
-### Validation
-```bash
-./scripts/test_health.sh
-./scripts/test_ingest.sh
+#### Zeek conn.log JSON
+```json
+{
+  "ts": 1642176000.0,
+  "uid": "C1234567890abcdef",
+  "id.orig_h": "192.168.1.100",
+  "id.orig_p": 54321,
+  "id.resp_h": "8.8.8.8",
+  "id.resp_p": 53,
+  "proto": "udp",
+  "service": "dns"
+}
 ```
 
-### Outputs Configuration
+#### NetFlow/IPFIX JSON
+```json
+{
+  "timestamp": 1642176000,
+  "src_ip": "192.168.1.100",
+  "dst_ip": "8.8.8.8",
+  "src_port": 54321,
+  "dst_port": 53,
+  "protocol": 17,
+  "bytes": 192,
+  "packets": 2
+}
+```
+
+**Endpoints**: `POST /v1/ingest/zeek`, `POST /v1/ingest/netflow`, `POST /v1/ingest/bulk`
+
+### Enrichment Pipeline
+
+- **GeoIP**: Country, city, location (MaxMind GeoLite2)
+- **ASN**: Autonomous system number and organization
+- **Threat Intelligence**: IP/CIDR matching with confidence scoring
+- **Risk Scoring**: 0-10 scale based on threat matches and context
+
+### Outputs
+
+- **Splunk HEC**: `POST /v1/export/splunk-hec` (buffered bulk)
+- **Elasticsearch**: `POST /v1/export/elastic` (bulk JSON)
+- **JSON Download**: `GET /v1/download/json?limit=10000`
+
+### Observability Dashboard
+
+- **Real-time Metrics**: Throughput chart + stat cards (Queue Lag, Avg Risk, Threat Matches, Error Rate)
+- **Request Audit**: Live tail with Server-Sent Events + detailed request inspection
+- **System Monitoring**: `GET /v1/system` with backpressure signals and DLQ status
+- **API Documentation**: Interactive Swagger UI at `/docs`
+
+## ⚙️ Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `API_KEY` | `TEST_KEY` | Bearer token for authentication |
+| `GEOIP_DB_CITY` | `/data/GeoLite2-City.mmdb` | MaxMind City database path |
+| `GEOIP_DB_ASN` | `/data/GeoLite2-ASN.mmdb` | MaxMind ASN database path |
+| `THREATLIST_CSV` | `/data/threats.csv` | Threat intelligence CSV file |
+| `SPLUNK_HEC_URL` | - | Splunk HEC endpoint URL |
+| `SPLUNK_HEC_TOKEN` | - | Splunk HEC token |
+| `ELASTIC_URL` | - | Elasticsearch URL |
+| `ELASTIC_USERNAME` | - | Elasticsearch username |
+| `ELASTIC_PASSWORD` | - | Elasticsearch password |
+| `REDACT_HEADERS` | - | Comma-separated headers to redact in logs |
+
+## 📈 Limits & Performance
+
+- **Batch Size**: 10,000 records max
+- **Payload Size**: 5MB max (gzip supported)
+- **Rate Limit**: 600 requests/minute
+- **Retention**: 7 days (rolling files)
+- **Queue Depth**: 10,000 records
+- **Dead Letter Queue**: Failed exports with retry logic
+
+## 🔧 Development
+
+### Local Development
 ```bash
-./scripts/configure_splunk.sh
-./scripts/configure_elastic.sh
+# Clone and setup
+git clone https://github.com/shervinhariri/telemetry-api.git
+cd telemetry-api
+
+# Build and run
+docker build -t telemetry-api:local .
+docker run -d -p 8080:8080 -e API_KEY=TEST_KEY --name telemetry-api telemetry-api:local
+
+# Test
+curl -s http://localhost:8080/v1/health | jq
 ```
 
 ### Testing
 ```bash
-./scripts/run_tests.sh  # Run all tests locally
+# Health check
+./scripts/test_health.sh
+
+# Ingest test
+./scripts/test_ingest.sh
+
+# Full test suite
+./scripts/run_tests.sh
 ```
 
-## 🚀 Core Features
-
-### Robust Ingest Pipeline
-- **Dual Format Support**: Accepts both raw JSON arrays `[...]` and wrapped `{"records": [...]}`
-- **Gzip Compression**: Auto-detects gzip via header or magic number (`1F 8B`)
-- **Queue-Based Processing**: Records processed asynchronously via background worker
-- **Backpressure Handling**: Returns 429 when queue is full (10k limit)
-- **Proper Error Handling**: 4xx for client errors, 5xx only for server faults
-
-### Request Observability (v0.7.5)
-- **Professional Dashboard**: 6 KPI cards with live sparklines and status indicators
-- **Request Audit Trail**: Complete request logging with operations tracking
-- **System Monitoring**: Structured system information and metrics
-- **Live Tail**: Real-time request monitoring with filters and export
-
-
-
-## 🚀 Step 7 Features (v0.7.5)
-
-### Professional Minimal Dashboard
-- **6 KPI Cards**: Events, Threats, Risk, Requests (15m), Status Codes, P95 Latency
-- **Live Sparklines**: Real-time trend visualization for each metric
-- **Status Code Pills**: 2xx/4xx/5xx breakdown with color coding
-- **Clean Design**: Removed clutter, focused on essential metrics
-- **Auto-refresh**: Updates every 5 seconds with smooth animations
-
-### Request Observability System
-- **Audit Trail**: Complete request logging with operations data
-- **Operations Tracking**: Detailed breakdown of what happened per request
-- **System Info**: Structured `/v1/system` endpoint with bounded JSON
-- **Request Details**: Individual request inspection with full context
-- **Live Tail**: Real-time request monitoring with filters
-
-### Enhanced API Endpoints
-- **`/v1/system`**: Structured system information (version, uptime, workers, metrics)
-- **`/v1/admin/requests`**: Paginated request audit log
-- **`/v1/admin/requests/summary`**: Request summary metrics (15m window)
-- **`/v1/admin/requests/{id}`**: Detailed request information with operations
-
-### Performance Optimizations
-- **Lightweight Dependencies**: Removed unnecessary packages (pytest, jsonschema, reportlab)
-- **Faster Startup**: Optimized container build and initialization
-- **Memory Efficient**: In-memory audit with 7-day retention
-- **Async Processing**: Non-blocking request handling
-
-### Professional UI Enhancements
-- **System Tab Fix**: No more overflow, bounded JSON display
-- **Copy Functionality**: One-click copying of system information
-- **Status Indicators**: Color-coded status badges and result indicators
-- **Responsive Design**: Maintains professional appearance on all devices
-
-### Quick Test Steps for v0.7.3
+### Output Configuration
 ```bash
-# 1. Check system information
-curl -s http://localhost:8080/v1/system | jq
+# Splunk HEC setup
+./scripts/configure_splunk.sh
 
-# 2. View request summary
-curl -s http://localhost:8080/v1/admin/requests/summary | jq
-
-# 3. Check request audit log
-curl -s http://localhost:8080/v1/admin/requests | jq '.items | length'
-
-# 4. Send test requests
-curl -X POST http://localhost:8080/v1/lookup \
-  -H "Authorization: Bearer TEST_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"ip":"8.8.8.8"}'
-
-# 5. View updated dashboard metrics
-curl -s http://localhost:8080/v1/metrics | jq '.totals'
+# Elasticsearch setup
+./scripts/configure_elastic.sh
 ```
 
+## 📚 API Documentation
 
+- **Interactive Docs**: `http://localhost:8080/docs` (Swagger UI)
+- **OpenAPI Spec**: `http://localhost:8080/openapi.yaml`
+- **Health Check**: `GET /v1/health`
+- **System Info**: `GET /v1/system`
+- **Metrics**: `GET /v1/metrics`
 
-## 🧪 Development & Testing
+## 🚀 Production Deployment
 
-### Local Development
-```bash
-# Build and run
-docker build -t telemetry-api:latest .
-docker run -d -p 8080:8080 -e APP_VERSION=0.7.2 telemetry-api:latest
-
-# Test endpoints
-curl http://localhost:8080/v1/health
-curl http://localhost:8080/v1/system
-curl http://localhost:8080/v1/admin/requests/summary
+### Docker Compose
+```yaml
+version: '3.8'
+services:
+  telemetry-api:
+    image: shvin/telemetry-api:0.7.9
+    ports:
+      - "8080:8080"
+    environment:
+      - API_KEY=your-secure-key
+      - SPLUNK_HEC_URL=https://your-splunk:8088
+      - SPLUNK_HEC_TOKEN=your-hec-token
+    volumes:
+      - ./data:/data:ro
 ```
 
+### Kubernetes
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemetry-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: telemetry-api
+  template:
+    metadata:
+      labels:
+        app: telemetry-api
+    spec:
+      containers:
+      - name: telemetry-api
+        image: shvin/telemetry-api:0.7.9
+        ports:
+        - containerPort: 8080
+        env:
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: telemetry-secrets
+              key: api-key
+```
 
+## 📋 Changelog
 
-## 🔗 API Endpoints
+### v0.7.9 (Current)
+- ✅ OpenAPI 3.1 specification with Swagger UI
+- ✅ Scoped API keys with RBAC (ingest, manage_indicators, export, read_requests, read_metrics)
+- ✅ Security headers and configurable field redaction
+- ✅ Dead Letter Queue (DLQ) for export failures with exponential backoff
+- ✅ Idempotency support for ingest operations
+- ✅ Enhanced observability with detailed metrics and system monitoring
+- ✅ Real-time dashboard with Server-Sent Events for live tailing
+- ✅ Comprehensive request audit logging
 
-### Core Endpoints
-- `GET /v1/health` - Health check
-- `GET /v1/version` - API version info
-- `GET /v1/schema` - Available schemas
-- `POST /v1/ingest` - Ingest telemetry data (batch)
-- `POST /v1/lookup` - Single IP enrichment
-- `POST /v1/outputs/splunk` - Configure Splunk HEC
-- `POST /v1/outputs/elastic` - Configure Elasticsearch
-- `POST /v1/alerts/rules` - Configure alert rules
-- `GET /v1/metrics` - Prometheus metrics (basic auth)
+### v0.7.8
+- Enhanced UI with real-time metrics
+- Improved error handling and logging
+- Better data transformation and normalization
 
-### Observability Endpoints (v0.7.5)
-- `GET /v1/system` - Structured system information
-- `GET /v1/admin/requests` - Request audit log (paginated)
-- `GET /v1/admin/requests/summary` - Request summary metrics
-- `GET /v1/admin/requests/{id}` - Detailed request information
+## 🤝 Contributing
 
-## 📊 Limits & Errors
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
 
-- **Payload size**: 5MB maximum (gzipped)
-- **Records per batch**: 10,000 maximum
-- **Rate limiting**: 
-  - Ingest: 120 req/min (configurable via `RATE_LIMIT_INGEST_RPM`)
-  - Default: 600 req/min (configurable via `RATE_LIMIT_DEFAULT_RPM`)
-- **Retention**: 7 days for deadletter queue
-- **Error format**: JSON with `detail` field
-- **Authentication**: Bearer token required for all endpoints except `/v1/health`
-- **Versioning**: All responses include `X-API-Version` header
+## 📄 License
 
-## 🔧 Environment Variables
+MIT License - see LICENSE file for details.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `API_KEY` | Bearer token for authentication | `TEST_KEY` |
-| `API_IMAGE` | Docker image name | `shvin/telemetry-api:latest` |
-| `DOMAIN` | API domain | `api.yourdomain.com` |
-| `GEOIP_DB_CITY` | MaxMind City database path | `/data/GeoLite2-City.mmdb` |
-| `GEOIP_DB_ASN` | MaxMind ASN database path | `/data/GeoLite2-ASN.mmdb` |
-| `THREATLIST_CSV` | Threat intelligence CSV | `/data/threats.csv` |
-| `SPLUNK_HEC_URL` | Splunk HEC endpoint | - |
-| `SPLUNK_HEC_TOKEN` | Splunk HEC token | - |
-| `ELASTIC_URL` | Elasticsearch endpoint | - |
-| `ELASTIC_USERNAME` | Elasticsearch username | - |
-| `ELASTIC_PASSWORD` | Elasticsearch password | - |
-| `BASIC_AUTH_USER` | Metrics endpoint username | `metrics` |
-| `BASIC_AUTH_PASS` | Metrics endpoint password | `changeme` |
-| `RATE_LIMIT_INGEST_RPM` | Ingest rate limit | `120` |
-| `RATE_LIMIT_DEFAULT_RPM` | Default rate limit | `600` |
-| `TZ` | Timezone | `UTC` |
+## 🔗 Links
 
-## 📋 Data Formats
-
-### Supported Input Formats
-- **`zeek.conn.v1`** - Zeek connection logs
-- **`flows.v1`** - Network flow data
-
-### Enriched Output
-All records include:
-- **GeoIP data** (country, city, coordinates)
-- **ASN information** (ASN number, organization)
-- **Threat intelligence** (matches, categories, confidence)
-- **Risk scoring** (0-100 scale with reasons)
-- **Tags** for categorization
-
-## 🔒 Security Features
-
-- **HTTPS/TLS** with automatic Let's Encrypt certificates
-- **Rate limiting** to prevent abuse
-- **Basic authentication** for metrics endpoint
-- **CORS headers** for cross-origin requests
-- **Security headers** (X-Content-Type-Options, X-Frame-Options, etc.)
-- **UFW firewall** configuration
-- **Fail2ban** for brute force protection
-
-## 📈 Monitoring & Operations
-
-- **Health checks** with automatic restart
-- **Prometheus metrics** endpoint
-- **Structured logging** in JSON format
-- **Log rotation** for Caddy access/error logs
-- **Deadletter queue** for failed output processing
-- **Comprehensive test suite** with CI integration
-
-## 🚀 CI/CD Pipeline
-
-- **Automated testing** on pull requests
-- **Schema validation** in CI pipeline
-- **Docker image builds** on version tags
-- **Security scanning** and dependency updates
-- **Deployment automation** scripts
-
-## 📚 Documentation
-
-- **[docs/](docs/)** - Project documentation and PDFs
-- **[schemas/](schemas/)** - JSON schema definitions
+- **Docker Hub**: [shvin/telemetry-api](https://hub.docker.com/r/shvin/telemetry-api)
+- **GitHub**: [shervinhariri/telemetry-api](https://github.com/shervinhariri/telemetry-api)
+- **Issues**: [GitHub Issues](https://github.com/shervinhariri/telemetry-api/issues)
 
 

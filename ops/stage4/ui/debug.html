@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug - Telemetry API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .debug-section { margin: 20px 0; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .debug-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #333; }
+        .debug-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .json-display { background: #f8f9fa; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        .button:hover { background: #0056b3; }
+        .config-display { background: #e9ecef; padding: 10px; border-radius: 4px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Debug Panel - Telemetry API</h1>
+        
+        <div class="debug-section">
+            <div class="debug-title">Configuration</div>
+            <div class="config-display" id="configDisplay"></div>
+            <button class="button" onclick="showConfig()">Show Config</button>
+        </div>
+
+        <div class="debug-section">
+            <div class="debug-title">API Endpoint Tests</div>
+            <button class="button" onclick="testAllEndpoints()">Test All Endpoints</button>
+            <div id="endpointResults"></div>
+        </div>
+
+        <div class="debug-section">
+            <div class="debug-title">Raw Data Preview</div>
+            <div id="rawDataResults"></div>
+        </div>
+
+        <div class="debug-section">
+            <div class="debug-title">Force Refresh (No Cache)</div>
+            <button class="button" onclick="forceRefresh()">Force Refresh</button>
+            <div id="forceRefreshResults"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global configuration - same as main app
+        window.__CFG__ = {
+            API_BASE_URL: 'http://localhost:8080',
+            API_PREFIX: '/v1',
+            API_KEY: 'TEST_KEY'
+        };
+    </script>
+    <script src="/ui/api-client.js?v=1.0.6"></script>
+    
+    <script>
+        function showConfig() {
+            const config = window.apiConfig;
+            document.getElementById('configDisplay').innerHTML = `
+                API_BASE_URL: ${config.API_BASE_URL}<br>
+                API_PREFIX: ${config.API_PREFIX}<br>
+                API_KEY: ${config.API_KEY ? `${config.API_KEY.substring(0, 8)}...` : 'NOT_SET'}<br>
+                Full URL: ${config.API_BASE_URL}${config.API_PREFIX}
+            `;
+        }
+
+        async function testAllEndpoints() {
+            const results = document.getElementById('endpointResults');
+            results.innerHTML = '<div class="debug-result info">Testing endpoints...</div>';
+
+            const endpoints = [
+                { name: 'Health', path: '/health' },
+                { name: 'System', path: '/system' },
+                { name: 'Metrics', path: '/metrics' },
+                { name: 'Requests (15m)', path: '/api/requests', params: { limit: 50, window: '15m' } },
+                { name: 'Requests (24h)', path: '/api/requests', params: { limit: 500, window: '24h' } }
+            ];
+
+            let html = '';
+            
+            for (const endpoint of endpoints) {
+                try {
+                    const data = await api(endpoint.path, endpoint.params || {});
+                    const count = data.items ? data.items.length : (Array.isArray(data) ? data.length : 'N/A');
+                    html += `<div class="debug-result success">
+                        ✓ ${endpoint.name}: OK (${count} items)
+                    </div>`;
+                } catch (error) {
+                    html += `<div class="debug-result error">
+                        ✗ ${endpoint.name}: ${error.message}
+                    </div>`;
+                }
+            }
+            
+            results.innerHTML = html;
+        }
+
+        async function showRawData() {
+            const results = document.getElementById('rawDataResults');
+            results.innerHTML = '<div class="debug-result info">Loading raw data...</div>';
+
+            try {
+                // Test the three main endpoints
+                const [metrics, requests15m, requests24h] = await Promise.all([
+                    api('/metrics'),
+                    api('/api/requests', { limit: 50, window: '15m' }),
+                    api('/api/requests', { limit: 500, window: '24h' })
+                ]);
+
+                results.innerHTML = `
+                    <div class="debug-result success">
+                        <strong>Metrics Response:</strong>
+                        <div class="json-display">${JSON.stringify(metrics, null, 2)}</div>
+                    </div>
+                    
+                    <div class="debug-result success">
+                        <strong>Requests (15m) Response:</strong>
+                        <div class="json-display">${JSON.stringify(requests15m, null, 2)}</div>
+                    </div>
+                    
+                    <div class="debug-result success">
+                        <strong>Requests (24h) Response:</strong>
+                        <div class="json-display">${JSON.stringify(requests24h, null, 2)}</div>
+                    </div>
+                `;
+            } catch (error) {
+                results.innerHTML = `<div class="debug-result error">Error loading raw data: ${error.message}</div>`;
+            }
+        }
+
+        function forceRefresh() {
+            const results = document.getElementById('forceRefreshResults');
+            results.innerHTML = '<div class="debug-result info">Force refreshing...</div>';
+            
+            // Add random query param to bust cache
+            const timestamp = Date.now();
+            const random = Math.random().toString(36).substring(7);
+            
+            results.innerHTML = `
+                <div class="debug-result success">
+                    Cache busting with timestamp: ${timestamp}<br>
+                    Random param: ${random}<br>
+                    <a href="?v=${timestamp}&r=${random}" target="_blank">Open with cache busting</a>
+                </div>
+            `;
+        }
+
+        // Auto-run on page load
+        window.onload = function() {
+            showConfig();
+            testAllEndpoints();
+            showRawData();
+        };
+    </script>
+</body>
+</html>

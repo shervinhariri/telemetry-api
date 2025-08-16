@@ -90,3 +90,53 @@ def match_ip(ip: str) -> List[str]:
 def match_domain(domain: str) -> List[str]:
     """Convenience function to match domain against threat indicators"""
     return threat_intel.match_domain(domain)
+
+def add_indicator(ip_or_cidr: str, category: str = "unknown", confidence: int = 50) -> str:
+    """Add a new threat intelligence indicator"""
+    import hashlib
+    import time
+    
+    # Generate unique ID
+    indicator_id = hashlib.md5(f"{ip_or_cidr}:{category}:{time.time()}".encode()).hexdigest()[:8]
+    
+    # Add to in-memory storage (for now)
+    # In a production system, this would persist to database
+    if not hasattr(threat_intel, 'dynamic_indicators'):
+        threat_intel.dynamic_indicators = {}
+    
+    threat_intel.dynamic_indicators[indicator_id] = {
+        'ip_or_cidr': ip_or_cidr,
+        'category': category,
+        'confidence': confidence,
+        'added_at': time.time()
+    }
+    
+    # Also add to CIDR networks for matching
+    try:
+        network = ipaddress.ip_network(ip_or_cidr, strict=False)
+        threat_intel.cidr_networks.append(network)
+    except ValueError:
+        pass
+    
+    return indicator_id
+
+def remove_indicator(indicator_id: str) -> bool:
+    """Remove a threat intelligence indicator by ID"""
+    if not hasattr(threat_intel, 'dynamic_indicators'):
+        return False
+    
+    if indicator_id not in threat_intel.dynamic_indicators:
+        return False
+    
+    # Remove from dynamic indicators
+    indicator = threat_intel.dynamic_indicators.pop(indicator_id)
+    
+    # Remove from CIDR networks (this is simplified - in production you'd want better tracking)
+    try:
+        network = ipaddress.ip_network(indicator['ip_or_cidr'], strict=False)
+        if network in threat_intel.cidr_networks:
+            threat_intel.cidr_networks.remove(network)
+    except ValueError:
+        pass
+    
+    return True

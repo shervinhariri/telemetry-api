@@ -29,6 +29,21 @@ async def get_system_info() -> Dict[str, Any]:
         # Calculate uptime
         uptime_seconds = int(time.time() - STATS.get("start_time", time.time()))
         
+        # Get DLQ statistics
+        from ..dlq import dlq
+        dlq_stats = dlq.get_dlq_stats()
+        
+        # Get idempotency statistics
+        from ..idempotency import get_idempotency_stats
+        idempotency_stats = get_idempotency_stats()
+        
+        # Check for backpressure conditions
+        backpressure = False
+        if queue_depth > 5000:  # High queue depth
+            backpressure = True
+        if dlq_stats["total_events"] > 10000:  # High DLQ size
+            backpressure = True
+        
         return {
             "version": APP_VERSION,
             "git_sha": GIT_SHA,
@@ -40,6 +55,9 @@ async def get_system_info() -> Dict[str, Any]:
             "cpu_pct": 0,  # TODO: Implement without psutil
             "eps": events_per_second,
             "queue_depth": queue_depth,
+            "backpressure": backpressure,
+            "dlq": dlq_stats,
+            "idempotency": idempotency_stats,
             "last_errors": recent_errors
         }
         

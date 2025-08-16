@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-ARG APP_VERSION=0.6.0
+ARG APP_VERSION=0.7.9
 ARG GIT_SHA=dev
 ARG IMAGE=shvin/telemetry-api
 
@@ -21,6 +21,10 @@ COPY app /app/app
 
 # Copy UI files
 COPY ops/stage4/ui /app/ui
+
+# Copy OpenAPI spec and docs
+COPY openapi.yaml /app/openapi.yaml
+COPY docs /app/docs
 
 EXPOSE 8080
 ENV API_KEY=TEST_KEY
