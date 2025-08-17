@@ -2,6 +2,18 @@
 
 All notable changes to the Telemetry API project will be documented in this file.
 
+## [0.8.0] - 2025-08-17
+
+### Added
+- **Demo Mode**: Configurable demo data generation with customizable EPS and duration
+- **Enhanced Metrics**: Prometheus metrics with demo-specific counters and gauges
+- **Week 1 Features**: Demo & Metrics implementation for v0.8.0 milestone
+- **Comprehensive Release Notes**: Detailed documentation for v0.8.0 features
+
+### Changed
+- **Version Update**: Bumped from v0.7.9 to v0.8.0 across all components
+- **Docker Configuration**: Updated APP_VERSION and DOCKERHUB_TAG to 0.8.0
+
 ## [0.7.9] - 2025-08-16
 
 ### Added

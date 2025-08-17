@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Telemetry API
-  version: 0.7.9
+  version: 0.8.0
   description: Pre-SIEM enrichment for NetFlow/IPFIX and Zeek with GeoIP, ASN, Threat Intel, and Risk scoring.
 servers:
   - url: http://localhost:8080/v1
