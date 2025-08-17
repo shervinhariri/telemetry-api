@@ -120,7 +120,7 @@ environment:
 
 ### 1. Run with Demo Mode
 ```bash
-docker run -d -p 8080:8080 \
+docker run -d -p 80:8080 \
   -e API_KEY=TEST_KEY \
   -e DEMO_MODE=true \
   -e DEMO_EPS=50 \

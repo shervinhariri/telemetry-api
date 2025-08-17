@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for Telemetry API v0.7.8 endpoints
+Test script for Telemetry API v0.8.0 endpoints
 """
 
 import requests
@@ -188,7 +188,7 @@ def test_metrics():
 
 def main():
     """Run all tests"""
-    print("🚀 Starting Telemetry API v0.7.8 endpoint tests...")
+    print("🚀 Starting Telemetry API v0.8.0 endpoint tests...")
     print(f"Base URL: {BASE_URL}")
     print(f"API Key: {API_KEY}")
     print()

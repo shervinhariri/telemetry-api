@@ -8,13 +8,13 @@ services:
       - API_KEYS=TEST_KEY
       - LOG_LEVEL=info
       - RETENTION_DAYS=7
-      - APP_VERSION=0.5.1
+      - APP_VERSION=0.8.0
       - GIT_SHA=dev
       - IMAGE=shvin/telemetry-api
       - UPDATE_CHECK_ENABLED=true
       - ADMIN_TOKEN=dev-only-token  # Only for development
     ports:
-      - "8080:8080"
+      - "80:8080"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/v1/health"]
       interval: 10s
