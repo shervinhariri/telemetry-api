@@ -170,7 +170,7 @@ class TelemetryDashboard {
     updateSystemInfo(system) {
         console.log('Updating system info:', system);
         
-        const version = system?.version || system?.service || '0.7.9';
+        const version = system?.version || system?.service || '0.8.0';
         console.log('Version to display:', version);
         
         // Update version in dashboard only
