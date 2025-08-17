@@ -84,7 +84,7 @@ async def get_requests(
     exclude_monitoring: bool = Query(True, description="Exclude monitoring endpoints"),
     status: str = Query("any", pattern="^(any|2xx|4xx|5xx)$", description="Status filter"),
     path: Optional[str] = Query(None, description="Path filter"),
-    if_none_match: Optional[str] = Query(None, description="ETag for caching")
+    if_none_match: Optional[str] = Header(None, description="ETag for caching")
 ):
     """Get recent request audits with timeline events and ETag support"""
     from hashlib import sha1

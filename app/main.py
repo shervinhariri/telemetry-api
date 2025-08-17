@@ -170,10 +170,15 @@ async def track_requests(request: Request, call_next):
     trace_id = request.headers.get("x-trace-id") or str(uuid.uuid4())
     client_ip = request.client.host if request.client else None
     
+    # Normalize path to avoid duplicates and 307 artifacts
+    path = request.url.path
+    if path != "/" and path.endswith("/"):
+        path = path.rstrip("/")
+    
     # Start request audit using new observability system
     from .observability.audit import new_audit, push_event, finalize_audit
-    audit = new_audit(trace_id, request.method, request.url.path, client_ip, tenant_id)
-    push_event(audit, "received", {"tenant": tenant_id, "auth": "ingest" if "ingest" in request.url.path else "read"})
+    audit = new_audit(trace_id, request.method, path, client_ip, tenant_id)
+    push_event(audit, "received", {"tenant": tenant_id, "auth": "ingest" if "ingest" in path else "read"})
     
     # Store trace_id and audit in request state for handlers to access
     request.state.trace_id = trace_id
@@ -202,7 +207,7 @@ async def track_requests(request: Request, call_next):
         from .logging_config import log_http_request
         log_http_request(
             method=request.method,
-            path=request.url.path,
+            path=path,
             status=response.status_code,
             duration_ms=int(latency_ms),
             client_ip=client_ip or "unknown",
@@ -214,7 +219,7 @@ async def track_requests(request: Request, call_next):
         
         # Update Prometheus metrics with path and fitness
         from .services.prometheus_metrics import prometheus_metrics
-        prometheus_metrics.increment_requests(response.status_code, request.url.path)
+        prometheus_metrics.increment_requests(response.status_code, path)
         if audit.get('fitness') is not None:
             prometheus_metrics.observe_request_fitness(audit['fitness'])
         
@@ -231,7 +236,7 @@ async def track_requests(request: Request, call_next):
         from .logging_config import log_http_request
         log_http_request(
             method=request.method,
-            path=request.url.path,
+            path=path,
             status=500,
             duration_ms=int(latency_ms),
             client_ip=client_ip or "unknown",

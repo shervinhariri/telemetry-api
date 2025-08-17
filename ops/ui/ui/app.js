@@ -304,7 +304,7 @@ class TelemetryDashboard {
         const successRate = totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100 * 10) / 10 : 0;
         
         // Calculate average latency
-        const latencies = requests.map(req => req.duration_ms || 0).filter(lat => lat > 0);
+        const latencies = requests.map(req => req.latency_ms || req.duration_ms || 0).filter(lat => lat > 0);
         const avgLatency = latencies.length > 0 ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0;
         
         // Update success rate percentage
@@ -339,8 +339,12 @@ class TelemetryDashboard {
             return;
         }
         
+        // Ensure Health column exists and add legend
+        ensureRequestsHealthColumn();
+        addHealthLegend();
+        
         if (requests.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-6 text-center text-zinc-500">No requests found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-6 text-center text-zinc-500">No requests found</td></tr>';
             return;
         }
         
@@ -349,19 +353,21 @@ class TelemetryDashboard {
             const method = request.method || '—';
             const path = request.path || '—';
             const status = request.status !== undefined && request.status !== null ? request.status : '—';
-            const latency = request.duration_ms ? `${request.duration_ms}ms` : '—';
-            const records = request.ops || 0;
+            const latency = request.latency_ms ? `${request.latency_ms.toFixed(1)}ms` : '—';
+            const records = request.summary?.records || 0;
             const clientIp = request.client_ip || '—';
-            const country = request.geo_country || '';
+            const fitness = request.fitness || 0;
             
             const statusColor = (status >= 500) ? 'bg-rose-500/20 text-rose-300 border-rose-400/30' :
                                (status >= 400) ? 'bg-amber-500/20 text-amber-300 border-amber-400/30' :
                                'bg-emerald-500/20 text-emerald-300 border-emerald-400/30';
             
-            const flag = this.getCountryFlag(country);
+            // Create health gauge
+            const healthGauge = this.createHealthGauge(fitness, request);
             
             return `
                 <tr class="hover:bg-white/[0.04] cursor-pointer" onclick="dashboard.showRequestDetails(${index})">
+                    <td class="px-5 py-3">${healthGauge}</td>
                     <td class="px-5 py-3 text-sm text-zinc-300">${time}</td>
                     <td class="px-5 py-3 text-sm text-white">
                         <span class="text-zinc-400 mr-2">${method}</span>${path}
@@ -373,9 +379,7 @@ class TelemetryDashboard {
                     </td>
                     <td class="px-5 py-3 text-sm text-zinc-300">${latency}</td>
                     <td class="px-5 py-3 text-sm text-zinc-300">${records}</td>
-                    <td class="px-5 py-3 text-sm text-zinc-300">
-                        ${flag} ${clientIp}
-                    </td>
+                    <td class="px-5 py-3 text-sm text-zinc-300">${clientIp}</td>
                 </tr>
             `;
         }).join('');
@@ -482,6 +486,57 @@ ${JSON.stringify(request, null, 2)}
         if (code.length !== 2) return '🏳️';
         const A = 0x1f1e6; // regional indicator A
         return String.fromCodePoint(...[...code].map(c => A + (c.charCodeAt(0) - 65)));
+    }
+
+    createHealthGauge(fitness, request) {
+        const clamped = Math.max(0, Math.min(1, fitness || 0));
+        const percentage = Math.round(clamped * 100);
+        
+        // Determine color based on fitness
+        let color = '#ef4444'; // red
+        if (clamped >= 0.9) color = '#22c55e'; // green
+        else if (clamped >= 0.6) color = '#f59e0b'; // amber
+        
+        // Create tooltip text
+        let tooltip = 'Healthy';
+        if (request.status >= 400) tooltip = `HTTP ${request.status}`;
+        else if (request.timeline) {
+            const v = request.timeline.find(x => x.event === 'validated');
+            if (v && v.meta && v.meta.ok === false) tooltip = 'Validation failed';
+            const e = request.timeline.find(x => x.event === 'exported');
+            if (e && e.meta) {
+                const bad = [];
+                for (const k of ['splunk', 'elastic']) {
+                    const v = e.meta[k];
+                    if (v && String(v).toLowerCase() !== 'ok' && String(v).toLowerCase() !== 'success') bad.push(k);
+                }
+                if (bad.length) tooltip = `Export failure: ${bad.join(', ')}`;
+            }
+        }
+        
+        // Create SVG gauge with improved design
+        const size = 32; // Slightly larger for better readability
+        const strokeWidth = 2.5; // Thinner stroke for cleaner look
+        const radius = (size - strokeWidth) / 2;
+        const circumference = 2 * Math.PI * radius;
+        const progress = circumference * clamped;
+        
+        return `
+            <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="shrink-0" 
+                 title="${tooltip}" role="img" aria-label="health ${percentage}%">
+                <circle cx="${size/2}" cy="${size/2}" r="${radius}" 
+                        stroke="#374151" stroke-width="${strokeWidth}" fill="none"/>
+                <circle cx="${size/2}" cy="${size/2}" r="${radius}" 
+                        stroke="${color}" stroke-width="${strokeWidth}" fill="none"
+                        stroke-dasharray="${progress} ${circumference}"
+                        stroke-linecap="round"
+                        transform="rotate(-90 ${size/2} ${size/2})"/>
+                <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+                      font-size="${size * 0.28}" font-weight="500" fill="#ffffff" font-family="Inter, system-ui, sans-serif">
+                    ${percentage}
+                </text>
+            </svg>
+        `;
     }
 
     startLogs() {
@@ -677,7 +732,76 @@ ${JSON.stringify(request, null, 2)}
     }
 }
 
+// ====== HEALTH COLUMN BOOTSTRAP ======
+function ensureRequestsHealthColumn() {
+    // Try multiple selectors to find the table
+    const table = document.querySelector('#requests-table, table.requests, table#requests, table');
+    if (!table) {
+        console.log('No table found for health column');
+        return;
+    }
+
+    const thead = table.querySelector('thead');
+    if (!thead) {
+        console.log('No thead found');
+        return;
+    }
+
+    const headerRow = thead.querySelector('tr');
+    if (!headerRow) {
+        console.log('No header row found');
+        return;
+    }
+
+    const hasHealth = Array.from(headerRow.querySelectorAll('th'))
+        .some(th => th.textContent.trim().toLowerCase() === 'health');
+    
+    if (!hasHealth) {
+        console.log('Adding Health column to table');
+        const th = document.createElement('th');
+        th.textContent = 'Health';
+        th.className = 'px-5 py-3 text-left whitespace-nowrap';
+        headerRow.insertBefore(th, headerRow.firstChild);
+    } else {
+        console.log('Health column already exists');
+    }
+}
+
+function addHealthLegend() {
+    // Add legend if it doesn't exist
+    const existingLegend = document.querySelector('.health-legend');
+    if (existingLegend) return;
+
+    const table = document.querySelector('#requests-table, table.requests, table#requests');
+    if (!table) return;
+
+    const legend = document.createElement('div');
+    legend.className = 'health-legend mt-6 mb-2 flex items-center justify-center gap-6 text-xs text-zinc-500';
+    legend.innerHTML = `
+        <span class="flex items-center gap-1">
+            <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+            <span class="font-medium">≥90%</span>
+        </span>
+        <span class="flex items-center gap-1">
+            <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+            <span class="font-medium">≥60%</span>
+        </span>
+        <span class="flex items-center gap-1">
+            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+            <span class="font-medium">&lt;60%</span>
+        </span>
+    `;
+    
+    table.parentNode.insertBefore(legend, table.nextSibling);
+}
+
 // Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.dashboard = new TelemetryDashboard();
+    
+    // Add a small delay to ensure the table is rendered
+    setTimeout(() => {
+        ensureRequestsHealthColumn();
+        addHealthLegend();
+    }, 100);
 });

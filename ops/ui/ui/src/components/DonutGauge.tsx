@@ -6,13 +6,15 @@ type Props = {
   size?: number;        // px
   strokeWidth?: number; // px
   thresholds?: { green: number; amber: number }; // fraction boundaries
+  title?: string;       // tooltip (optional)
 };
 
 export default function DonutGauge({
   value,
-  size = 28,
-  strokeWidth = 4,
+  size = 32,
+  strokeWidth = 2.5,
   thresholds = { green: 0.9, amber: 0.6 },
+  title,
 }: Props) {
   const clamped = Math.max(0, Math.min(1, value ?? 0));
   const radius = (size - strokeWidth) / 2;
@@ -24,10 +26,18 @@ export default function DonutGauge({
   else if (clamped >= thresholds.amber) color = "#f59e0b"; // amber
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="shrink-0"
+      role="img"
+      aria-label={title ?? `health ${Math.round(clamped * 100)}%`}
+      title={title}
+    >
       <circle
         cx={size/2} cy={size/2} r={radius}
-        stroke="#e5e7eb" strokeWidth={strokeWidth}
+        stroke="#374151" strokeWidth={strokeWidth}
         fill="none"
       />
       <circle
@@ -41,7 +51,8 @@ export default function DonutGauge({
       />
       <text
         x="50%" y="50%" dominantBaseline="middle" textAnchor="middle"
-        fontSize={size * 0.32} fontWeight={600} fill="#111827"
+        fontSize={size * 0.28} fontWeight={500} fill="#ffffff"
+        fontFamily="Inter, system-ui, sans-serif"
       >
         {Math.round(clamped * 100)}
       </text>

@@ -11,7 +11,14 @@ MAX_AUDIT = int(os.getenv("ADMIN_AUDIT_MAX", "1000"))
 AUDIT_TTL_MINUTES = int(os.getenv("ADMIN_AUDIT_TTL_MINUTES", "60"))
 AUDIT: "deque[Dict[str, Any]]" = deque(maxlen=MAX_AUDIT)
 
-MONITORING_PATHS = {"/v1/metrics", "/v1/system", "/v1/logs/tail", "/v1/admin/requests"}
+MONITORING_PATTERNS = [
+    re.compile(r"^/$"),                         # root
+    re.compile(r"^/v1/system$"),
+    re.compile(r"^/v1/logs/tail$"),
+    re.compile(r"^/v1/admin/requests$"),
+    re.compile(r"^/v1/metrics(?:/.*)?$"),       # /v1/metrics and any subpath
+    re.compile(r"^/(favicon\.ico|robots\.txt)$"),
+]
 
 # Redaction configuration
 REDACT_HEADERS = set(os.getenv("REDACT_HEADERS", "authorization,x-api-key").split(","))
@@ -118,6 +125,10 @@ def finalize_audit(
         push_event(audit, "completed", {"status": status, "latency_ms": audit["latency_ms"]})
     audit["fitness"] = compute_fitness(audit)
 
+def _is_monitoring_path(path: str) -> bool:
+    p = path or ""
+    return any(pat.search(p) for pat in MONITORING_PATTERNS)
+
 def prune_expired_audits() -> None:
     """Remove audits older than TTL"""
     if AUDIT_TTL_MINUTES <= 0:
@@ -154,9 +165,10 @@ def list_audits(
     # Prune expired audits first
     prune_expired_audits()
     
-    items = list(AUDIT)
+    items = list(AUDIT)  # oldest → newest
     if exclude_monitoring:
-        items = [x for x in items if x.get("path") not in MONITORING_PATHS]
+        items = [x for x in items if not _is_monitoring_path(x.get("path", ""))]
+
     if status_filter in ("2xx", "4xx", "5xx"):
         def matches(status: Optional[int]) -> bool:
             if not isinstance(status, int): return False
@@ -165,6 +177,10 @@ def list_audits(
             if status_filter == "5xx": return 500 <= status < 600
             return True
         items = [x for x in items if matches(x.get("status"))]
+
     if path_filter:
-        items = [x for x in items if str(x.get("path","")).startswith(path_filter)]
-    return items[-limit:]
+        items = [x for x in items if str(x.get("path", "")).startswith(path_filter)]
+
+    # newest-first
+    items = items[-limit:][::-1]
+    return items
