@@ -69,7 +69,7 @@ The dashboard connects to the Telemetry API endpoints:
 ## Configuration
 
 Set the API base URL and key in the top bar:
-- **API Base**: Defaults to `http://localhost:8080`
+- **API Base**: Defaults to `http://localhost`
 - **API Key**: Defaults to `TEST_KEY`
 
 ## Browser Support

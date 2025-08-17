@@ -3,7 +3,7 @@
 
 // Configuration - can be overridden by window.__CFG__
 const DEFAULT_CONFIG = {
-    API_BASE_URL: 'http://localhost:8080',
+    API_BASE_URL: 'http://localhost',
     API_PREFIX: '/v1',
     API_KEY: 'TEST_KEY'
 };

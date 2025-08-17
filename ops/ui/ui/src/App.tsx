@@ -85,7 +85,7 @@ const Tabs = ({ tab, setTab, items }: {
 );
 
 export default function App() {
-  const [apiBase, setApiBase] = useState("http://localhost:8080");
+  const [apiBase, setApiBase] = useState("http://localhost");
   const [apiKey, setApiKey] = useState("TEST_KEY");
   const [tab, setTab] = useState("Dashboard");
   const [status, setStatus] = useState("online");

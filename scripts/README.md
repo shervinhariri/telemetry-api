@@ -31,7 +31,7 @@ Comprehensive API test suite that validates all endpoints.
 ./scripts/test_api.sh
 
 # Test with custom settings
-BASE_URL=http://localhost:8080 API_KEY=YOUR_KEY ./scripts/test_api.sh
+BASE_URL=http://localhost API_KEY=YOUR_KEY ./scripts/test_api.sh
 ```
 
 **Tests included:**
