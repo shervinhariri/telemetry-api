@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-API=${API:-http://localhost:8080}
+API=${API:-http://localhost}
 KEY=${KEY:-TEST_KEY}
 
 echo "🧪 Telemetry API Smoke Test"

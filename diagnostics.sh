@@ -2,7 +2,7 @@
 # diagnostics.sh — Deterministic end-to-end checks for Telemetry API + UI
 # Usage: bash diagnostics.sh [API_BASE] [API_KEY]
 set -euo pipefail
-API_BASE="${1:-http://localhost:8080}"
+API_BASE="${1:-http://localhost}"
 API_KEY="${2:-TEST_KEY}"
 
 echo "==> Using API_BASE=$API_BASE"
@@ -64,7 +64,7 @@ If the UI is still blank:
 1) Open DevTools → Network. Refresh page with Cmd+Shift+R.
    - Confirm /v1/api/requests and /v1/metrics are 200, not 401/404/CORS.
 2) In Console, run:
-   fetch('http://localhost:8080/v1/api/requests?limit=50&window=15m',{headers:{Authorization:'Bearer TEST_KEY'}}).then(r=>r.json()).then(console.log)
+   fetch('http://localhost/v1/api/requests?limit=50&window=15m',{headers:{Authorization:'Bearer TEST_KEY'}}).then(r=>r.json()).then(console.log)
 3) Check the UI config printed on load: "API Config: {...}".
 4) If /v1/* 404s, check the API_PREFIX in the UI config.
 

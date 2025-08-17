@@ -4,7 +4,7 @@ echo "🎯 DASHBOARD VALUES TEST"
 echo "========================"
 
 # Get current metrics
-METRICS=$(curl -s -H "Authorization: Bearer TEST_KEY" http://localhost:8080/v1/metrics)
+METRICS=$(curl -s -H "Authorization: Bearer TEST_KEY" http://localhost/v1/metrics)
 
 echo ""
 echo "📊 Current Metrics:"
@@ -30,6 +30,6 @@ echo "Threat Matches (15m): Should show $(echo $METRICS | jq -r '.totals.threat_
 echo "Error Rate (%): Should show $(echo $METRICS | jq -r 'if .requests_total > 0 then (.requests_failed / .requests_total * 100) else 0 end | . * 10 | floor / 10')%"
 
 echo ""
-echo "🎯 Next: Open http://localhost:8080 and hard refresh (Ctrl+Shift+R)"
+echo "🎯 Next: Open http://localhost and hard refresh (Ctrl+Shift+R)"
 echo "Check console for logs starting with 🔧 and ✅"
 

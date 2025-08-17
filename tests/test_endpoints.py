@@ -9,7 +9,7 @@ import time
 import random
 from typing import Dict, Any
 
-BASE_URL = "http://localhost:8080"
+BASE_URL = "http://localhost"
 API_KEY = "TEST_KEY"
 
 def make_request(method: str, endpoint: str, data: Dict[str, Any] = None, headers: Dict[str, str] = None) -> Dict[str, Any]:
@@ -148,7 +148,7 @@ def test_download():
     # For streaming endpoints, we need to handle the response differently
     try:
         response = requests.get(
-            "http://localhost:8080/v1/download/json?limit=10",
+            "http://localhost/v1/download/json?limit=10",
             headers={"Authorization": "Bearer TEST_KEY"},
             stream=True
         )

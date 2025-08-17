@@ -12,22 +12,22 @@ Ingest NetFlow/IPFIX and Zeek JSON → enrich with GeoIP/ASN/threat intel → ap
 
 ```bash
 # 1) Run container
-docker run -d -p 8080:8080 \
+docker run -d -p 80:8080 \
   -e API_KEY=TEST_KEY \
   -e REDACT_HEADERS=authorization \
   --name telapi shvin/telemetry-api:0.8.0
 
 # 2) Ingest sample Zeek
-curl -s -X POST http://localhost:8080/v1/ingest/zeek \
+curl -s -X POST http://localhost/v1/ingest/zeek \
   -H "Authorization: Bearer TEST_KEY" -H "Content-Type: application/json" \
   --data @samples/zeek_conn_small.json | jq
 
 # 3) See it live
-open http://localhost:8080/docs  # API documentation
-open http://localhost:8080       # Dashboard
+open http://localhost/docs  # API documentation
+open http://localhost       # Dashboard
 
 # 4) Download enriched output
-curl -s "http://localhost:8080/v1/download/json?limit=50" \
+curl -s "http://localhost/v1/download/json?limit=50" \
   -H "Authorization: Bearer TEST_KEY" | head -n 5
 ```
 
@@ -35,7 +35,7 @@ curl -s "http://localhost:8080/v1/download/json?limit=50" \
 
 ```bash
 # Single container with MaxMind/TI data
-docker run -d -p 8080:8080 \
+docker run -d -p 80:8080 \
   -e API_KEY=TEST_KEY \
   -e GEOIP_DB_CITY=/data/GeoLite2-City.mmdb \
   -e GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb \
@@ -44,10 +44,10 @@ docker run -d -p 8080:8080 \
   --name telemetry-api shvin/telemetry-api:0.8.0
 
 # Open dashboard
-open http://localhost:8080
+open http://localhost
 
 # Test ingest
-curl -s -X POST http://localhost:8080/v1/ingest/zeek \
+curl -s -X POST http://localhost/v1/ingest/zeek \
   -H "Authorization: Bearer TEST_KEY" \
   -H "Content-Type: application/json" \
   --data @samples/zeek_conn_small.json | jq
@@ -59,7 +59,7 @@ Get up and running with demo data and monitoring in 5 minutes:
 
 ```bash
 # 1) Run with demo mode enabled
-docker run -d -p 8080:8080 \
+docker run -d -p 80:8080 \
   -e API_KEY=TEST_KEY \
   -e DEMO_MODE=true \
   -e DEMO_EPS=50 \
@@ -67,24 +67,24 @@ docker run -d -p 8080:8080 \
   --name telemetry-api-demo shvin/telemetry-api:latest
 
 # 2) Start demo generator
-curl -s -X POST http://localhost:8080/v1/demo/start \
+curl -s -X POST http://localhost/v1/demo/start \
   -H "Authorization: Bearer TEST_KEY" | jq
 
 # 3) Check Prometheus metrics
-curl -s http://localhost:8080/v1/metrics/prometheus | head -20
+curl -s http://localhost/v1/metrics/prometheus | head -20
 
 # 4) View dashboard
-open http://localhost:8080
+open http://localhost
 
 # 5) Stop demo when done
-curl -s -X POST http://localhost:8080/v1/demo/stop \
+curl -s -X POST http://localhost/v1/demo/stop \
   -H "Authorization: Bearer TEST_KEY" | jq
 ```
 
 ### Grafana Dashboard
 
 1. **Import Dashboard**: Use `dashboards/grafana/telemetry-api.json`
-2. **Configure Prometheus**: Add Prometheus data source pointing to `http://localhost:8080/v1/metrics/prometheus`
+2. **Configure Prometheus**: Add Prometheus data source pointing to `http://localhost/v1/metrics/prometheus`
 3. **View Metrics**: Dashboard shows EPS, latency, threat matches, and more
 
 ### Demo Configuration
@@ -191,10 +191,10 @@ cd telemetry-api
 
 # Build and run
 docker build -t telemetry-api:local .
-docker run -d -p 8080:8080 -e API_KEY=TEST_KEY --name telemetry-api telemetry-api:local
+docker run -d -p 80:8080 -e API_KEY=TEST_KEY --name telemetry-api telemetry-api:local
 
 # Test
-curl -s http://localhost:8080/v1/health | jq
+curl -s http://localhost/v1/health | jq
 ```
 
 ### Testing
@@ -220,8 +220,8 @@ curl -s http://localhost:8080/v1/health | jq
 
 ## 📚 API Documentation
 
-- **Interactive Docs**: `http://localhost:8080/docs` (Swagger UI)
-- **OpenAPI Spec**: `http://localhost:8080/openapi.yaml`
+- **Interactive Docs**: `http://localhost/docs` (Swagger UI)
+- **OpenAPI Spec**: `http://localhost/openapi.yaml`
 - **Health Check**: `GET /v1/health`
 - **System Info**: `GET /v1/system`
 - **Metrics**: `GET /v1/metrics`
@@ -235,7 +235,7 @@ services:
   telemetry-api:
     image: shvin/telemetry-api:0.8.0
     ports:
-      - "8080:8080"
+      - "80:8080"
     environment:
       - API_KEY=your-secure-key
       - SPLUNK_HEC_URL=https://your-splunk:8088

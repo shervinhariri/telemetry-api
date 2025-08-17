@@ -9,7 +9,7 @@ while true; do
     echo "$(date '+%H:%M:%S') - Fetching metrics..."
     
     # Get metrics
-    METRICS=$(curl -s -H "Authorization: Bearer TEST_KEY" http://localhost:8080/v1/metrics)
+    METRICS=$(curl -s -H "Authorization: Bearer TEST_KEY" http://localhost/v1/metrics)
     
     # Extract key values
     RECORDS=$(echo $METRICS | jq -r '.records_processed')

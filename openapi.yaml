@@ -4,7 +4,7 @@ info:
   version: 0.8.0
   description: Pre-SIEM enrichment for NetFlow/IPFIX and Zeek with GeoIP, ASN, Threat Intel, and Risk scoring.
 servers:
-  - url: http://localhost:8080/v1
+  - url: http://localhost/v1
 security:
   - bearerAuth: []
 components:

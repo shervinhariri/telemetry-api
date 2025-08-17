@@ -12,7 +12,7 @@ import threading
 from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-BASE_URL = "http://localhost:8080"
+BASE_URL = "http://localhost"
 API_KEY = "TEST_KEY"
 TOTAL_REQUESTS = 1000
 DURATION_SECONDS = 120  # 2 minutes

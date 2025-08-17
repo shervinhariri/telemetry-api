@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE="${BASE:-http://localhost:8080}"
+BASE="${BASE:-http://localhost}"
 API_KEY="${API_KEY:-TEST_KEY}"
 D="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA="$D/data"
