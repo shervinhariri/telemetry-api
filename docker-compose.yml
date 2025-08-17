@@ -33,6 +33,7 @@ services:
       - ADMIN_SHOW_LOG_TAIL=false
     ports:
       - "80:80"
+      - "3000:3000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/v1/health')"]
       interval: 10s
