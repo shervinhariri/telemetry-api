@@ -2,7 +2,7 @@
 
 ## Prerequisites
 - `curl` and `gzip` installed
-- Telemetry API running locally at `http://localhost:8080`
+- Telemetry API running locally at `http://localhost`
 - API key configured (default: `TEST_KEY`)
 
 ## Quick Start

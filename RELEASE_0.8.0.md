@@ -130,18 +130,18 @@ docker run -d -p 8080:8080 \
 
 ### 2. Start Demo Generator
 ```bash
-curl -X POST http://localhost:8080/v1/demo/start \
+curl -X POST http://localhost/v1/demo/start \
   -H "Authorization: Bearer TEST_KEY"
 ```
 
 ### 3. Check Prometheus Metrics
 ```bash
-curl http://localhost:8080/v1/metrics/prometheus
+curl http://localhost/v1/metrics/prometheus
 ```
 
 ### 4. Import Grafana Dashboard
 - Use `dashboards/grafana/telemetry-api.json`
-- Configure Prometheus data source: `http://localhost:8080/v1/metrics/prometheus`
+- Configure Prometheus data source: `http://localhost/v1/metrics/prometheus`
 
 ## 🔮 What's Next (v0.9.0)
 

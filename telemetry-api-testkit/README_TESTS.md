@@ -2,7 +2,7 @@
 
 ## Prerequisites
 - `curl` and `gzip` installed
-- Telemetry API running locally at `http://localhost:8080`
+- Telemetry API running locally at `http://localhost`
 - API key configured (default: `TEST_KEY`)
 
 ## Quick Start
@@ -12,7 +12,7 @@ unzip telemetry-api-testkit.zip
 cd telemetry-api-testkit
 
 # Optional overrides
-export BASE=http://localhost:8080
+export BASE=http://localhost
 export API_KEY=TEST_KEY
 
 # Run all tests
