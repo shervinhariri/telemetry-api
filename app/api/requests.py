@@ -2,7 +2,7 @@
 Request audit API endpoints
 """
 
-from fastapi import APIRouter, HTTPException, Query, Depends, Request
+from fastapi import APIRouter, HTTPException, Query, Depends, Request, Response, Header
 from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict, Any
 import json
@@ -14,17 +14,21 @@ from ..audit import mask_api_key, get_active_clients_count
 
 router = APIRouter()
 
-from ..audit import in_memory_audit_logs, mask_api_key, get_active_clients_count
+from ..observability.audit import list_audits
+from ..audit import mask_api_key, get_active_clients_count
 
 def get_audit_summary(window_minutes: int = 15) -> Dict[str, Any]:
     """Get audit summary for dashboard cards"""
+    # Get recent audits from the new audit system
+    recent_audits = list_audits(limit=1000, exclude_monitoring=True)  # Get all recent audits
+    
+    # Filter by time window
     now = datetime.utcnow()
     cutoff = now - timedelta(minutes=window_minutes)
     
-    # Use real audit data from memory
     recent_requests = [
-        req for req in in_memory_audit_logs 
-        if req.get('ts', now) >= cutoff
+        req for req in recent_audits 
+        if datetime.fromisoformat(req.get('ts', now.isoformat())) >= cutoff
     ]
     
     # Calculate metrics
@@ -42,7 +46,7 @@ def get_audit_summary(window_minutes: int = 15) -> Dict[str, Any]:
             status_codes['5xx'] += 1
     
     # P95 latency
-    latencies = [req.get('duration_ms', 0) for req in recent_requests]
+    latencies = [req.get('latency_ms', 0) for req in recent_requests]
     p95_latency = 0
     if latencies:
         latencies.sort()
@@ -61,99 +65,56 @@ def get_audit_summary(window_minutes: int = 15) -> Dict[str, Any]:
 
 @router.get("/admin/requests/summary")
 async def get_requests_summary(
+    Authorization: Optional[str] = Header(None),
     window: int = Query(15, description="Time window in minutes")
 ):
     """Get requests summary for dashboard cards"""
+    from ..auth import require_api_key
+    
+    # Require admin scope
+    require_api_key(Authorization, required_scopes=["admin", "read_requests"])
+    
     return get_audit_summary(window)
 
 @router.get("/admin/requests")
 async def get_requests(
-    limit: int = Query(500, ge=1, le=1000, description="Number of requests to return"),
-    window: str = Query("15m", description="Time window (e.g., 15m, 1h, 24h)"),
-    page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=500, description="Page size"),
-    since: Optional[str] = Query(None, description="Start time (ISO format)"),
-    until: Optional[str] = Query(None, description="End time (ISO format)"),
-    method: Optional[str] = Query(None, description="HTTP method"),
-    status: Optional[int] = Query(None, description="HTTP status code"),
-    endpoint: Optional[str] = Query(None, description="API endpoint path"),
-    client_ip: Optional[str] = Query(None, description="Client IP address"),
-    api_key_prefix: Optional[str] = Query(None, description="API key prefix")
+    response: Response,
+    Authorization: Optional[str] = Header(None),
+    limit: int = Query(50, ge=1, le=200, description="Number of requests to return"),
+    exclude_monitoring: bool = Query(True, description="Exclude monitoring endpoints"),
+    status: str = Query("any", pattern="^(any|2xx|4xx|5xx)$", description="Status filter"),
+    path: Optional[str] = Query(None, description="Path filter"),
+    if_none_match: Optional[str] = Query(None, description="ETag for caching")
 ):
-    """Get paginated audit records with enhanced filtering"""
-    # Parse time window
-    window_minutes = 15  # default
-    if window.endswith('m'):
-        try:
-            window_minutes = int(window[:-1])
-        except ValueError:
-            pass
-    elif window.endswith('h'):
-        try:
-            window_minutes = int(window[:-1]) * 60
-        except ValueError:
-            pass
+    """Get recent request audits with timeline events and ETag support"""
+    from hashlib import sha1
+    from ..auth import require_api_key
     
-    # Calculate time cutoff
-    now = datetime.utcnow()
-    cutoff = now - timedelta(minutes=window_minutes)
+    # Require admin scope
+    require_api_key(Authorization, required_scopes=["admin", "read_requests"])
     
-    # Use real audit data from memory
-    filtered_data = in_memory_audit_logs.copy()
+    # Get recent audits with filtering
+    items = list_audits(
+        limit=limit,
+        exclude_monitoring=exclude_monitoring,
+        status_filter=status,
+        path_filter=path
+    )
     
-    # Apply time window filter
-    filtered_data = [req for req in filtered_data if req.get('ts', now) >= cutoff]
+    # Generate ETag for caching
+    signature = sha1(f"{len(items)}|{items[-1]['id'] if items else 'none'}".encode()).hexdigest()
+    etag = f'W/"{signature}"'
     
-    # Apply additional filters
-    if since:
-        since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
-        filtered_data = [req for req in filtered_data if req.get('ts', datetime.utcnow()) >= since_dt]
+    # Return 304 if unchanged
+    if if_none_match and if_none_match == etag:
+        response.status_code = 304
+        return
     
-    if until:
-        until_dt = datetime.fromisoformat(until.replace('Z', '+00:00'))
-        filtered_data = [req for req in filtered_data if req.get('ts', datetime.utcnow()) <= until_dt]
-    
-    if method:
-        filtered_data = [req for req in filtered_data if req.get('method') == method.upper()]
-    
-    if status:
-        filtered_data = [req for req in filtered_data if req.get('status') == status]
-    
-    if endpoint:
-        filtered_data = [req for req in filtered_data if endpoint in req.get('path', '')]
-    
-    if client_ip:
-        filtered_data = [req for req in filtered_data if client_ip in req.get('client_ip', '')]
-    
-    if api_key_prefix:
-        filtered_data = [req for req in filtered_data if api_key_prefix in req.get('api_key_masked', '')]
-    
-    # Sort by timestamp (newest first)
-    filtered_data.sort(key=lambda x: x.get('ts', now), reverse=True)
-    
-    # Apply limit
-    filtered_data = filtered_data[:limit]
-    
-    # Pagination
-    total = len(filtered_data)
-    start_idx = (page - 1) * page_size
-    end_idx = start_idx + page_size
-    items = filtered_data[start_idx:end_idx]
-    
-    # Mask API keys for display
-    for item in items:
-        if 'api_key' in item:
-            item['api_key_masked'] = mask_api_key(item['api_key'])
-            del item['api_key']  # Don't expose raw keys
+    response.headers["ETag"] = etag
     
     return {
         "items": items,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size,
-        "window_minutes": window_minutes,
-        "window": window
+        "total": len(items)
     }
 
 @router.get("/admin/requests/stream")
@@ -257,59 +218,35 @@ async def get_request_detail(request_id: int):
 
 @router.get("/api/requests")
 async def get_requests_api(
-    limit: int = Query(500, ge=1, le=1000, description="Number of requests to return"),
-    window: str = Query("15m", description="Time window (e.g., 15m, 1h, 24h)")
+    limit: int = Query(50, ge=1, le=1000, description="Number of requests to return"),
+    status_filter: Optional[str] = Query(None, description="Status filter (2xx, 4xx, 5xx)")
 ):
-    """Enhanced API endpoint for requests with aggregation by time window"""
-    # Parse time window
-    window_minutes = 15  # default
-    if window.endswith('m'):
-        try:
-            window_minutes = int(window[:-1])
-        except ValueError:
-            pass
-    elif window.endswith('h'):
-        try:
-            window_minutes = int(window[:-1]) * 60
-        except ValueError:
-            pass
-    
-    # Calculate time cutoff
-    now = datetime.utcnow()
-    cutoff = now - timedelta(minutes=window_minutes)
-    
-    # Use real audit data from memory
-    recent_requests = [req for req in in_memory_audit_logs if req.get('ts', now) >= cutoff]
-    
-    # Sort by timestamp (newest first)
-    recent_requests.sort(key=lambda x: x.get('ts', now), reverse=True)
-    
-    # Apply limit
-    recent_requests = recent_requests[:limit]
+    """Enhanced API endpoint for requests with timeline events"""
+    # Get recent audits with filtering
+    audits = list_audits(
+        limit=limit,
+        exclude_monitoring=True,
+        status_filter=status_filter or "any"
+    )
     
     # Calculate aggregations for state boxes
-    total_requests = len(recent_requests)
-    succeeded = sum(1 for req in recent_requests if 200 <= req.get('status', 0) < 300)
-    failed = sum(1 for req in recent_requests if req.get('status', 0) >= 400)
+    total_requests = len(audits)
+    succeeded = sum(1 for req in audits if 200 <= req.get('status', 0) < 300)
+    failed = sum(1 for req in audits if req.get('status', 0) >= 400)
     
     # Calculate average latency
-    latencies = [req.get('duration_ms', 0) for req in recent_requests if req.get('duration_ms', 0) > 0]
+    latencies = [req.get('latency_ms', 0) for req in audits if req.get('latency_ms', 0) > 0]
     avg_latency = sum(latencies) / len(latencies) if latencies else 0
     
     # Prepare response data with enhanced fields for UI
     items = []
-    for req in recent_requests:
+    for req in audits:
         item = req.copy()
         
-        # Mask API keys
-        if 'api_key' in item:
-            item['api_key_masked'] = mask_api_key(item['api_key'])
-            del item['api_key']
-        
         # Add computed fields for UI
-        item['records'] = item.get('records_processed', 0)
-        item['risk_avg'] = item.get('avg_risk_score', 0)
-        item['latency_ms'] = item.get('duration_ms', 0)
+        item['records'] = item.get('summary', {}).get('records', 0)
+        item['risk_avg'] = item.get('summary', {}).get('risk_avg', 0)
+        item['latency_ms'] = item.get('latency_ms', 0)
         
         # Extract source IP for display
         item['source_ip'] = item.get('client_ip', 'unknown')
@@ -321,7 +258,5 @@ async def get_requests_api(
         "total": total_requests,
         "succeeded": succeeded,
         "failed": failed,
-        "avg_latency_ms": round(avg_latency, 2),
-        "window_minutes": window_minutes,
-        "window": window
+        "avg_latency_ms": round(avg_latency, 2)
     }

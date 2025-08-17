@@ -72,7 +72,7 @@ export API_KEY=TEST_KEY
 ## Troubleshooting
 
 ### Common Issues
-1. **Connection refused** - Make sure API is running on port 8080
+1. **Connection refused** - Make sure API is running on port 80
 2. **401 Unauthorized** - Check API_KEY environment variable
 3. **404 Not Found** - Verify endpoint paths are correct
 4. **500 Internal Server Error** - Check server logs for details

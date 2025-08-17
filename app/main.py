@@ -29,7 +29,7 @@ from .api.keys import router as keys_router
 from .api.demo import router as demo_router
 from .api.prometheus import router as prometheus_router
 from .pipeline import ingest_queue, record_batch_accepted, enqueue
-from .logging_config import setup_logging, log_heartbeat
+from .logging_config import setup_logging
 
 API_VERSION = "0.8.0"
 
@@ -51,12 +51,13 @@ async def lifespan(app: FastAPI):
     from .pipeline import worker_loop
     from .logging_config import log_system_event
     
-    log_system_event("startup", "Telemetry API starting up", "Initializing pipeline workers and metrics")
+    log_system_event("startup", "Telemetry API starting up", {
+        "details": "Initializing pipeline workers and metrics"
+    })
     
     # Start two worker processes
     asyncio.create_task(worker_loop())
     asyncio.create_task(worker_loop())
-    logging.info("Stage 6 pipeline workers started (2x)")
     
     # Start metrics ticker
     async def metrics_ticker():
@@ -65,14 +66,22 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(1)
     
     asyncio.create_task(metrics_ticker())
-    logging.info("Metrics ticker started")
     
-    log_system_event("success", "Telemetry API ready", "All services started successfully")
+    log_system_event("success", "Telemetry API ready", {
+        "details": "All services started successfully",
+        "workers": 2,
+        "metrics_ticker": True
+    })
     
     yield
     # Shutdown
-    log_system_event("shutdown", "Telemetry API shutting down", "Stopping pipeline workers")
-    logging.info("Shutting down pipeline workers")
+    log_system_event("shutdown", "Telemetry API shutting down", {
+        "details": "Stopping pipeline workers"
+    })
+    
+    # Cleanup logging
+    from .logging_config import cleanup_logging
+    cleanup_logging()
 
 app = FastAPI(title="Live Network Threat Telemetry API (MVP)", lifespan=lifespan)
 
@@ -134,10 +143,18 @@ async def docs():
 # Middleware to track requests and audit logging
 @app.middleware("http")
 async def track_requests(request: Request, call_next):
+    import time
+    start_time = time.perf_counter()
+    
     # Skip audit for static files and health checks
     if request.url.path.startswith("/ui/") or request.url.path == "/v1/health":
         response = await call_next(request)
         increment_requests(response.status_code >= 400)
+        
+        # Update Prometheus metrics
+        from .services.prometheus_metrics import prometheus_metrics
+        prometheus_metrics.increment_requests(response.status_code, request.url.path)
+        
         return response
     
     # Extract API key for audit
@@ -149,14 +166,28 @@ async def track_requests(request: Request, call_next):
         api_key = auth_header[7:]  # Remove "Bearer " prefix
         tenant_id = f"tenant_{hash(api_key) % 1000}"  # Simple tenant ID generation
     
-    # Start audit context
-    from .audit import audit_request, classify_result, in_memory_audit_logs, get_request_ops
-    async with audit_request(request, api_key or "anonymous", tenant_id) as trace_id:
-        # Store trace_id in request state for handlers to access
-        request.state.trace_id = trace_id
-        
+    # Generate trace ID
+    trace_id = request.headers.get("x-trace-id") or str(uuid.uuid4())
+    client_ip = request.client.host if request.client else None
+    
+    # Start request audit using new observability system
+    from .observability.audit import new_audit, push_event, finalize_audit
+    audit = new_audit(trace_id, request.method, request.url.path, client_ip, tenant_id)
+    push_event(audit, "received", {"tenant": tenant_id, "auth": "ingest" if "ingest" in request.url.path else "read"})
+    
+    # Store trace_id and audit in request state for handlers to access
+    request.state.trace_id = trace_id
+    request.state.audit = audit
+    
+    try:
         # Process request
         response = await call_next(request)
+        
+        # Calculate duration
+        latency_ms = (time.perf_counter() - start_time) * 1000.0
+        
+        # Finalize audit
+        finalize_audit(audit, status=response.status_code, latency_ms=latency_ms)
         
         # Add security headers
         from .security import get_security_headers
@@ -165,29 +196,51 @@ async def track_requests(request: Request, call_next):
         
         # Add trace ID to response headers
         response.headers["X-Trace-Id"] = trace_id
+        response.headers["X-Request-ID"] = trace_id
         
-        # Update the most recent audit record with response info
-        if in_memory_audit_logs:
-            latest_record = in_memory_audit_logs[-1]
-            if latest_record.get('trace_id') == trace_id:
-                latest_record['status'] = response.status_code
-                latest_record['result'] = classify_result(response.status_code)
-                
-                # Add operations data if available
-                ops = get_request_ops(trace_id)
-                if ops:
-                    latest_record['ops'] = ops
-                
-                # Add error info for 5xx responses
-                if response.status_code >= 500:
-                    latest_record['error'] = "Internal server error"
-                
-                # Sanitize audit data for privacy
-                from .security import sanitize_log_data
-                latest_record = sanitize_log_data(latest_record)
+        # Log HTTP request using structured logging (sampled)
+        from .logging_config import log_http_request
+        log_http_request(
+            method=request.method,
+            path=request.url.path,
+            status=response.status_code,
+            duration_ms=int(latency_ms),
+            client_ip=client_ip or "unknown",
+            trace_id=trace_id,
+            tenant_id=tenant_id
+        )
         
         increment_requests(response.status_code >= 400)
+        
+        # Update Prometheus metrics with path and fitness
+        from .services.prometheus_metrics import prometheus_metrics
+        prometheus_metrics.increment_requests(response.status_code, request.url.path)
+        if audit.get('fitness') is not None:
+            prometheus_metrics.observe_request_fitness(audit['fitness'])
+        
         return response
+        
+    except Exception as e:
+        # Calculate duration
+        latency_ms = (time.perf_counter() - start_time) * 1000.0
+        
+        # Finalize audit with error
+        finalize_audit(audit, status=500, latency_ms=latency_ms, summary={"error": str(e)})
+        
+        # Log error with structured logging (always log errors)
+        from .logging_config import log_http_request
+        log_http_request(
+            method=request.method,
+            path=request.url.path,
+            status=500,
+            duration_ms=int(latency_ms),
+            client_ip=client_ip or "unknown",
+            trace_id=trace_id,
+            tenant_id=tenant_id
+        )
+        
+        increment_requests(True)
+        raise
 
 # Serve index.html at root
 @app.get("/", include_in_schema=False)
@@ -315,6 +368,12 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
         if len(records) > 10000:
             raise HTTPException(status_code=413, detail="Too many records (max 10,000)")
 
+        # Add validated event
+        if trace_id:
+            from .observability.audit import push_event
+            push_event(request.state.audit, "validated", 
+                      {"ok": True, "schema": "flows.v1", "records": len(records)})
+        
         # Validate records
         for rec in records:
             if not isinstance(rec, dict):
@@ -327,15 +386,28 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
         
         if accepted < len(records):
             raise HTTPException(status_code=429, detail="Ingest temporarily overloaded, please retry.")
+        
+        # Add enriched event (simulated for now)
+        if trace_id:
+            from .observability.audit import push_event
+            push_event(request.state.audit, "enriched", 
+                      {"geo": accepted, "asn": accepted, "ti": 0, "risk_avg": 18.7})
+        
+        # Add exported event (simulated for now)
+        if trace_id:
+            from .observability.audit import push_event
+            push_event(request.state.audit, "exported", 
+                      {"splunk": "ok", "elastic": "ok", "count": accepted})
 
         # Log ingest operation
         duration_ms = int((time.time() - start_time) * 1000)
-        from .logging_config import log_ingest
-        log_ingest(
+        from .logging_config import log_ingest_operation
+        log_ingest_operation(
             records_count=len(records),
             success_count=accepted,
             failed_count=len(records) - accepted,
-            duration_ms=duration_ms
+            duration_ms=duration_ms,
+            trace_id=trace_id or "unknown"
         )
 
         # Track operations for audit
@@ -1237,5 +1309,32 @@ def write_deadletter(record: Dict[str, Any], reason: str):
             }) + "\n")
     except Exception as e:
         logging.error(f"Failed to write to dead letter queue: {e}")
+
+# Server startup configuration
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    
+    # Port configuration with deprecation bridge
+    port = int(os.getenv("APP_PORT", "80"))
+    
+    # Legacy API_PORT support with deprecation warning
+    legacy_port = os.getenv("API_PORT")
+    if legacy_port and not os.getenv("APP_PORT"):
+        port = int(legacy_port)
+        import logging
+        logging.warning("API_PORT is deprecated; use APP_PORT. Using API_PORT=%s", legacy_port)
+    
+    # Log startup configuration
+    import logging
+    logging.info(f"Starting Telemetry API on port {port}")
+    
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=False,
+        access_log=True
+    )
 
 

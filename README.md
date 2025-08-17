@@ -12,7 +12,7 @@ Ingest NetFlow/IPFIX and Zeek JSON → enrich with GeoIP/ASN/threat intel → ap
 
 ```bash
 # 1) Run container
-docker run -d -p 80:8080 \
+docker run -d -p 80:80 \
   -e API_KEY=TEST_KEY \
   -e REDACT_HEADERS=authorization \
   --name telapi shvin/telemetry-api:0.8.0
@@ -35,7 +35,7 @@ curl -s "http://localhost/v1/download/json?limit=50" \
 
 ```bash
 # Single container with MaxMind/TI data
-docker run -d -p 80:8080 \
+docker run -d -p 80:80 \
   -e API_KEY=TEST_KEY \
   -e GEOIP_DB_CITY=/data/GeoLite2-City.mmdb \
   -e GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb \
@@ -53,13 +53,42 @@ curl -s -X POST http://localhost/v1/ingest/zeek \
   --data @samples/zeek_conn_small.json | jq
 ```
 
+## 📊 Structured Logging
+
+The API now includes production-ready structured logging with:
+
+- **JSON logs** for production environments
+- **Queue-based async logging** to prevent blocking
+- **Intelligent sampling** (1% of successful requests by default)
+- **Trace ID correlation** across request → pipeline → output
+- **Environment-based configuration** for dev vs production
+
+### Development Mode
+```bash
+# Human-readable logs with emojis
+export ENVIRONMENT=development
+export LOG_FORMAT=text
+export HTTP_LOG_SAMPLE_RATE=1.0  # Log all requests
+```
+
+### Production Mode
+```bash
+# JSON logs with sampling
+export ENVIRONMENT=production
+export LOG_FORMAT=json
+export HTTP_LOG_SAMPLE_RATE=0.01  # Sample 1% of successful requests
+export HTTP_LOG_EXCLUDE_PATHS=/health,/metrics,/system
+```
+
+See [docs/LOGGING.md](docs/LOGGING.md) for complete configuration options.
+
 ## 🎯 Quickstart (Demo Mode + Prometheus)
 
 Get up and running with demo data and monitoring in 5 minutes:
 
 ```bash
 # 1) Run with demo mode enabled
-docker run -d -p 80:8080 \
+docker run -d -p 80:80 \
   -e API_KEY=TEST_KEY \
   -e DEMO_MODE=true \
   -e DEMO_EPS=50 \
@@ -191,7 +220,7 @@ cd telemetry-api
 
 # Build and run
 docker build -t telemetry-api:local .
-docker run -d -p 80:8080 -e API_KEY=TEST_KEY --name telemetry-api telemetry-api:local
+docker run -d -p 80:80 -e API_KEY=TEST_KEY --name telemetry-api telemetry-api:local
 
 # Test
 curl -s http://localhost/v1/health | jq
@@ -235,7 +264,7 @@ services:
   telemetry-api:
     image: shvin/telemetry-api:0.8.0
     ports:
-      - "80:8080"
+      - "80:80"
     environment:
       - API_KEY=your-secure-key
       - SPLUNK_HEC_URL=https://your-splunk:8088
@@ -264,7 +293,7 @@ spec:
       - name: telemetry-api
         image: shvin/telemetry-api:0.8.0
         ports:
-        - containerPort: 8080
+        - containerPort: 80
         env:
         - name: API_KEY
           valueFrom:

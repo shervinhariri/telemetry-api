@@ -108,11 +108,39 @@ class DemoService:
             "demo": True
         }
     
+    async def _send_to_ingest(self, event):
+        """Send event to ingest endpoint for proper logging."""
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "/v1/api/ingest",
+                    headers={"Authorization": "Bearer TEST_KEY", "Content-Type": "application/json"},
+                    json=event,
+                    timeout=1.0
+                )
+                if response.status_code != 200:
+                    log_system_event("demo_ingest_warning", f"Ingest endpoint returned {response.status_code}", {
+                        "status_code": response.status_code
+                    })
+        except Exception as e:
+            log_system_event("demo_ingest_error", f"Failed to send to ingest endpoint: {e}", {
+                "error": str(e)
+            })
+            # Fallback to queue
+            from ..pipeline import enqueue
+            enqueue(event)
+    
     async def _generator_loop(self):
         """Main generator loop that produces events at the specified EPS rate."""
         from ..pipeline import enqueue
         
-        logger.info(f"Demo generator started: {DEMO_EPS} EPS for {DEMO_DURATION_SEC} seconds")
+        from ..logging_config import log_system_event
+        log_system_event("demo_start", f"Demo generator started: {DEMO_EPS} EPS for {DEMO_DURATION_SEC} seconds", {
+            "eps": DEMO_EPS,
+            "duration_sec": DEMO_DURATION_SEC,
+            "variants": DEMO_VARIANTS
+        })
         self.start_time = time.time()
         
         # Calculate delay between events to achieve target EPS
@@ -122,47 +150,49 @@ class DemoService:
             try:
                 # Check if we've exceeded duration
                 if time.time() - self.start_time > DEMO_DURATION_SEC:
-                    logger.info("Demo generator duration reached, stopping")
+                    log_system_event("demo_duration_reached", "Demo generator duration reached, stopping")
                     break
                 
                 # Generate events based on variants
                 for variant in DEMO_VARIANTS:
                     if variant.strip() == "netflow":
                         event = self._generate_netflow_event()
-                        enqueue(event)
+                        # Send to ingest endpoint for proper logging
+                        await self._send_to_ingest(event)
                     elif variant.strip() == "zeek":
                         event = self._generate_zeek_event()
-                        enqueue(event)
+                        # Send to ingest endpoint for proper logging
+                        await self._send_to_ingest(event)
                 
                 # Wait for next event
                 await asyncio.sleep(delay)
                 
             except Exception as e:
-                logger.error(f"Error in demo generator: {e}")
+                log_system_event("demo_error", f"Error in demo generator: {e}", {"error": str(e)})
                 await asyncio.sleep(1)  # Wait before retrying
         
-        logger.info("Demo generator stopped")
+        log_system_event("demo_stop", "Demo generator stopped")
         self.is_running = False
     
     async def start(self) -> bool:
         """Start the demo generator."""
         if self.is_running:
-            logger.warning("Demo generator is already running")
+            log_system_event("demo_warning", "Demo generator is already running")
             return False
         
         if not DEMO_MODE:
-            logger.warning("Demo mode is not enabled")
+            log_system_event("demo_warning", "Demo mode is not enabled")
             return False
         
         self.is_running = True
         self.task = asyncio.create_task(self._generator_loop())
-        logger.info("Demo generator started successfully")
+        log_system_event("demo_started", "Demo generator started successfully")
         return True
     
     async def stop(self) -> bool:
         """Stop the demo generator."""
         if not self.is_running:
-            logger.warning("Demo generator is not running")
+            log_system_event("demo_warning", "Demo generator is not running")
             return False
         
         self.is_running = False
@@ -173,7 +203,7 @@ class DemoService:
             except asyncio.CancelledError:
                 pass
         
-        logger.info("Demo generator stopped successfully")
+        log_system_event("demo_stopped", "Demo generator stopped successfully")
         return True
     
     def get_status(self) -> Dict[str, Any]:

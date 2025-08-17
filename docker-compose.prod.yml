@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  api:
+    environment:
+      # Production Logging Configuration
+      - ENVIRONMENT=production
+      - LOG_LEVEL=WARNING
+      - LOG_FORMAT=json
+      - HTTP_LOG_ENABLED=true
+      - HTTP_LOG_SAMPLE_RATE=0.01
+      - HTTP_LOG_EXCLUDE_PATHS=/v1/metrics,/v1/system,/v1/logs/tail,/v1/admin/requests
+      - REDACT_HEADERS=authorization,x-api-key,x-forwarded-for,x-real-ip
+      - REDACT_FIELDS=password,token,secret,key
+      - ADMIN_AUDIT_MAX=1000
+      - ADMIN_AUDIT_TTL_MINUTES=60
+      - ADMIN_SHOW_LOG_TAIL=false
+      # Disable demo mode in production
+      - DEMO_MODE=false
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:80/v1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M

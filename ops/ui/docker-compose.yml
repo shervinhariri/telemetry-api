@@ -14,9 +14,9 @@ services:
       - UPDATE_CHECK_ENABLED=true
       - ADMIN_TOKEN=dev-only-token  # Only for development
     ports:
-      - "80:8080"
+      - "80:80"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/v1/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:80/v1/health"]
       interval: 10s
       timeout: 3s
       retries: 10

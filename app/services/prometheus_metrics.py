@@ -18,7 +18,14 @@ BUILD_INFO = Gauge(
 REQUESTS_TOTAL = Counter(
     'telemetry_requests_total',
     'Total number of requests',
-    ['code', 'tenant']
+    ['status_class', 'path_group']
+)
+
+# Request fitness buckets
+REQUEST_FITNESS = Histogram(
+    'telemetry_request_fitness',
+    'Request fitness score distribution',
+    buckets=[0.6, 0.9, 1.0]
 )
 
 # Records processed
@@ -69,19 +76,35 @@ class PrometheusMetrics:
             image_tag=image_tag
         ).set(1)
     
-    def increment_requests(self, status_code: int, tenant: str = "default"):
+    def increment_requests(self, status_code: int, path: str = "/unknown"):
         """Increment request counter."""
         # Categorize status codes
         if 200 <= status_code < 300:
-            code = "2xx"
+            status_class = "2xx"
         elif 400 <= status_code < 500:
-            code = "4xx"
+            status_class = "4xx"
         elif 500 <= status_code < 600:
-            code = "5xx"
+            status_class = "5xx"
         else:
-            code = "other"
+            status_class = "other"
         
-        REQUESTS_TOTAL.labels(code=code, tenant=tenant).inc()
+        # Categorize paths
+        if "/v1/ingest" in path:
+            path_group = "ingest"
+        elif "/v1/lookup" in path:
+            path_group = "lookup"
+        elif "/v1/outputs" in path:
+            path_group = "outputs"
+        elif "/v1/admin" in path:
+            path_group = "admin"
+        else:
+            path_group = "other"
+        
+        REQUESTS_TOTAL.labels(status_class=status_class, path_group=path_group).inc()
+    
+    def observe_request_fitness(self, fitness: float):
+        """Observe request fitness score."""
+        REQUEST_FITNESS.observe(fitness)
     
     def increment_records_processed(self, count: int = 1):
         """Increment records processed counter."""

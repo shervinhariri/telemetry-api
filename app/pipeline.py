@@ -119,7 +119,9 @@ def _append_ndjson(record: Dict[str, Any]):
         with open(filename, "a") as f:
             f.write(json.dumps(record) + "\n")
     except Exception as e:
-        logging.error(f"Failed to write to {filename}: {e}")
+        from .logging_config import log_pipeline_event
+        log_pipeline_event("write_error", f"Failed to write to {filename}", 
+                          error=str(e), filename=str(filename))
 
 def _update_stats():
     """Update statistics"""
@@ -132,7 +134,9 @@ def _update_stats():
 
 async def worker_loop():
     """Background worker that processes records from the ingest queue"""
-    logging.info("Pipeline worker started")
+    from .logging_config import log_pipeline_event
+    
+    log_pipeline_event("worker_start", "Pipeline worker started", worker_id=id(asyncio.current_task()))
     
     while True:
         try:
@@ -173,16 +177,23 @@ async def worker_loop():
                 
                 _update_stats()
                 
-                logging.debug(f"Processed record: {record.get('ts', 'no-ts')}")
+                # Log pipeline processing event
+                log_pipeline_event("record_processed", "Record processed successfully", 
+                                 record_id=record.get('ts', 'no-ts'),
+                                 risk_score=risk_score,
+                                 threat_matches=len(ti_matches),
+                                 source_ip=src_ip)
                 
             except Exception as e:
-                logging.exception(f"Worker failed processing record: {e}")
+                log_pipeline_event("processing_error", f"Worker failed processing record: {e}", 
+                                 error=str(e),
+                                 record_id=record.get('ts', 'no-ts'))
                 # TODO: implement dead letter queue
             finally:
                 ingest_queue.task_done()
                 
         except Exception as e:
-            logging.exception(f"Worker loop error: {e}")
+            log_pipeline_event("worker_error", f"Worker loop error: {e}", error=str(e))
             await asyncio.sleep(1)
 
 def get_stats() -> Dict[str, Any]:
@@ -207,5 +218,7 @@ def get_daily_events(date: str = None) -> str:
         with open(filename, "r") as f:
             return f.read()
     except Exception as e:
-        logging.error(f"Failed to read {filename}: {e}")
+        from .logging_config import log_pipeline_event
+        log_pipeline_event("read_error", f"Failed to read {filename}", 
+                          error=str(e), filename=str(filename))
         return ""

@@ -16,7 +16,7 @@ docker system prune -a --volumes -f
 
 echo "==> Fresh build"
 docker build -t telemetry-api:local .
-docker run -d -p 80:8080 -e API_KEY=TEST_KEY -e REDACT_HEADERS=authorization,x-forwarded-for --name telemetry-api-test telemetry-api:local
+docker run -d -p 80:80 -e API_KEY=TEST_KEY -e REDACT_HEADERS=authorization,x-forwarded-for --name telemetry-api-test telemetry-api:local
 
 echo "==> Done. Check logs:"
 docker logs telemetry-api-test --tail=20

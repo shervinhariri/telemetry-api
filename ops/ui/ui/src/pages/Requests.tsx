@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import SuccessRing from "../components/SuccessRing";
 import SlideOver from "../components/SlideOver";
+import { RequestRow } from "../components/RequestRow";
+import { RequestDrawer } from "../components/RequestDrawer";
+import { useAdminRequestsPoll } from "../hooks/useAdminRequestsPoll";
 
 type AuditRow = {
   id?: string;
@@ -54,10 +57,14 @@ function Chip({ label, value, tone = "default" }:{
 
 export default function Requests({ api }: { api: any }) {
   const [metrics, setMetrics] = useState<any>(null);
-  const [rows, setRows] = useState<AuditRow[]>([]);
-  const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<AuditRow | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [excludeMonitoring, setExcludeMonitoring] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("any");
+  const [pathFilter, setPathFilter] = useState("");
+
+  // Use new polling hook with ETag support
+  const url = `/v1/admin/requests?exclude_monitoring=${excludeMonitoring}&limit=50&status=${statusFilter}${pathFilter ? `&path=${pathFilter}` : ''}`;
+  const rows = useAdminRequestsPoll(url, 10000);
 
   async function fetchMetrics() {
     try {
@@ -68,25 +75,8 @@ export default function Requests({ api }: { api: any }) {
     }
   }
 
-  async function fetchRequests() {
-    setLoading(true);
-    try {
-      let res;
-      try {
-        res = await api.get("/v1/requests?limit=50");
-      } catch {
-        res = await api.get("/v1/audit/requests?limit=50");
-      }
-      setRows(Array.isArray(res) ? res : (res.items ?? []));
-    } catch (error) {
-      console.error("Failed to fetch requests:", error);
-    }
-    setLoading(false);
-  }
-
   useEffect(() => {
     fetchMetrics();
-    fetchRequests();
   }, []);
 
   const successRate = useMemo(() => {
@@ -125,8 +115,37 @@ export default function Requests({ api }: { api: any }) {
       <div className="mt-10 mb-3 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-white">Recent Requests</h2>
         <div className="flex items-center gap-3">
+          {/* Quick filters */}
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm text-zinc-400">
+              <input
+                type="checkbox"
+                checked={excludeMonitoring}
+                onChange={(e) => setExcludeMonitoring(e.target.checked)}
+                className="rounded"
+              />
+              Hide monitoring
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-zinc-300"
+            >
+              <option value="any">All Status</option>
+              <option value="2xx">2xx Success</option>
+              <option value="4xx">4xx Client Error</option>
+              <option value="5xx">5xx Server Error</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Filter by path..."
+              value={pathFilter}
+              onChange={(e) => setPathFilter(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-zinc-300 w-40"
+            />
+          </div>
           <button
-            onClick={() => { fetchMetrics(); fetchRequests(); }}
+            onClick={() => fetchMetrics()}
             className="rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 px-4 py-2 border border-emerald-400/20"
           >
             Refresh
@@ -139,50 +158,28 @@ export default function Requests({ api }: { api: any }) {
         <table className="w-full text-left">
           <thead className="text-zinc-400 text-sm border-b border-white/5">
             <tr>
+              <th className="px-5 py-3">Health</th>
               <th className="px-5 py-3">Time</th>
-              <th className="px-5 py-3">Endpoint</th>
+              <th className="px-5 py-3">Method/Path</th>
               <th className="px-5 py-3">Status</th>
               <th className="px-5 py-3">Latency</th>
               <th className="px-5 py-3">Records</th>
               <th className="px-5 py-3">Client</th>
+              <th className="px-5 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {rows.map((r, idx) => {
-              const dt = r.ts ? new Date(r.ts) : null;
-              const statusColor =
-                (r.status ?? 0) >= 500 ? "bg-rose-500/20 text-rose-300 border-rose-400/30" :
-                (r.status ?? 0) >= 400 ? "bg-amber-500/20 text-amber-300 border-amber-400/30" :
-                "bg-emerald-500/20 text-emerald-300 border-emerald-400/30";
-              return (
-                <tr
-                  key={r.id ?? idx}
-                  className="hover:bg-white/[0.04] cursor-pointer"
-                  onClick={() => { setSelected(r); setOpen(true); }}
-                >
-                  <td className="px-5 py-3 text-sm text-zinc-300">
-                    {dt ? dt.toLocaleTimeString() : "—"}
-                  </td>
-                  <td className="px-5 py-3 text-sm text-white">
-                    <span className="text-zinc-400 mr-2">{r.method}</span>{r.path}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs border ${statusColor}`}>
-                      {r.status ?? "—"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-sm text-zinc-300">{fmtLatency(r.duration_ms)}</td>
-                  <td className="px-5 py-3 text-sm text-zinc-300">{r.records ?? 0}</td>
-                  <td className="px-5 py-3 text-sm text-zinc-300">
-                    {countryFlag(r.geo_country)} {r.client_ip ?? "—"}
-                  </td>
-                </tr>
-              );
-            })}
+            {rows.map((r, idx) => (
+              <RequestRow
+                key={r.id ?? idx}
+                item={r}
+                onClick={(item) => setSelected(item)}
+              />
+            ))}
             {!rows.length && (
               <tr>
-                <td colSpan={6} className="px-5 py-6 text-center text-zinc-500">
-                  {loading ? "Loading…" : "No requests yet"}
+                <td colSpan={8} className="px-5 py-6 text-center text-zinc-500">
+                  No requests yet
                 </td>
               </tr>
             )}
@@ -190,51 +187,13 @@ export default function Requests({ api }: { api: any }) {
         </table>
       </div>
 
-      {/* Slide-over for details */}
-      <SlideOver
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Request Details"
-        width={560}
-      >
-        {!selected ? null : (
-          <div className="space-y-6">
-            {/* summary chips */}
-            <div className="flex flex-wrap gap-2">
-              <Chip label="Status" value={String(selected.status ?? "—")}
-                tone={(selected.status ?? 0) >= 500 ? "danger" :
-                      (selected.status ?? 0) >= 400 ? "warn" : "ok"} />
-              <Chip label="Method" value={selected.method ?? "—"} />
-              <Chip label="Latency" value={fmtLatency(selected.duration_ms)} />
-              <Chip label="Records" value={String(selected.records ?? 0)} />
-              <Chip label="Endpoint" value={selected.path ?? "—"} />
-              <Chip label="Source IP" value={`${countryFlag(selected.geo_country)} ${selected.client_ip ?? "—"}`} />
-              <Chip label="Country" value={selected.geo_country ?? "—"} />
-              <Chip label="ASN" value={String(selected.asn ?? "—")} />
-              <Chip label="Tenant" value={selected.tenant_id ?? "—"} />
-              <Chip label="API Key" value={(selected.api_key_hash ?? "—").slice(0, 8)} />
-              <Chip label="Trace ID" value={selected.trace_id ?? "—"} />
-              {selected.risk_avg != null && <Chip label="Avg Risk" value={String(selected.risk_avg)} />}
-            </div>
-
-            {/* JSON viewer */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-zinc-300">Raw JSON</div>
-                <button
-                  onClick={() => navigator.clipboard.writeText(JSON.stringify(selected, null, 2))}
-                  className="px-3 py-1.5 text-sm rounded-md bg-white/5 hover:bg-white/10 text-zinc-200"
-                >
-                  Copy
-                </button>
-              </div>
-              <pre className="bg-black/40 border border-white/10 rounded-xl p-4 overflow-auto text-xs leading-relaxed text-zinc-300">
-{JSON.stringify(selected, null, 2)}
-              </pre>
-            </div>
-          </div>
-        )}
-      </SlideOver>
+      {/* Request drawer for timeline details */}
+      {selected && (
+        <RequestDrawer
+          item={selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }

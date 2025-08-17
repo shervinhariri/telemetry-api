@@ -24,7 +24,7 @@ localhost:80 {
     respond @options 200
 
     # Reverse proxy to API
-    reverse_proxy api:8080 {
+    reverse_proxy api:80 {
         # Health check
         health_uri /v1/health
         health_interval 10s

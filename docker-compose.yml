@@ -19,10 +19,22 @@ services:
       - DEMO_EPS=50
       - DEMO_DURATION_SEC=120
       - DEMO_VARIANTS=netflow,zeek
+      # Structured Logging Configuration
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=text
+      - HTTP_LOG_ENABLED=true
+      - HTTP_LOG_SAMPLE_RATE=0.1
+      - HTTP_LOG_EXCLUDE_PATHS=/v1/metrics,/v1/system,/v1/logs/tail,/v1/admin/requests
+      - REDACT_HEADERS=authorization,x-api-key
+      - REDACT_FIELDS=password,token
+      - ADMIN_AUDIT_MAX=1000
+      - ADMIN_AUDIT_TTL_MINUTES=60
+      - ADMIN_SHOW_LOG_TAIL=false
     ports:
-      - "80:8080"
+      - "80:80"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/v1/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/v1/health')"]
       interval: 10s
       timeout: 3s
       retries: 6

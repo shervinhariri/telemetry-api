@@ -26,12 +26,16 @@ COPY ops/ui/ui /app/ui
 COPY openapi.yaml /app/openapi.yaml
 COPY docs /app/docs
 
-EXPOSE 8080
+# Copy tests
+COPY tests /app/tests
+
+EXPOSE 80
 ENV API_KEY=TEST_KEY
+ENV APP_PORT=80
 
 # Default MMDB/CSV mount points (read-only)
 ENV GEOIP_DB_CITY=/data/GeoLite2-City.mmdb
 ENV GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb
 ENV THREATLIST_CSV=/data/threats.csv
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]

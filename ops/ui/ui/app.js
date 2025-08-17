@@ -1,7 +1,7 @@
 // Modern Telemetry Dashboard - Vanilla JavaScript with Tailwind CSS
 class TelemetryDashboard {
     constructor() {
-        this.apiBase = 'http://localhost';
+        this.apiBase = ''; // Use relative URLs
         this.apiKey = 'TEST_KEY'; // Change this to your desired API key
         this.currentRequestsData = [];
         this.logsEventSource = null;

@@ -59,6 +59,21 @@ def create_api_key(scopes: List[str], note: str = "", created_by: str = "system"
         "created_at": datetime.fromtimestamp(time.time()).isoformat()
     }
 
+def require_api_key(auth_header: Optional[str], required_scopes: Optional[List[str]] = None) -> Dict:
+    """Require API key with optional scope validation - raises HTTPException on failure"""
+    from fastapi import HTTPException
+    
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    
+    api_key = auth_header.split(" ", 1)[1].strip()
+    key_data = validate_api_key(api_key, required_scopes)
+    
+    if not key_data:
+        raise HTTPException(status_code=403, detail="Invalid API key or insufficient permissions")
+    
+    return key_data
+
 def validate_api_key(api_key: str, required_scopes: Optional[List[str]] = None) -> Optional[Dict]:
     """Validate API key and check scopes"""
     if not api_key:
