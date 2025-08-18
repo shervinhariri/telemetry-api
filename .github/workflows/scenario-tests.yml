@@ -14,12 +14,21 @@ jobs:
           docker compose version || { sudo apt-get update && sudo apt-get install -y docker-compose-plugin; }
           docker compose down || true
           docker compose up -d --build
-          sleep 6
+          echo "Waiting for API to become healthy..."
+          for i in {1..60}; do
+            if curl -sf http://localhost:80/v1/health >/dev/null; then
+              echo "API is up"; break;
+            fi
+            sleep 2
+          done
+          # Final check or fail with logs
+          curl -sf http://localhost:80/v1/health || { docker compose ps; docker compose logs --no-color | tail -n 300; exit 1; }
 
       - name: Python deps
         run: |
           python3 -m pip install --upgrade pip
           pip install requests pytest
+          sudo apt-get update && sudo apt-get install -y jq
 
       - name: Unit tests
         run: pytest -q || true
@@ -32,6 +41,12 @@ jobs:
           python tools/scenario_tester.py | tee scenario_report.json
           echo "---- Summary ----"
           jq '.results[] | {scenario, status, ok}' scenario_report.json
+
+      - name: Dump logs on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --no-color | tail -n 500
 
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
