@@ -253,11 +253,11 @@ async def get_requests_api(
     
     # Calculate aggregations for state boxes
     total_requests = len(audits)
-    succeeded = sum(1 for req in audits if 200 <= req.get('status', 0) < 300)
-    failed = sum(1 for req in audits if req.get('status', 0) >= 400)
+    succeeded = sum(1 for req in audits if req.get('status') is not None and 200 <= req.get('status', 0) < 300)
+    failed = sum(1 for req in audits if req.get('status') is not None and req.get('status', 0) >= 400)
     
     # Calculate average latency
-    latencies = [req.get('latency_ms', 0) for req in audits if req.get('latency_ms', 0) > 0]
+    latencies = [req.get('latency_ms', 0) for req in audits if req.get('latency_ms') is not None and req.get('latency_ms', 0) > 0]
     avg_latency = sum(latencies) / len(latencies) if latencies else 0
     
     # Prepare response data with enhanced fields for UI

@@ -19,6 +19,12 @@ export default function Logs({ api }: { api: any }) {
   const [status, setStatus] = useState("Live logs stopped.");
   const pollRef = useRef<any>(null);
 
+  // Test function to verify button clicks work
+  const testClick = () => {
+    console.log("Test button clicked!");
+    setStatus("Test button works!");
+  };
+
   const startPolling = () => {
     console.log("startPolling called");
     if (pollRef.current) clearInterval(pollRef.current);
@@ -52,6 +58,10 @@ export default function Logs({ api }: { api: any }) {
 
   const start = async () => {
     console.log("Start Live button clicked");
+    console.log("Current running state:", running);
+    console.log("API base:", api.base);
+    console.log("API headers:", api.headers);
+    
     setError("");
     setRunning(true);
     setStatus("Starting live logs...");
@@ -69,6 +79,7 @@ export default function Logs({ api }: { api: any }) {
   };
 
   const stop = () => {
+    console.log("Stop Live button clicked");
     stopPolling();
     setRunning(false);
     setStatus("Live logs stopped.");
@@ -104,7 +115,8 @@ export default function Logs({ api }: { api: any }) {
     <div className="mt-6 space-y-4">
       {error && <div className="text-xs text-red-400">{error}</div>}
       <div className="flex items-center gap-3">
-        <button onClick={start} disabled={running}
+        <button onClick={testClick} className="rounded-xl px-3 py-2 text-sm bg-blue-500/15 text-blue-200 ring-1 ring-blue-500/30 hover:bg-blue-500/20">Test Button</button>
+        <button onClick={start} 
           className={cx("rounded-xl px-3 py-2 text-sm ring-1",
             running ? "opacity-40 cursor-not-allowed bg-[#14151B] ring-white/5" : "bg-emerald-500/15 ring-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20")}>Start Live</button>
         <button onClick={stop} className="rounded-xl px-3 py-2 text-sm bg-rose-500/15 text-rose-200 ring-1 ring-rose-500/30 hover:bg-rose-500/20">Stop Live</button>

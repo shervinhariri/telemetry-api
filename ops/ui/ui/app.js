@@ -1,12 +1,344 @@
 // Modern Telemetry Dashboard - Vanilla JavaScript with Tailwind CSS
+console.log('app.js loaded');
+
+// ---------- VALIDATION HELPERS ----------
+function requireKeys(obj, keys, path = '') {
+  const missing = [];
+  for (const k of keys) {
+    if (!(k in obj) || obj[k] === undefined || obj[k] === null || (typeof obj[k] === 'string' && obj[k].trim() === '')) {
+      missing.push(path ? `${path}.${k}` : k);
+    }
+  }
+  return missing;
+}
+
+function isNumberLike(v) {
+  return typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)));
+}
+
+// Minimal validators for MVP formats
+function validateFlowsV1Record(r, idx) {
+  const missing = requireKeys(r, ['ts','src_ip','dst_ip','src_port','dst_port','proto','bytes'], `records[${idx}]`);
+  const typeErr = [];
+  if (missing.length) return { ok:false, msg:`Missing fields: ${missing.join(', ')}` };
+  if (!isNumberLike(r.ts)) typeErr.push(`records[${idx}].ts must be number (epoch seconds)`);
+  if (!isNumberLike(r.src_port)) typeErr.push(`records[${idx}].src_port must be number`);
+  if (!isNumberLike(r.dst_port)) typeErr.push(`records[${idx}].dst_port must be number`);
+  if (!isNumberLike(r.bytes))    typeErr.push(`records[${idx}].bytes must be number`);
+  if (!['tcp','udp','icmp','other'].includes(String(r.proto).toLowerCase())) {
+    typeErr.push(`records[${idx}].proto must be one of tcp|udp|icmp|other`);
+  }
+  return typeErr.length ? { ok:false, msg:typeErr.join('; ') } : { ok:true };
+}
+
+function validateZeekConnRecord(r, idx) {
+  // Keep it pragmatic for MVP; Zeek has many optional fields
+  const missing = requireKeys(r, ['ts','uid','id.orig_h','id.resp_h','id.orig_p','id.resp_p','proto'], `records[${idx}]`);
+  if (missing.length) return { ok:false, msg:`Missing fields: ${missing.join(', ')}` };
+  const typeErr = [];
+  if (!isNumberLike(r.ts)) typeErr.push(`records[${idx}].ts must be number (epoch seconds)`);
+  if (!isNumberLike(r['id.orig_p'])) typeErr.push(`records[${idx}]['id.orig_p'] must be number`);
+  if (!isNumberLike(r['id.resp_p'])) typeErr.push(`records[${idx}]['id.resp_p'] must be number`);
+  return typeErr.length ? { ok:false, msg:typeErr.join('; ') } : { ok:true };
+}
+
+function validateIngestBody(body) {
+  const rootMissing = requireKeys(body, ['collector_id','format','records']);
+  if (rootMissing.length) return { ok:false, msg:`Missing fields: ${rootMissing.join(', ')}` };
+  if (!Array.isArray(body.records) || body.records.length === 0) {
+    return { ok:false, msg:`"records" must be a non-empty array` };
+  }
+
+  const fmt = String(body.format).toLowerCase();
+  for (let i=0;i<body.records.length;i++){
+    const r = body.records[i];
+    if (fmt === 'flows.v1') {
+      const res = validateFlowsV1Record(r, i); if (!res.ok) return res;
+    } else if (fmt === 'zeek.conn') {
+      const res = validateZeekConnRecord(r, i); if (!res.ok) return res;
+    } else {
+      return { ok:false, msg:`Unsupported format "${body.format}". Try "flows.v1" or "zeek.conn".` };
+    }
+  }
+  return { ok:true };
+}
+
+// ---------- SAMPLE PAYLOADS ----------
+function sampleFlowsV1() {
+  const now = Math.floor(Date.now()/1000);
+  return {
+    collector_id: "tester",
+    format: "flows.v1",
+    records: [{
+      ts: now + 0.123,
+      src_ip: "10.0.0.5",
+      dst_ip: "1.1.1.1",
+      src_port: 51514,
+      dst_port: 53,
+      proto: "udp",
+      bytes: 1200
+    },{
+      ts: now + 1.234,
+      src_ip: "10.0.0.5",
+      dst_ip: "142.250.74.36",
+      src_port: 51514,
+      dst_port: 443,
+      proto: "tcp",
+      bytes: 4820
+    }]
+  };
+}
+
+function sampleZeekConn() {
+  const now = Math.floor(Date.now()/1000);
+  return {
+    collector_id: "tester",
+    format: "zeek.conn",
+    records: [{
+      ts: now + 0.456,
+      uid: "Ckvb3W1H1xZ",
+      "id.orig_h": "10.0.0.8",
+      "id.resp_h": "8.8.8.8",
+      "id.orig_p": 54321,
+      "id.resp_p": 53,
+      proto: "udp",
+      service: "dns",
+      duration: 0.002,
+      orig_bytes: 76,
+      resp_bytes: 128
+    }]
+  };
+}
+
+// UI helpers for sample insertion
+function insertSampleFlows() {
+  const ta = document.getElementById('ingest-payload');
+  if (ta) ta.value = JSON.stringify(sampleFlowsV1(), null, 2);
+}
+function insertSampleZeek() {
+  const ta = document.getElementById('ingest-payload');
+  if (ta) ta.value = JSON.stringify(sampleZeekConn(), null, 2);
+}
+
+// --- New helpers for the output box ---
+function setOutput(textOrObj) {
+  const out = document.querySelector('#api-output');
+  if (!out) return;
+  if (typeof textOrObj === 'string') {
+    out.textContent = textOrObj;
+  } else {
+    out.textContent = JSON.stringify(textOrObj, null, 2);
+  }
+}
+function appendOutputLine(line) {
+  const out = document.querySelector('#api-output');
+  if (!out) return;
+  out.textContent += (out.textContent ? '\n' : '') + line;
+}
+function clearOutput() { setOutput(''); }
+function copyOutput() {
+  const out = document.querySelector('#api-output');
+  if (!out) return;
+  navigator.clipboard.writeText(out.textContent || '').catch(()=>{});
+}
+
+// ---------- TOASTS ----------
+function showToast(type, message, title = null, timeoutMs = 4200) {
+  const root = document.getElementById('toast-root');
+  if (!root) return console[type === 'error' ? 'error' : 'log'](message);
+
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `
+    ${title ? `<span class="title">${escapeHtml(title)}</span>` : ''}
+    <span class="msg">${escapeHtml(String(message))}</span>
+    <button class="close" aria-label="Close">×</button>
+  `;
+  const remove = () => el.parentNode && el.parentNode.removeChild(el);
+  el.querySelector('.close').addEventListener('click', remove);
+  root.appendChild(el);
+  if (timeoutMs) setTimeout(remove, timeoutMs);
+}
+
+// ---------- LOADING STATE ----------
+function setLoading(btn, loading = true) {
+  if (!btn) return;
+  if (loading) {
+    btn.setAttribute('aria-busy', 'true');
+    btn.setAttribute('disabled', 'true');
+  } else {
+    btn.removeAttribute('aria-busy');
+    btn.removeAttribute('disabled');
+  }
+}
+
+// ---------- UTILITY FUNCTIONS ----------
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function clearError(panel) {
+  const errorEl = document.getElementById(`${panel}-error`);
+  if (errorEl) {
+    errorEl.classList.add('hidden');
+  }
+}
+
+function showError(panel, message) {
+  const errorEl = document.getElementById(`${panel}-error`);
+  if (errorEl) {
+    errorEl.innerHTML = `<div>${escapeHtml(message)}</div>`;
+    errorEl.classList.remove('hidden');
+  }
+}
+
+// --- Lookup action (/v1/lookup?q=...) ---
+async function doLookup() {
+  clearError('api');
+  const qInput = document.querySelector('#lookup-value');
+  const btn = document.querySelector('#btn-lookup');
+  const qv = (qInput?.value || '').trim();
+  if (!qv) { 
+    showError('api','Enter a value to look up (IP, domain, hash, etc.)'); 
+    showToast('info','Enter a value to look up'); 
+    return; 
+  }
+
+  setLoading(btn, true);
+  try {
+    // If your API expects ?q=, keep as-is. If it expects JSON body, switch to POST.
+    const { resp, data, text } = await apiCall(`/v1/lookup?q=${encodeURIComponent(qv)}`, {}, 'api');
+
+    if (!resp.ok) {
+      const snippet = (text || JSON.stringify(data || {})).slice(0, 500);
+      throw new Error(`Lookup failed (HTTP ${resp.status}): ${snippet}`);
+    }
+
+    setOutput(data ?? { raw: text || 'No body' });
+    showToast('success', `Lookup OK: ${qv}`, '/v1/lookup');
+  } catch (e) {
+    showError('api', e.message);
+    showToast('error', e.message, '/v1/lookup failed');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+// ===== API KEY STATE (single source of truth) =====
+const API_KEY_STORAGE = 'API_KEY';
+
+function maskKey(k) {
+  if (!k) return '—';
+  if (k.length <= 6) return k;
+  return `${k.slice(0,3)}…${k.slice(-3)}`;
+}
+
+function getApiKey() {
+  return localStorage.getItem(API_KEY_STORAGE) || 'TEST_KEY';
+}
+
+function setApiKey(k) {
+  localStorage.setItem(API_KEY_STORAGE, k);
+  // notify all listeners (other tabs/pages) to refresh UI/client
+  window.dispatchEvent(new CustomEvent('api-key-changed', { detail: { key: k }}));
+}
+
+// Update all visible key chips/badges
+function refreshKeyChips() {
+  const k = getApiKey();
+  // API Tools chip
+  const m = document.getElementById('api-key-mask');
+  if (m) m.textContent = maskKey(k);
+  // If your API client caches the key, update it here as well
+  // e.g. window.API_CLIENT.setKey(k);
+}
+
+// ===== Inline API Key Editing =====
+function initKeyPopover() {
+  const container = document.getElementById('api-key-container');
+  const display   = document.getElementById('api-key-display');
+  const edit      = document.getElementById('api-key-edit');
+  const input     = document.getElementById('api-key-input');
+  const btnSave   = document.getElementById('api-key-save');
+  const btnCan    = document.getElementById('api-key-cancel');
+
+  if (!container || !display || !edit || !input || !btnSave || !btnCan) return;
+
+  const open = () => {
+    input.value = getApiKey();
+    display.classList.add('hidden');
+    edit.classList.remove('hidden');
+    setTimeout(()=> input.focus(), 0);
+  };
+  const close = () => {
+    display.classList.remove('hidden');
+    edit.classList.add('hidden');
+  };
+
+  // Click on display mode to edit
+  display.addEventListener('click', open);
+  
+  // Save button
+  btnSave.addEventListener('click', () => {
+    const val = input.value.trim();
+    if (!val) return;
+    setApiKey(val);
+    refreshKeyChips();
+    close();
+    showToast?.('success', 'API key updated.');
+  });
+
+  // Cancel button
+  btnCan.addEventListener('click', close);
+
+  // Close on Esc
+  document.addEventListener('keydown', (e)=>{ 
+    if (e.key === 'Escape') close(); 
+  });
+}
+
+// ===== Keep network client in sync on change =====
+window.addEventListener('api-key-changed', (e) => {
+  const k = e.detail?.key || getApiKey();
+  // Update your API client (if using a wrapper)
+  window.API_KEY = k; // if your apiCall() reads from this variable/localStorage
+  refreshKeyChips();
+  
+  // Refresh requests data when API key changes
+  if (window.telemetryDashboard) {
+    window.telemetryDashboard.loadRequestsData();
+  }
+});
+
+// Wait for DOM to be ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM ready, initializing dashboard...');
+    
+    refreshKeyChips();
+    initKeyPopover();
+
+    // Ensure your apiCall() uses latest key:
+    // In apiCall(), read from localStorage each time or from window.API_KEY
+    window.API_KEY = getApiKey();
+    
+    // Create dashboard instance and make it globally accessible
+    window.telemetryDashboard = new TelemetryDashboard();
+});
+
 class TelemetryDashboard {
     constructor() {
-        this.apiBase = ''; // Use relative URLs
+        console.log('TelemetryDashboard constructor called');
+        this.apiBase = window.location.origin; // Use the current domain
         this.apiKey = 'TEST_KEY'; // Change this to your desired API key
         this.currentRequestsData = [];
         this.logsEventSource = null;
         this.logsInterval = null;
         this.autoRefreshInterval = null;
+        
+        console.log('API Base URL:', this.apiBase);
+        console.log('API Key:', this.apiKey);
         
         this.init();
     }
@@ -62,15 +394,75 @@ class TelemetryDashboard {
         if (downloadLogsBtn) downloadLogsBtn.addEventListener('click', () => this.downloadLogs());
 
         // API actions
-        const fetchSystemBtn = document.getElementById('fetch-system');
-        const fetchMetricsBtn = document.getElementById('fetch-metrics');
-        const sendIngestBtn = document.getElementById('send-ingest');
-        const runLookupBtn = document.getElementById('run-lookup');
+        const btnSystem = document.getElementById('btn-system');
+        const btnMetrics = document.getElementById('btn-metrics');
+        const btnSendIngest = document.getElementById('btn-send-ingest');
+        const btnLookup = document.getElementById('btn-lookup');
+        const btnCopyOutput = document.getElementById('btn-copy-output');
+        const btnClearOutput = document.getElementById('btn-clear-output');
         
-        if (fetchSystemBtn) fetchSystemBtn.addEventListener('click', () => this.fetchSystem());
-        if (fetchMetricsBtn) fetchMetricsBtn.addEventListener('click', () => this.fetchMetrics());
-        if (sendIngestBtn) sendIngestBtn.addEventListener('click', () => this.sendIngest());
-        if (runLookupBtn) runLookupBtn.addEventListener('click', () => this.runLookup());
+        console.log('API buttons found:', {
+            btnSystem: !!btnSystem,
+            btnMetrics: !!btnMetrics,
+            btnSendIngest: !!btnSendIngest,
+            btnLookup: !!btnLookup,
+            btnCopyOutput: !!btnCopyOutput,
+            btnClearOutput: !!btnClearOutput
+        });
+        
+        if (btnSystem) {
+            btnSystem.addEventListener('click', () => {
+                console.log('System button clicked');
+                this.fetchSystem();
+            });
+        }
+        if (btnMetrics) {
+            btnMetrics.addEventListener('click', () => {
+                console.log('Metrics button clicked');
+                this.fetchMetrics();
+            });
+        }
+        if (btnSendIngest) {
+            btnSendIngest.addEventListener('click', () => {
+                console.log('Send ingest button clicked');
+                this.sendIngest();
+            });
+        }
+        if (btnLookup) {
+            btnLookup.addEventListener('click', () => {
+                console.log('Lookup button clicked');
+                doLookup();
+            });
+        }
+        if (btnCopyOutput) {
+            btnCopyOutput.addEventListener('click', () => {
+                console.log('Copy output button clicked');
+                copyOutput();
+            });
+        }
+        if (btnClearOutput) {
+            btnClearOutput.addEventListener('click', () => {
+                console.log('Clear output button clicked');
+                clearOutput();
+            });
+        }
+
+        // Sample buttons
+        const sampleFlowsBtn = document.getElementById('btn-sample-flows');
+        const sampleZeekBtn = document.getElementById('btn-sample-zeek');
+        
+        if (sampleFlowsBtn) {
+            sampleFlowsBtn.addEventListener('click', () => {
+                console.log('Sample flows button clicked');
+                insertSampleFlows();
+            });
+        }
+        if (sampleZeekBtn) {
+            sampleZeekBtn.addEventListener('click', () => {
+                console.log('Sample zeek button clicked');
+                insertSampleZeek();
+            });
+        }
 
         // Slide-over
         const closeSlideOverBtn = document.getElementById('close-slide-over');
@@ -128,18 +520,41 @@ class TelemetryDashboard {
     async apiCall(endpoint, options = {}) {
         try {
             const url = `${this.apiBase}/v1${endpoint}`;
+            const apiKey = getApiKey(); // Read from localStorage at call time
             const headers = {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.apiKey}`,
+                'Authorization': `Bearer ${apiKey}`,
                 ...options.headers
             };
 
             console.log('API call:', url);
+            console.log('Headers:', headers);
             const response = await fetch(url, { ...options, headers });
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+            
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            return await response.json();
+            
+            const text = await response.text();
+            console.log('Response text length:', text.length);
+            console.log('Response text preview:', text.substring(0, 100));
+            
+            if (!text.trim()) {
+                console.log('Empty response received');
+                return { message: 'Empty response' };
+            }
+            
+            try {
+                const json = JSON.parse(text);
+                console.log('JSON parsed successfully');
+                return json;
+            } catch (parseError) {
+                console.error('JSON parse error:', parseError);
+                console.error('Raw response:', text);
+                return { raw_response: text, parse_error: parseError.message };
+            }
         } catch (error) {
             console.error(`API call failed (${endpoint}):`, error);
             throw error;
@@ -253,23 +668,16 @@ class TelemetryDashboard {
         try {
             console.log('Loading requests data...');
             
-            // Try multiple endpoints to get requests data
+            // Always use /v1/api/requests since it doesn't require admin authentication
+            // and works with any valid API key
             let requestsData = null;
             
             try {
-                // Try /v1/admin/requests first
-                requestsData = await this.apiCall('/admin/requests');
-                console.log('Admin requests loaded:', requestsData);
+                requestsData = await this.apiCall('/api/requests');
+                console.log('API requests loaded:', requestsData);
             } catch (error) {
-                console.log('Admin requests failed, trying API requests...');
-                try {
-                    // Try /v1/api/requests as fallback
-                    requestsData = await this.apiCall('/api/requests');
-                    console.log('API requests loaded:', requestsData);
-                } catch (apiError) {
-                    console.error('Both request endpoints failed:', apiError);
-                    throw apiError;
-                }
+                console.error('API requests failed:', error);
+                throw error;
             }
             
             if (requestsData && requestsData.items) {
@@ -678,40 +1086,86 @@ ${JSON.stringify(request, null, 2)}
     async fetchSystem() {
         try {
             this.hideError('api');
+            const btn = document.querySelector('#btn-system');
+            setLoading(btn, true);
+            
             let system;
             try {
                 system = await this.apiCall('/system');
             } catch {
                 system = await this.apiCall('/version');
             }
-            document.getElementById('system-response').textContent = JSON.stringify(system, null, 2);
+            setOutput(system);
+            showToast('success', 'System info loaded.', '/v1/system');
         } catch (error) {
             this.showError('api', error.message);
+            showToast('error', error.message, '/v1/system failed');
+        } finally {
+            const btn = document.querySelector('#btn-system');
+            setLoading(btn, false);
         }
     }
 
     async fetchMetrics() {
         try {
             this.hideError('api');
+            const btn = document.querySelector('#btn-metrics');
+            setLoading(btn, true);
+            
             const metrics = await this.apiCall('/metrics');
-            document.getElementById('metrics-response').textContent = JSON.stringify(metrics, null, 2);
+            setOutput(metrics);
+            showToast('success', 'Metrics refreshed.', '/v1/metrics');
         } catch (error) {
             this.showError('api', error.message);
+            showToast('error', error.message, '/v1/metrics failed');
+        } finally {
+            const btn = document.querySelector('#btn-metrics');
+            setLoading(btn, false);
         }
     }
 
     async sendIngest() {
         try {
             this.hideError('api');
-            const data = document.getElementById('ingest-data').value;
-            const json = JSON.parse(data);
+            const data = document.getElementById('ingest-payload').value;
+            const btn = document.querySelector('#btn-send-ingest');
+            
+            // Parse JSON with detailed error reporting
+            let bodyObj;
+            try {
+                bodyObj = JSON.parse(data);
+            } catch (parseError) {
+                throw new Error(`Invalid JSON: ${parseError.message}`);
+            }
+            
+            // Validate payload
+            const check = validateIngestBody(bodyObj);
+            if (!check.ok) {
+                throw new Error(`Invalid payload: ${check.msg}`);
+            }
+            
+            setLoading(btn, true);
+            
+            // Make API call
             const result = await this.apiCall('/ingest', {
                 method: 'POST',
-                body: JSON.stringify(json)
+                body: JSON.stringify(bodyObj)
             });
-            document.getElementById('api-output').textContent = JSON.stringify(result, null, 2);
+            
+            setOutput(result);
+            showToast('success', 'Ingest accepted.', '/v1/ingest');
+            
+            // Optionally refresh metrics after successful ingest
+            try { 
+                await this.fetchMetrics(); 
+            } catch (_) {}
+            
         } catch (error) {
             this.showError('api', error.message);
+            showToast('error', error.message, '/v1/ingest failed');
+        } finally {
+            const btn = document.querySelector('#btn-send-ingest');
+            setLoading(btn, false);
         }
     }
 
@@ -730,14 +1184,28 @@ ${JSON.stringify(request, null, 2)}
     }
 
     showError(panel, message) {
+        console.log(`Showing error for panel: ${panel}, message: ${message}`);
         const errorEl = document.getElementById(`${panel}-error`);
-        errorEl.textContent = message;
-        errorEl.classList.remove('hidden');
+        if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+        } else {
+            console.error(`Error element not found for panel: ${panel}`, message);
+            // Try to show error in api-output if it's an API error
+            if (panel === 'api') {
+                const apiOutput = document.getElementById('api-output');
+                if (apiOutput) {
+                    apiOutput.textContent = `Error: ${message}`;
+                }
+            }
+        }
     }
 
     hideError(panel) {
         const errorEl = document.getElementById(`${panel}-error`);
-        errorEl.classList.add('hidden');
+        if (errorEl) {
+            errorEl.classList.add('hidden');
+        }
     }
 
     formatNumber(n, decimals = 0) {
@@ -825,14 +1293,3 @@ function addHealthLegend() {
     
     table.parentNode.insertBefore(legend, table.nextSibling);
 }
-
-// Initialize dashboard when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.dashboard = new TelemetryDashboard();
-    
-    // Add a small delay to ensure the table is rendered
-    setTimeout(() => {
-        ensureRequestsHealthColumn();
-        addHealthLegend();
-    }, 100);
-});

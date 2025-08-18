@@ -36,6 +36,98 @@
         body {
             font-family: 'Inter', system-ui, sans-serif;
         }
+        
+        :root{
+          --bg:#0b0f17; --panel:#0f1624; --soft:#141c2e; --line:#1c2740;
+          --txt:#e6eefc; --muted:#a7b3cc; --hint:#7d8aa6;
+          --brand:#6d5efc; --brand-2:#8f83ff; --ok:#2ecc71; --bad:#ff5d5d; --warn:#ffb84d;
+          --r:14px; --pad:12px; --gap:10px; --shadow:0 8px 30px rgba(0,0,0,.25);
+          --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          --sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+        }
+
+        /* Page containers - matching Requests page styling */
+        .card{background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:16px; box-shadow:0 8px 30px rgba(0,0,0,.25);}
+        .card-header{padding:24px; border-bottom:1px solid rgba(255,255,255,0.05); display:flex; align-items:center; gap:10px;}
+        .card-title{font:600 16px/1 var(--sans); color:var(--txt);}
+        .card-body{padding:24px;}
+
+        /* Toolbar */
+        .toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+        .toolbar .spacer{flex:1}
+
+        /* Buttons - balanced styling with gray for most, color for important */
+        .btn{border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:var(--txt); border-radius:12px; padding:8px 16px; font:500 13px/1 var(--sans); cursor:pointer; transition:all 0.2s;}
+        .btn:hover{background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.2);}
+        .btn:focus{outline:2px solid rgba(255,255,255,0.2); outline-offset:2px;}
+        .btn[aria-busy="true"]{opacity:.7; pointer-events:none; position:relative;}
+        .btn[aria-busy="true"]::after{content:""; position:absolute; right:8px; top:50%; width:14px; height:14px; border-radius:50%; border:2px solid currentColor; border-top-color:transparent; transform:translateY(-50%); animation:spin .7s linear infinite;}
+        @keyframes spin{to{transform:translateY(-50%) rotate(360deg)}}
+
+        .btn--primary{background:rgba(16,185,129,0.25); border-color:rgba(16,185,129,0.4); color:rgba(16,185,129,1);}
+        .btn--ghost{background:rgba(255,255,255,0.03); border-color:rgba(255,255,255,0.08); color:rgba(255,255,255,0.7);}
+
+        /* Inputs - matching Requests page styling */
+        .input,.codearea{width:100%; background:rgba(255,255,255,0.05); color:var(--txt); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:10px 12px; font:500 13px/1.4 var(--sans);}
+        .input::placeholder{color:var(--hint);}
+        .codearea{font-family:var(--mono); resize:vertical; min-height:160px}
+
+        /* Output box */
+        .output-bar{display:flex; align-items:center; gap:8px; margin-top:12px; margin-bottom:8px; color:var(--muted); font:600 12px/1 var(--sans);}
+        .codebox{background:rgba(0,0,0,0.3); color:#d6e3ff; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:12px; white-space:pre-wrap; word-break:break-word; max-height:340px; overflow:auto; font-family:var(--mono);}
+
+        /* Error box */
+        .alert{background:#2b1220; border:1px solid #5c2038; color:#ffd6df; border-radius:6px; padding:10px 12px; margin-bottom:10px;}
+        .hidden{display:none}
+
+        /* API Key chip - matching Requests page purple styling */
+        .chip {
+          display:inline-flex; align-items:center; gap:8px;
+          padding:4px 12px; border-radius:999px;
+          font:600 12px var(--sans); border:1px solid rgba(139,92,246,0.4);
+          cursor:pointer; user-select:none;
+          background:rgba(139,92,246,0.15); color:rgba(196,181,253,1);
+        }
+        .chip--dark { background:rgba(139,92,246,0.15); color:rgba(196,181,253,1); border-color:rgba(139,92,246,0.4); }
+        .chip-label { color:rgba(196,181,253,0.8); font-weight:600; }
+
+        /* Inline API Key Editing */
+        .api-key-mode { display:flex; align-items:center; gap:8px; }
+        .api-key-mode.hidden { display:none; }
+        
+        .chip-input {
+          background:transparent; border:none; color:rgba(196,181,253,1);
+          font:600 12px var(--sans); outline:none; min-width:120px;
+          padding:0; margin:0;
+        }
+        .chip-input::placeholder { color:rgba(196,181,253,0.5); }
+        
+        .chip-btn {
+          background:transparent; border:none; color:rgba(196,181,253,1);
+          font:600 12px var(--sans); cursor:pointer; padding:2px 4px;
+          border-radius:4px; transition:all 0.2s;
+        }
+        .chip-btn:hover { background:rgba(196,181,253,0.2); }
+        .chip-btn--save:hover { background:rgba(16,185,129,0.2); color:rgba(16,185,129,1); }
+        .chip-btn--cancel:hover { background:rgba(255,255,255,0.2); color:rgba(255,255,255,1); }
+        
+        /* Toasts */
+        #toast-root {
+          position: fixed; right: 16px; bottom: 16px; z-index: 9999;
+          display: flex; flex-direction: column; gap: 8px;
+        }
+        .toast {
+          min-width: 260px; max-width: 520px;
+          padding: .6rem .8rem; border-radius: 10px; box-shadow: 0 10px 18px rgba(0,0,0,.15);
+          color: #0b1020; background: #f5f7ff; border: 1px solid #dfe7ff;
+          display:flex; gap:.5rem; align-items: flex-start;
+        }
+        .toast.success { background:#eefbf0; border-color:#bde8c3; color:#0a3d18; }
+        .toast.error   { background:#fff1f1; border-color:#ffcece; color:#7a1a1a; }
+        .toast.info    { background:#f5f7ff; border-color:#dfe7ff; color:#0b1020; }
+        .toast .title { font-weight:700; margin-right:.25rem; }
+        .toast .msg { white-space: pre-wrap; word-break: break-word; }
+        .toast .close { margin-left:auto; background:transparent; border:0; cursor:pointer; font-size: 18px; line-height: 1; }
     </style>
 </head>
 <body class="min-h-screen w-full bg-[#0B0C10] text-zinc-100 antialiased">
@@ -43,14 +135,11 @@
         <div class="sticky top-0 z-30 backdrop-blur bg-[#0B0C10]/70">
             <div class="px-5 py-4 flex items-center gap-3">
                 <div class="text-xl font-semibold tracking-tight">Telemetry</div>
-                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40">
-                    <span class="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-                    Online
-                </span>
                 <div class="ml-auto flex items-center gap-2 text-xs text-zinc-400">
-                    <button id="api-key-pill" class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-purple-500/15 text-purple-300 ring-1 ring-purple-500/40">
-                        API KEY: <span id="api-key-value" class="ml-1">TEST_KEY</span>
-                    </button>
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40">
+                        <span class="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                        Online
+                    </span>
                 </div>
             </div>
         </div>
@@ -177,6 +266,7 @@
 
         <!-- Panel: Logs -->
         <div id="panel-logs" class="panel hidden mt-6 space-y-4">
+            <div id="logs-error" class="hidden text-xs text-red-400"></div>
             <div class="flex items-center gap-3">
                 <button id="start-logs" class="rounded-xl px-3 py-2 text-sm ring-1 bg-emerald-500/15 ring-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20">Start Live</button>
                 <button id="stop-logs" class="rounded-xl px-3 py-2 text-sm bg-rose-500/15 text-rose-200 ring-1 ring-rose-500/30 hover:bg-rose-500/20">Stop Live</button>
@@ -186,20 +276,57 @@
         </div>
 
         <!-- Panel: API -->
-        <div id="panel-api" class="panel hidden mt-6 grid md:grid-cols-2 gap-6">
-            <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-4 space-y-3">
-                <div class="flex gap-2">
-                    <button id="fetch-system" class="rounded-md bg-white/10 px-3 py-2 text-sm">/v1/system</button>
-                    <button id="fetch-metrics" class="rounded-md bg-white/10 px-3 py-2 text-sm">/v1/metrics</button>
-                </div>
-                <textarea id="ingest-data" class="w-full h-40 bg-black/30 rounded-md p-2 text-sm" placeholder='{"collector_id":"tester","format":"flows.v1","records":[{...}]}'></textarea>
-                <div class="flex gap-2">
-                    <input id="lookup-value" class="flex-1 bg-black/30 rounded-md p-2 text-sm" placeholder="value for /v1/lookup" />
-                    <button id="send-ingest" class="rounded-md bg-emerald-600 px-3 py-2 text-sm">Send ingest</button>
-                </div>
+        <section id="panel-api" data-panel="api" class="card panel hidden mt-6">
+          <div class="card-header">
+            <div class="card-title">API Tools</div>
+            <div class="spacer"></div>
+
+            <!-- Inline Editable API Key Chip -->
+            <div id="api-key-container" class="chip chip--dark" style="position:relative;">
+              <!-- Display mode (normal state) -->
+              <div id="api-key-display" class="api-key-mode">
+                <span class="chip-label">API KEY:</span>
+                <span id="api-key-mask">TEST_KEY</span>
+                <svg aria-hidden="true" width="14" height="14" style="margin-left:8px;opacity:.7;cursor:pointer;">
+                  <path fill="currentColor" d="M2 10l4 4 8-8-4-4L2 10z"/>
+                </svg>
+              </div>
+              
+              <!-- Edit mode (hidden by default) -->
+              <div id="api-key-edit" class="api-key-mode hidden">
+                <input id="api-key-input" class="chip-input" placeholder="Enter API key" />
+                <button id="api-key-save" class="chip-btn chip-btn--save">✓</button>
+                <button id="api-key-cancel" class="chip-btn chip-btn--cancel">✕</button>
+              </div>
             </div>
-            <pre id="api-output" class="rounded-2xl bg-black/40 border border-white/5 p-4 text-xs text-zinc-300"></pre>
-        </div>
+          </div>
+
+          <div class="card-body">
+            <div id="api-error" class="alert hidden"></div>
+
+            <div class="toolbar" style="margin-bottom:10px">
+              <button id="btn-system"  class="btn">/v1/system</button>
+              <button id="btn-metrics" class="btn">/v1/metrics</button>
+              <input id="lookup-value" class="input" placeholder="value for /v1/lookup" />
+              <button id="btn-lookup" class="btn btn--ghost">Lookup</button>
+              <div class="spacer"></div>
+              <button id="btn-sample-flows" class="btn btn--ghost">Insert sample flows.v1</button>
+              <button id="btn-sample-zeek"  class="btn btn--ghost">Insert sample zeek.conn</button>
+              <button id="btn-send-ingest"  class="btn btn--primary">Send ingest</button>
+            </div>
+
+            <label for="ingest-payload" style="display:block; margin:6px 0 6px; color:var(--muted); font:600 12px var(--sans);">Ingest payload (JSON)</label>
+            <textarea id="ingest-payload" class="codearea" spellcheck="false"></textarea>
+
+            <div class="output-bar">
+              <span>Response</span>
+              <div class="spacer"></div>
+              <button id="btn-copy-output"  class="btn btn--ghost">Copy</button>
+              <button id="btn-clear-output" class="btn btn--ghost">Clear</button>
+            </div>
+            <pre id="api-output" class="codebox"></pre>
+          </div>
+        </section>
     </div>
 
     <!-- Slide over for details -->
@@ -208,6 +335,9 @@
         <div id="slide-over-content" class="p-6 text-sm text-zinc-200"></div>
     </div>
 
-    <script src="/ui/app.js"></script>
+    <!-- Toasts -->
+    <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
+
+    <script src="/ui/app.js?v=2.1"></script>
 </body>
 </html>
