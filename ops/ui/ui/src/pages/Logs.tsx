@@ -20,19 +20,23 @@ export default function Logs({ api }: { api: any }) {
   const pollRef = useRef<any>(null);
 
   const startPolling = () => {
+    console.log("startPolling called");
     if (pollRef.current) clearInterval(pollRef.current);
     setStatus("Starting live logs...");
     
     pollRef.current = setInterval(async () => {
       try {
+        console.log("Polling for logs...");
         const r = await fetch(`${api.base}/v1/logs/tail?max_bytes=50000&format=text`, { headers: api.headers });
         if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
         const text = await r.text();
         const next = text.split('\n').filter(Boolean);
+        console.log(`Received ${next.length} log lines`);
         setLines((prev) => [...next.slice(-100), ...prev].slice(0, 500));
         setStatus(`Live logs running. Last update: ${new Date().toLocaleTimeString()}`);
         setError("");
       } catch (e: any) {
+        console.error("Polling error:", e);
         setError(String(e.message || e));
         setStatus("Live logs error - check connection.");
       }
@@ -47,14 +51,17 @@ export default function Logs({ api }: { api: any }) {
   };
 
   const start = async () => {
+    console.log("Start Live button clicked");
     setError("");
     setRunning(true);
     setStatus("Starting live logs...");
     
     try {
+      console.log("Starting polling...");
       // Start polling immediately
       startPolling();
     } catch (e: any) {
+      console.error("Error in start function:", e);
       setError(String(e.message || e));
       setStatus("Failed to start live logs.");
       setRunning(false);
@@ -97,7 +104,7 @@ export default function Logs({ api }: { api: any }) {
     <div className="mt-6 space-y-4">
       {error && <div className="text-xs text-red-400">{error}</div>}
       <div className="flex items-center gap-3">
-        <button onClick={running ? undefined : start} disabled={running}
+        <button onClick={start} disabled={running}
           className={cx("rounded-xl px-3 py-2 text-sm ring-1",
             running ? "opacity-40 cursor-not-allowed bg-[#14151B] ring-white/5" : "bg-emerald-500/15 ring-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20")}>Start Live</button>
         <button onClick={stop} className="rounded-xl px-3 py-2 text-sm bg-rose-500/15 text-rose-200 ring-1 ring-rose-500/30 hover:bg-rose-500/20">Stop Live</button>
