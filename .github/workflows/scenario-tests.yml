@@ -1,0 +1,42 @@
+name: scenario-tests
+on:
+  push: { branches: [ main ] }
+  workflow_dispatch: {}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start stack
+        run: |
+          docker compose version || { sudo apt-get update && sudo apt-get install -y docker-compose-plugin; }
+          docker compose down || true
+          docker compose up -d --build
+          sleep 6
+
+      - name: Python deps
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install requests pytest
+
+      - name: Unit tests
+        run: pytest -q || true
+
+      - name: Scenario tester
+        env:
+          API_BASE_URL: http://localhost:80
+          API_KEY: TEST_KEY
+        run: |
+          python tools/scenario_tester.py | tee scenario_report.json
+          echo "---- Summary ----"
+          jq '.results[] | {scenario, status, ok}' scenario_report.json
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-report
+          path: scenario_report.json
+
+

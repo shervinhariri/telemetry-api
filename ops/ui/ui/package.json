@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "scenario": "API_BASE_URL=http://localhost:80 API_KEY=TEST_KEY python ../tools/scenario_tester.py"
   },
   "dependencies": {
     "react": "^18.2.0",
