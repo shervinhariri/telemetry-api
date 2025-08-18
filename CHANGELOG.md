@@ -2,6 +2,32 @@
 
 All notable changes to the Telemetry API project will be documented in this file.
 
+## [0.8.2] - 2025-08-18
+
+### Added
+- **Multi-Tenancy Support**: Complete tenant isolation with database-backed tenants
+- **Database Models**: SQLAlchemy models for Tenant, ApiKey, OutputConfig, and Job
+- **Tenant-Scoped Authentication**: Per-tenant API keys with scope validation
+- **Admin Override**: X-Tenant-ID header for cross-tenant operations
+- **Data Isolation**: All events, DLQ, and logs separated by tenant
+- **Configurable Retention**: Per-tenant retention policies (default: 7 days)
+- **Alembic Migrations**: Database schema management with proper foreign keys
+- **Seed Script**: Automated default tenant and admin key creation
+- **Path Services**: Tenantized storage paths for complete data separation
+
+### Changed
+- **Authentication Middleware**: Global authentication with tenant resolution
+- **API Key Storage**: Moved from in-memory to database with proper hashing
+- **Backward Compatibility**: All existing endpoints work unchanged
+- **Version Update**: Bumped from v0.8.1 to v0.8.2
+
+### Technical
+- **SQLAlchemy Integration**: Full ORM support with SQLite/PostgreSQL
+- **Alembic Setup**: Database migration system with autogenerate
+- **Tenant Resolution**: Request-scoped tenant identification
+- **Scope Enforcement**: Proper permission checking across all endpoints
+- **Legacy Support**: Maintained compatibility with existing API keys
+
 ## [0.8.1] - 2025-01-XX
 
 ### Added

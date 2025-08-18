@@ -2,7 +2,7 @@
 Demo API endpoints for Telemetry API
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends, Header, Request
 from typing import Dict, Any, Optional
 import logging
 from ..demo.generator import demo_service
@@ -13,7 +13,8 @@ router = APIRouter(tags=["Demo"])
 
 @router.post("/demo/start", summary="Start demo generator")
 async def start_demo(
-    Authorization: Optional[str] = Header(None)
+    Authorization: Optional[str] = Header(None),
+    request: Request = None
 ) -> Dict[str, Any]:
     """
     Start the demo event generator.
@@ -21,9 +22,10 @@ async def start_demo(
     Requires admin scope. Generates synthetic NetFlow and Zeek events
     at the configured EPS rate for the configured duration.
     """
-    # Verify admin scope
-    from ..main import require_api_key
-    require_api_key(Authorization, required_scopes=["admin"])
+    # Check if user has admin scope
+    scopes = getattr(request.state, 'scopes', []) if request else []
+    if "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'admin' scope")
     
     try:
         success = await demo_service.start()
@@ -43,16 +45,18 @@ async def start_demo(
 
 @router.post("/demo/stop", summary="Stop demo generator")
 async def stop_demo(
-    Authorization: Optional[str] = Header(None)
+    Authorization: Optional[str] = Header(None),
+    request: Request = None
 ) -> Dict[str, Any]:
     """
     Stop the demo event generator.
     
     Requires admin scope. Stops the currently running demo generator.
     """
-    # Verify admin scope
-    from ..main import require_api_key
-    require_api_key(Authorization, required_scopes=["admin"])
+    # Check if user has admin scope
+    scopes = getattr(request.state, 'scopes', []) if request else []
+    if "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'admin' scope")
     
     try:
         success = await demo_service.stop()
@@ -73,16 +77,15 @@ async def stop_demo(
 
 @router.get("/demo/status", summary="Get demo generator status")
 async def get_demo_status(
-    Authorization: Optional[str] = Header(None)
+    Authorization: Optional[str] = Header(None),
+    request: Request = None
 ) -> Dict[str, Any]:
     """
     Get the current status of the demo generator.
     
     Returns configuration and runtime status information.
     """
-    # Verify API key
-    from ..main import require_api_key
-    require_api_key(Authorization)
+    # Authentication handled by middleware
     try:
         status = demo_service.get_status()
         return {

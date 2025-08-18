@@ -1,4 +1,4 @@
-# Telemetry API — v0.8.1
+# Telemetry API — v0.8.2
 
 Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability.
 
@@ -15,7 +15,7 @@ Ingest NetFlow/IPFIX and Zeek JSON → enrich with GeoIP/ASN/threat intel → ap
 docker run -d -p 80:80 \
   -e API_KEY=TEST_KEY \
   -e REDACT_HEADERS=authorization \
-  --name telapi shvin/telemetry-api:0.8.1
+  --name telapi shvin/telemetry-api:0.8.2
 
 # 2) Ingest sample Zeek
 curl -s -X POST http://localhost/v1/ingest/zeek \
@@ -41,7 +41,7 @@ docker run -d -p 80:80 \
   -e GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb \
   -e THREATLIST_CSV=/data/threats.csv \
   -v $PWD/data:/data:ro \
-  --name telemetry-api shvin/telemetry-api:0.8.1
+  --name telemetry-api shvin/telemetry-api:0.8.2
 
 # Open dashboard
 open http://localhost
@@ -131,6 +131,58 @@ curl -s -X POST http://localhost/v1/demo/stop \
 - **No metrics**: Verify `/v1/metrics/prometheus` endpoint is accessible
 - **Grafana import fails**: Ensure Prometheus data source is configured correctly
 ```
+
+## 🏢 Multi-Tenancy (v0.8.2)
+
+The API now supports multi-tenant deployments with complete data isolation:
+
+### Tenant Features
+- **Database-backed tenants**: SQLite/PostgreSQL with proper foreign keys
+- **Per-tenant API keys**: Scoped authentication with admin override
+- **Data isolation**: All events, DLQ, and logs separated by tenant
+- **Configurable retention**: Per-tenant retention policies (default: 7 days)
+- **Admin override**: `X-Tenant-ID` header for cross-tenant operations
+
+### Quick Multi-Tenant Setup
+
+```bash
+# 1) Run with database persistence
+docker run -d -p 80:80 \
+  -e DATABASE_URL=sqlite:///./telemetry.db \
+  -e ADMIN_API_KEY=YOUR_ADMIN_KEY \
+  -v $PWD/data:/data \
+  --name telemetry-api shvin/telemetry-api:0.8.2
+
+# 2) Create default tenant and admin key
+docker exec telemetry-api python3 scripts/seed_default_tenant.py
+
+# 3) Test tenant isolation
+curl -H "Authorization: Bearer YOUR_ADMIN_KEY" http://localhost/v1/health
+curl -H "Authorization: Bearer YOUR_ADMIN_KEY" -H "X-Tenant-ID: default" http://localhost/v1/health
+```
+
+### Tenant Management
+
+```bash
+# Create new tenant (admin only)
+curl -X POST http://localhost/v1/admin/tenants \
+  -H "Authorization: Bearer YOUR_ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"tenant_id": "acme-prod", "name": "ACME Production", "retention_days": 30}'
+
+# Create tenant API key
+curl -X POST http://localhost/v1/admin/keys \
+  -H "Authorization: Bearer YOUR_ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"tenant_id": "acme-prod", "scopes": ["ingest", "read_metrics"]}'
+```
+
+### Backward Compatibility
+
+- **Zero breaking changes**: All existing `/v1/*` endpoints work unchanged
+- **Legacy API keys**: Continue to work with full admin access
+- **Same retention**: Default 7-day retention maintained
+- **Same Bearer auth**: No changes to authentication model
 
 ## 📊 Features
 

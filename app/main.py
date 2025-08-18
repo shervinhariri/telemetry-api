@@ -31,7 +31,7 @@ from .api.prometheus import router as prometheus_router
 from .pipeline import ingest_queue, record_batch_accepted, enqueue
 from .logging_config import setup_logging
 
-API_VERSION = "0.8.1"
+API_VERSION = "0.8.2"
 
 # Import configuration
 from .config import (
@@ -112,11 +112,14 @@ app.include_router(prometheus_router, prefix=API_PREFIX)
 async def get_requests_api_compat(
     limit: int = Query(500, ge=1, le=1000),
     window: str = Query("15m"),
-    Authorization: Optional[str] = Header(None)
+    Authorization: Optional[str] = Header(None),
+    request: Request = None
 ):
     """Compatibility route for old UI - forwards to /v1/api/requests"""
-    # Validate API key first
-    require_api_key(Authorization, required_scopes=["read_requests"])
+    # Check if user has read_requests scope
+    scopes = getattr(request.state, 'scopes', []) if request else []
+    if "read_requests" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'read_requests' scope")
     
     # Call the actual function
     from .api.requests import get_requests_api
@@ -144,6 +147,18 @@ async def docs():
     """Serve Swagger UI"""
     return FileResponse("docs/swagger.html", media_type="text/html")
 
+# Authentication middleware
+@app.middleware("http")
+async def tenancy_middleware(request: Request, call_next):
+    # Skip authentication for static files only
+    if request.url.path.startswith("/ui/"):
+        return await call_next(request)
+    
+    # Authenticate and set tenant_id
+    from .auth.deps import authenticate
+    await authenticate(request)
+    return await call_next(request)
+
 # Middleware to track requests and audit logging
 @app.middleware("http")
 async def track_requests(request: Request, call_next):
@@ -163,12 +178,11 @@ async def track_requests(request: Request, call_next):
     
     # Extract API key for audit
     api_key = None
-    tenant_id = "unknown"
+    tenant_id = getattr(request.state, 'tenant_id', 'unknown')
     
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         api_key = auth_header[7:]  # Remove "Bearer " prefix
-        tenant_id = f"tenant_{hash(api_key) % 1000}"  # Simple tenant ID generation
     
     # Generate trace ID
     trace_id = request.headers.get("x-trace-id") or str(uuid.uuid4())
@@ -288,20 +302,10 @@ DEADLETTER_DIR = Path("ops/deadletter")
 DEADLETTER_DIR.mkdir(parents=True, exist_ok=True)
 
 def require_api_key(auth_header: Optional[str], required_scopes: Optional[List[str]] = None):
-    """Require API key with optional scope validation"""
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
-    
-    api_key = auth_header.split(" ", 1)[1].strip()
-    
-    # Use scoped authentication (includes legacy support)
-    from .auth import validate_api_key
-    key_data = validate_api_key(api_key, required_scopes)
-    
-    if key_data:
-        return key_data
-    
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    """Require API key with optional scope validation - now handled by middleware"""
+    # This function is now a no-op since authentication is handled by middleware
+    # The middleware will have already validated the API key and set request.state
+    pass
 
 def add_version_header(response: Response):
     response.headers["X-API-Version"] = API_VERSION
@@ -347,7 +351,10 @@ async def schema(response: Response):
 
 @app.post(f"{API_PREFIX}/ingest")
 async def ingest(request: Request, response: Response, Authorization: Optional[str] = Header(None), content_encoding: Optional[str] = Header(None)):
-    require_api_key(Authorization, required_scopes=["ingest"])
+    # Check if user has ingest scope
+    scopes = getattr(request.state, 'scopes', [])
+    if "ingest" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'ingest' scope")
     add_version_header(response)
     
     start_time = time.time()
@@ -464,7 +471,10 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
 @app.post(f"{API_PREFIX}/ingest/zeek")
 async def ingest_zeek(request: Request, response: Response, Authorization: Optional[str] = Header(None), content_encoding: Optional[str] = Header(None)):
     """Ingest Zeek conn.log JSON lines or array"""
-    require_api_key(Authorization, required_scopes=["ingest"])
+    # Check if user has ingest scope
+    scopes = getattr(request.state, 'scopes', [])
+    if "ingest" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'ingest' scope")
     add_version_header(response)
     
     start_time = time.time()
@@ -601,7 +611,10 @@ async def ingest_zeek(request: Request, response: Response, Authorization: Optio
 @app.post(f"{API_PREFIX}/ingest/netflow")
 async def ingest_netflow(request: Request, response: Response, Authorization: Optional[str] = Header(None), content_encoding: Optional[str] = Header(None)):
     """Ingest NetFlow/IPFIX JSON"""
-    require_api_key(Authorization, required_scopes=["ingest"])
+    # Check if user has ingest scope
+    scopes = getattr(request.state, 'scopes', [])
+    if "ingest" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'ingest' scope")
     add_version_header(response)
     
     start_time = time.time()
@@ -746,7 +759,10 @@ async def ingest_netflow(request: Request, response: Response, Authorization: Op
 @app.post(f"{API_PREFIX}/ingest/bulk")
 async def ingest_bulk(request: Request, response: Response, Authorization: Optional[str] = Header(None), content_encoding: Optional[str] = Header(None)):
     """Ingest bulk records with type specification"""
-    require_api_key(Authorization, required_scopes=["ingest"])
+    # Check if user has ingest scope
+    scopes = getattr(request.state, 'scopes', [])
+    if "ingest" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'ingest' scope")
     add_version_header(response)
     
     start_time = time.time()
@@ -865,7 +881,7 @@ async def ingest_bulk(request: Request, response: Response, Authorization: Optio
 
 @app.post(f"{API_PREFIX}/lookup")
 async def lookup(request: Request, response: Response, Authorization: Optional[str] = Header(None)):
-    require_api_key(Authorization)
+    # Authentication handled by middleware
     add_version_header(response)
     
     start_time = time.time()
@@ -922,7 +938,7 @@ async def lookup(request: Request, response: Response, Authorization: Optional[s
 
 @app.post(f"{API_PREFIX}/outputs/splunk")
 async def configure_splunk(request: Request, response: Response, Authorization: Optional[str] = Header(None)):
-    require_api_key(Authorization)
+    # Authentication handled by middleware
     add_version_header(response)
     
     payload = await request.json()
@@ -935,7 +951,7 @@ async def configure_splunk(request: Request, response: Response, Authorization: 
 
 @app.post(f"{API_PREFIX}/outputs/elastic")
 async def configure_elastic(request: Request, response: Response, Authorization: Optional[str] = Header(None)):
-    require_api_key(Authorization)
+    # Authentication handled by middleware
     add_version_header(response)
     
     payload = await request.json()
@@ -946,7 +962,10 @@ async def configure_elastic(request: Request, response: Response, Authorization:
 @app.put(f"{API_PREFIX}/indicators")
 async def upsert_indicators(request: Request, response: Response, Authorization: Optional[str] = Header(None)):
     """Upsert threat intelligence indicators"""
-    require_api_key(Authorization, required_scopes=["manage_indicators"])
+    # Check if user has manage_indicators scope
+    scopes = getattr(request.state, 'scopes', [])
+    if "manage_indicators" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'manage_indicators' scope")
     add_version_header(response)
     
     start_time = time.time()
@@ -1005,7 +1024,10 @@ async def upsert_indicators(request: Request, response: Response, Authorization:
 @app.delete(f"{API_PREFIX}/indicators/{{indicator_id}}")
 async def delete_indicator(indicator_id: str, request: Request, response: Response, Authorization: Optional[str] = Header(None)):
     """Delete threat intelligence indicator by ID"""
-    require_api_key(Authorization, required_scopes=["manage_indicators"])
+    # Check if user has manage_indicators scope
+    scopes = getattr(request.state, 'scopes', [])
+    if "manage_indicators" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'manage_indicators' scope")
     add_version_header(response)
     
     start_time = time.time()
@@ -1043,7 +1065,10 @@ async def download_json(
     Authorization: Optional[str] = Header(None)
 ):
     """Download latest enriched events as JSON lines"""
-    require_api_key(Authorization, required_scopes=["read_requests"])
+    # Check if user has read_requests scope
+    scopes = getattr(request.state, 'scopes', []) if request else []
+    if "read_requests" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'read_requests' scope")
     add_version_header(response)
     
     start_time = time.time()
@@ -1092,7 +1117,10 @@ async def download_json(
 @app.post(f"{API_PREFIX}/export/splunk-hec")
 async def export_splunk_hec(request: Request, response: Response, Authorization: Optional[str] = Header(None)):
     """Export events to Splunk HEC with retries and DLQ"""
-    require_api_key(Authorization, required_scopes=["export"])
+    # Check if user has export scope
+    scopes = getattr(request.state, 'scopes', [])
+    if "export" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'export' scope")
     add_version_header(response)
     
     start_time = time.time()
@@ -1200,7 +1228,10 @@ async def export_splunk_hec(request: Request, response: Response, Authorization:
 @app.post(f"{API_PREFIX}/export/elastic")
 async def export_elastic(request: Request, response: Response, Authorization: Optional[str] = Header(None)):
     """Export events to Elasticsearch"""
-    require_api_key(Authorization, required_scopes=["export"])
+    # Check if user has export scope
+    scopes = getattr(request.state, 'scopes', [])
+    if "export" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'export' scope")
     add_version_header(response)
     
     start_time = time.time()
@@ -1293,15 +1324,18 @@ async def export_elastic(request: Request, response: Response, Authorization: Op
 
 @app.post(f"{API_PREFIX}/alerts/rules")
 async def configure_alerts(request: Request, response: Response, Authorization: Optional[str] = Header(None)):
-    require_api_key(Authorization)
+    # Authentication handled by middleware
     add_version_header(response)
     
     # TODO: Implement alert rules configuration
     return {"status": "not_implemented"}
 
 @app.get(f"{API_PREFIX}/metrics")
-async def metrics(response: Response, Authorization: Optional[str] = Header(None)):
-    require_api_key(Authorization, required_scopes=["read_metrics"])
+async def metrics(response: Response, Authorization: Optional[str] = Header(None), request: Request = None):
+    # Check if user has read_metrics scope
+    scopes = getattr(request.state, 'scopes', []) if request else []
+    if "read_metrics" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'read_metrics' scope")
     add_version_header(response)
     return get_metrics()
 

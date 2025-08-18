@@ -66,13 +66,14 @@ def get_audit_summary(window_minutes: int = 15) -> Dict[str, Any]:
 @router.get("/admin/requests/summary")
 async def get_requests_summary(
     Authorization: Optional[str] = Header(None),
-    window: int = Query(15, description="Time window in minutes")
+    window: int = Query(15, description="Time window in minutes"),
+    request: Request = None
 ):
     """Get requests summary for dashboard cards"""
-    from ..auth import require_api_key
-    
-    # Require admin scope
-    require_api_key(Authorization, required_scopes=["admin", "read_requests"])
+    # Check if user has admin or read_requests scope
+    scopes = getattr(request.state, 'scopes', []) if request else []
+    if "admin" not in scopes and "read_requests" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'admin' or 'read_requests' scope")
     
     return get_audit_summary(window)
 
@@ -84,14 +85,16 @@ async def get_requests(
     exclude_monitoring: bool = Query(True, description="Exclude monitoring endpoints"),
     status: str = Query("any", pattern="^(any|2xx|4xx|5xx)$", description="Status filter"),
     path: Optional[str] = Query(None, description="Path filter"),
-    if_none_match: Optional[str] = Header(None, description="ETag for caching")
+    if_none_match: Optional[str] = Header(None, description="ETag for caching"),
+    request: Request = None
 ):
     """Get recent request audits with timeline events and ETag support"""
     from hashlib import sha1
-    from ..auth import require_api_key
     
-    # Require admin scope
-    require_api_key(Authorization, required_scopes=["admin", "read_requests"])
+    # Check if user has admin or read_requests scope
+    scopes = getattr(request.state, 'scopes', []) if request else []
+    if "admin" not in scopes and "read_requests" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'admin' or 'read_requests' scope")
     
     # Get recent audits with filtering
     items = list_audits(
@@ -129,9 +132,10 @@ async def stream_requests(
 ):
     """Stream audit records via Server-Sent Events"""
     
-    # Require admin scope
-    from ..auth import require_api_key
-    require_api_key(Authorization, required_scopes=["admin", "read_requests"])
+    # Check if user has admin or read_requests scope
+    scopes = getattr(request.state, 'scopes', [])
+    if "admin" not in scopes and "read_requests" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'admin' or 'read_requests' scope")
     
     async def generate():
         """Generate SSE events"""
@@ -241,9 +245,14 @@ async def get_request_detail(request_id: int):
 @router.get("/api/requests")
 async def get_requests_api(
     limit: int = Query(50, ge=1, le=1000, description="Number of requests to return"),
-    status_filter: Optional[str] = Query(None, description="Status filter (2xx, 4xx, 5xx)")
+    status_filter: Optional[str] = Query(None, description="Status filter (2xx, 4xx, 5xx)"),
+    request: Request = None
 ):
     """Enhanced API endpoint for requests with timeline events"""
+    # Check if user has read_requests scope
+    scopes = getattr(request.state, 'scopes', []) if request else []
+    if "read_requests" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'read_requests' scope")
     # Get recent audits with filtering
     audits = list_audits(
         limit=limit,

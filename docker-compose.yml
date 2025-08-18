@@ -2,8 +2,8 @@ services:
   api:
     build: .
     environment:
-      - APP_VERSION=0.8.1
-      - DOCKERHUB_TAG=0.8.1
+      - APP_VERSION=0.8.2
+      - DOCKERHUB_TAG=0.8.2
       - GEOIP_CITY_DB=/data/geo/GeoLite2-City.mmdb
       - GEOIP_ASN_DB=/data/geo/GeoLite2-ASN.mmdb
       - TI_PATH=/data/ti/indicators.txt

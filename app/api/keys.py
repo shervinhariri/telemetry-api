@@ -6,10 +6,9 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import logging
 
-from ..auth import (
-    validate_api_key, create_api_key, delete_api_key, 
-    list_api_keys, rotate_api_key, get_available_scopes
-)
+# Import the old auth functions for now (we'll update this later)
+# Import from the auth module (not the auth package)
+from .. import auth
 
 router = APIRouter()
 
@@ -37,7 +36,7 @@ def require_admin_scope(Authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     
     api_key = Authorization[7:]  # Remove "Bearer "
-    key_data = validate_api_key(api_key, required_scopes=["admin"])
+    key_data = auth.validate_api_key(api_key, required_scopes=["admin"])
     
     if not key_data:
         raise HTTPException(status_code=403, detail="Admin scope required")
@@ -52,13 +51,13 @@ async def create_key(
     require_admin_scope(Authorization)
     
     # Validate scopes
-    available_scopes = get_available_scopes()
+    available_scopes = auth.get_available_scopes()
     for scope in request.scopes:
         if scope not in available_scopes:
             raise HTTPException(status_code=400, detail=f"Invalid scope: {scope}")
     
     # Create the key
-    key_data = create_api_key(
+    key_data = auth.create_api_key(
         scopes=request.scopes,
         note=request.note,
         created_by="admin"  # In production, get from auth context
@@ -76,7 +75,7 @@ async def list_keys(
     """List all API keys (admin only)"""
     require_admin_scope(Authorization)
     
-    keys = list_api_keys()
+    keys = auth.list_api_keys()
     
     response.headers["X-API-Version"] = "1.0.0"
     
@@ -94,7 +93,7 @@ async def delete_key(
     """Delete an API key (admin only)"""
     require_admin_scope(Authorization)
     
-    if delete_api_key(key_id):
+    if auth.delete_api_key(key_id):
         response.headers["X-API-Version"] = "1.0.0"
         return {"status": "deleted", "key_id": key_id}
     else:
@@ -109,7 +108,7 @@ async def rotate_key(
     """Rotate an API key (admin only)"""
     require_admin_scope(Authorization)
     
-    rotated_key = rotate_api_key(key_id)
+    rotated_key = auth.rotate_api_key(key_id)
     if rotated_key:
         response.headers["X-API-Version"] = "1.0.0"
         return RotateKeyResponse(**rotated_key)
