@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { apiFetch } from "../lib/apiClient";
 
 // ---------- UI atoms ----------
 const Card = ({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) => (
@@ -24,24 +25,27 @@ export default function APIPlayground({ api }: { api: any }) {
   const [out, setOut] = useState<any>(null);
   const [error, setError] = useState("");
 
+  // Keep API key persisted for apiClient
+  useEffect(() => {
+    try { localStorage.setItem("API_KEY", (api as any)?.headers?.Authorization?.replace('Bearer ', '') || 'TEST_KEY'); } catch {}
+  }, [api]);
+
   const fetchSystem = async () => {
     setError("");
     try {
-      let s;
-      try { s = await api.get("/v1/system"); }
-      catch { s = await api.get("/v1/version"); }
-      setSys(s);
+      const { status, data } = await apiFetch("/v1/system", "GET");
+      setSys({ status, data });
     } catch (e: any) { setError(String(e.message || e)); }
   };
 
   const fetchMetrics = async () => {
     setError("");
-    try { setMet(await api.get("/v1/metrics")); } catch (e: any) { setError(String(e.message || e)); }
+    try { const { status, data } = await apiFetch("/v1/metrics?window=900", "GET"); setMet({ status, data }); } catch (e: any) { setError(String(e.message || e)); }
   };
 
   const doIngest = async () => {
     setError("");
-    try { const j = JSON.parse(ingest); const r = await api.post("/v1/ingest", j); setOut(r); } catch (e: any) { setError(String(e.message || e)); }
+    try { const j = JSON.parse(ingest); const r = await apiFetch("/v1/ingest", "POST", j); setOut(r); } catch (e: any) { setError(String(e.message || e)); }
   };
 
   return (

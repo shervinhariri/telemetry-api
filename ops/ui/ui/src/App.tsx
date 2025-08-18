@@ -102,6 +102,7 @@ export default function App() {
 
   // Initial ping for version + status
   useEffect(() => {
+    try { localStorage.setItem("API_KEY", apiKey || ""); } catch {}
     (async () => {
       try {
         let sys;
