@@ -39,6 +39,81 @@
     </style>
 </head>
 <body class="min-h-screen w-full bg-[#0B0C10] text-zinc-100 antialiased">
-    <div id="root"></div>
+    <div class="max-w-7xl mx-auto px-5 pb-24">
+        <div class="sticky top-0 z-30 backdrop-blur bg-[#0B0C10]/70">
+            <div class="px-5 py-4 flex items-center gap-3">
+                <div class="text-xl font-semibold tracking-tight">Telemetry</div>
+                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40">
+                    <span class="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                    Online
+                </span>
+                <div class="ml-auto flex items-center gap-2 text-xs text-zinc-400">
+                    <label class="flex items-center gap-2"><input id="auto-refresh" type="checkbox" class="rounded" checked> Auto</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top stats -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-6">
+                <div class="mx-auto flex flex-col items-center">
+                    <div id="success-ring" class="h-40 w-40 rounded-full border border-white/10"></div>
+                    <div class="mt-4 text-4xl font-semibold" id="success-percentage">0%</div>
+                    <div class="mt-1 text-sm text-zinc-400">Success Rate</div>
+                </div>
+            </div>
+            <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-6 flex items-center justify-center">
+                <div class="text-center">
+                    <div class="text-sm text-zinc-400 tracking-wide">Avg Latency</div>
+                    <div class="mt-2 text-5xl font-semibold tracking-tight text-white" id="avg-latency">0ms</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent requests toolbar -->
+        <div class="mt-10 mb-3 flex items-center justify-between">
+            <h2 class="text-xl font-semibold text-white">Recent Requests</h2>
+            <div class="flex items-center gap-3">
+                <button id="refresh-requests" class="rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 px-4 py-2 border border-emerald-400/20">Refresh</button>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02]">
+            <table class="w-full text-left">
+                <thead class="text-zinc-400 text-sm border-b border-white/5">
+                    <tr>
+                        <th class="px-5 py-3">Health</th>
+                        <th class="px-5 py-3">Time</th>
+                        <th class="px-5 py-3">Endpoint</th>
+                        <th class="px-5 py-3">Status</th>
+                        <th class="px-5 py-3">Latency</th>
+                        <th class="px-5 py-3">Records</th>
+                        <th class="px-5 py-3">Client</th>
+                    </tr>
+                </thead>
+                <tbody id="requests-table" class="divide-y divide-white/5">
+                    <tr>
+                        <td colspan="7" class="px-5 py-6 text-center text-zinc-500">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Legend -->
+        <div class="mt-6 mb-2 flex items-center justify-center gap-6 text-xs text-zinc-500">
+            <span class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-emerald-500"></div><span class="font-medium">≥90%</span></span>
+            <span class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-amber-500"></div><span class="font-medium">≥60%</span></span>
+            <span class="flex items-center gap-1"><div class="w-3 h-3 rounded-full bg-red-500"></div><span class="font-medium">&lt;60%</span></span>
+        </div>
+    </div>
+
+    <!-- Slide over for details -->
+    <div id="slide-over-backdrop" class="fixed inset-0 bg-black/40 opacity-0 pointer-events-none transition"></div>
+    <div id="slide-over" class="fixed inset-y-0 right-0 w-full max-w-md bg-[#111218] border-l border-white/10 translate-x-full transition">
+        <div id="slide-over-content" class="p-6 text-sm text-zinc-200"></div>
+    </div>
+
+    <script src="/ui/app.js"></script>
 </body>
 </html>
