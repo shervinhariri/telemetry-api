@@ -30,8 +30,7 @@ from .api.demo import router as demo_router
 from .api.prometheus import router as prometheus_router
 from .pipeline import ingest_queue, record_batch_accepted, enqueue
 from .logging_config import setup_logging
-
-API_VERSION = "0.8.2"
+from .config import API_VERSION
 
 # Import configuration
 from .config import (
@@ -150,8 +149,8 @@ async def docs():
 # Authentication middleware
 @app.middleware("http")
 async def tenancy_middleware(request: Request, call_next):
-    # Skip authentication for static files only
-    if request.url.path.startswith("/ui/"):
+    # Skip authentication for static files and health checks
+    if request.url.path.startswith("/ui/") or request.url.path == "/v1/health":
         return await call_next(request)
     
     # Authenticate and set tenant_id

@@ -93,7 +93,7 @@ docker run -d -p 80:80 \
   -e DEMO_MODE=true \
   -e DEMO_EPS=50 \
   -e DEMO_DURATION_SEC=120 \
-  --name telemetry-api-demo shvin/telemetry-api:latest
+  --name telemetry-api-demo shvin/telemetry-api:0.8.2
 
 # 2) Start demo generator
 curl -s -X POST http://localhost/v1/demo/start \
@@ -314,7 +314,7 @@ curl -s http://localhost/v1/health | jq
 version: '3.8'
 services:
   telemetry-api:
-    image: shvin/telemetry-api:0.8.1
+    image: shvin/telemetry-api:0.8.2
     ports:
       - "80:80"
     environment:
@@ -343,7 +343,7 @@ spec:
     spec:
       containers:
       - name: telemetry-api
-        image: shvin/telemetry-api:0.8.1
+        image: shvin/telemetry-api:0.8.2
         ports:
         - containerPort: 80
         env:
@@ -356,25 +356,23 @@ spec:
 
 ## 📋 Changelog
 
-### v0.8.1 (Current)
-- ✅ OpenAPI 3.1 specification with Swagger UI
-- ✅ Scoped API keys with RBAC (ingest, manage_indicators, export, read_requests, read_metrics)
-- ✅ Security headers and configurable field redaction
-- ✅ Dead Letter Queue (DLQ) for export failures with exponential backoff
-- ✅ Idempotency support for ingest operations
-- ✅ Enhanced observability with detailed metrics and system monitoring
-- ✅ Real-time dashboard with Server-Sent Events for live tailing
-- ✅ Comprehensive request audit logging
-
-### v0.8.0
-- ✅ OpenAPI 3.1 specification with Swagger UI
-- ✅ Scoped API keys with RBAC (ingest, manage_indicators, export, read_requests, read_metrics)
-- ✅ Security headers and configurable field redaction
-- ✅ Dead Letter Queue (DLQ) for export failures with exponential backoff
-- ✅ Idempotency support for ingest operations
-- ✅ Enhanced observability with detailed metrics and system monitoring
-- ✅ Real-time dashboard with Server-Sent Events for live tailing
-- ✅ Comprehensive request audit logging
+### v0.8.2 (Current)
+- ✅ **Multi-Tenancy Support**: Complete tenant isolation with database-backed tenants
+- ✅ **Database Models**: SQLAlchemy models for Tenant, ApiKey, OutputConfig, and Job
+- ✅ **Tenant-Scoped Authentication**: Per-tenant API keys with scope validation
+- ✅ **Admin Override**: X-Tenant-ID header for cross-tenant operations
+- ✅ **Data Isolation**: All events, DLQ, and logs separated by tenant
+- ✅ **Configurable Retention**: Per-tenant retention policies (default: 7 days)
+- ✅ **Alembic Migrations**: Database schema management with proper foreign keys
+- ✅ **Backward Compatibility**: All existing endpoints work unchanged
+- ✅ **OpenAPI 3.1 specification** with Swagger UI
+- ✅ **Scoped API keys** with RBAC (ingest, manage_indicators, export, read_requests, read_metrics)
+- ✅ **Security headers** and configurable field redaction
+- ✅ **Dead Letter Queue (DLQ)** for export failures with exponential backoff
+- ✅ **Idempotency support** for ingest operations
+- ✅ **Enhanced observability** with detailed metrics and system monitoring
+- ✅ **Real-time dashboard** with Server-Sent Events for live tailing
+- ✅ **Comprehensive request audit** logging
 
 ## 🤝 Contributing
 

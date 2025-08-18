@@ -6,12 +6,14 @@ from packaging import version as semver
 router = APIRouter()
 
 APP_NAME = os.getenv("APP_NAME", "telemetry-api")
-APP_VERSION = os.getenv("APP_VERSION", "0.8.1")
+# Import version from config module
+from ..config import API_VERSION
+APP_VERSION = os.getenv("APP_VERSION", API_VERSION)
 GIT_SHA = os.getenv("GIT_SHA", "unknown")
 IMAGE = os.getenv("IMAGE", "shvin/telemetry-api")
 UPDATE_CHECK_ENABLED = os.getenv("UPDATE_CHECK_ENABLED", "true").lower() == "true"
 DOCKERHUB_REPO = os.getenv("DOCKERHUB_REPO", IMAGE)  # e.g. shvin/telemetry-api
-DOCKERHUB_TAG = os.getenv("DOCKERHUB_TAG", "0.8.1")
+DOCKERHUB_TAG = os.getenv("DOCKERHUB_TAG", API_VERSION)
 
 @router.get("/version")
 def get_version():
