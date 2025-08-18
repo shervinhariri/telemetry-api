@@ -120,6 +120,7 @@ async def get_requests(
 @router.get("/admin/requests/stream")
 async def stream_requests(
     request: Request,
+    Authorization: Optional[str] = Header(None),
     since: Optional[str] = Query(None, description="Start time (ISO format)"),
     method: Optional[str] = Query(None, description="HTTP method"),
     status: Optional[int] = Query(None, description="HTTP status code"),
@@ -127,6 +128,10 @@ async def stream_requests(
     client_ip: Optional[str] = Query(None, description="Client IP address")
 ):
     """Stream audit records via Server-Sent Events"""
+    
+    # Require admin scope
+    from ..auth import require_api_key
+    require_api_key(Authorization, required_scopes=["admin", "read_requests"])
     
     async def generate():
         """Generate SSE events"""
@@ -136,20 +141,29 @@ async def stream_requests(
             yield "event: connected\n"
             yield f"data: {json.dumps({'message': 'Connected to audit stream'})}\n\n"
             
-            # Mock streaming - replace with real-time database queries
+            # Track last seen records to avoid duplicates
+            last_seen_ids = set()
+            
             while True:
                 # Check if client disconnected
                 if await request.is_disconnected():
                     break
                 
                 # Get recent audit records
-                recent_data = in_memory_audit_logs[-10:]  # Last 10 records
+                recent_data = list_audits(limit=50, exclude_monitoring=False)
                 
                 for record in recent_data:
+                    record_id = record.get('id', record.get('trace_id', ''))
+                    
+                    # Skip if we've already sent this record
+                    if record_id in last_seen_ids:
+                        continue
+                    
                     # Apply filters
                     if since:
                         since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
-                        if record.get('ts', datetime.utcnow()) < since_dt:
+                        record_ts = datetime.fromisoformat(record.get('ts', datetime.utcnow().isoformat()))
+                        if record_ts < since_dt:
                             continue
                     
                     if method and record.get('method') != method.upper():
@@ -181,6 +195,13 @@ async def stream_requests(
                     yield f"id: {serializable_record.get('trace_id', 'unknown')}\n"
                     yield "event: request\n"
                     yield f"data: {json.dumps(serializable_record)}\n\n"
+                    
+                    # Track this record
+                    last_seen_ids.add(record_id)
+                
+                # Keep only recent IDs to prevent memory growth
+                if len(last_seen_ids) > 1000:
+                    last_seen_ids.clear()
                 
                 # Wait before next poll
                 await asyncio.sleep(5)
@@ -210,7 +231,8 @@ async def stream_requests(
 async def get_request_detail(request_id: int):
     """Get detailed information about a specific request"""
     # Find the request by ID
-    for req in in_memory_audit_logs:
+    audits = list_audits(limit=1000, exclude_monitoring=False)
+    for req in audits:
         if req.get('id') == request_id:
             return req
     
