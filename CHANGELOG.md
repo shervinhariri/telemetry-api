@@ -2,6 +2,25 @@
 
 All notable changes to the Telemetry API project will be documented in this file.
 
+## [0.9.0] - 2025-08-17
+
+### Added
+- Admin timelines with max 6 canonical events and per-row donut gauges
+- In-memory audit ring buffer with TTL pruning and configurable size
+- Admin endpoint with filters (limit, status, path, exclude_monitoring) and ETag support
+- Prometheus metrics: `telemetry_requests_total` and `telemetry_request_fitness`
+- Security and privacy: scope-based access, header/field redaction
+- Comprehensive tests: fitness unit tests and admin requests API tests
+
+### Changed
+- Standardized internal port to 80; removed hardcoded 8080 from code
+- Reduced log noise; structured logging with sampling and excludes
+
+### Fixed
+- Trace propagation across pipeline; X-Trace-Id on responses
+
+---
+
 ## [0.8.0] - 2025-08-17
 
 ### Added

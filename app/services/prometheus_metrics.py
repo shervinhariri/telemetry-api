@@ -66,7 +66,7 @@ class PrometheusMetrics:
     
     def _setup_build_info(self):
         """Set up build information gauge."""
-        version = os.getenv("APP_VERSION", "0.8.0")
+        version = os.getenv("APP_VERSION", "0.9.0")
         image = os.getenv("IMAGE", "shvin/telemetry-api")
         image_tag = os.getenv("IMAGE_TAG", "latest")
         
