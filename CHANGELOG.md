@@ -2,7 +2,26 @@
 
 All notable changes to the Telemetry API project will be documented in this file.
 
-## [0.9.0] - 2025-08-17
+## [0.8.1] - 2025-01-XX
+
+### Added
+- Inline API key editing within the oval chip (no popover)
+- Balanced button styling with gray for most buttons, green for important actions
+- Clean header design with Online status moved to right side
+- Improved error handling and user feedback
+- API key synchronization across all pages
+
+### Changed
+- Updated version from 0.8.0 to 0.8.1
+- Removed old data files and unnecessary logs
+- Cleaned up version history and documentation
+
+### Fixed
+- Backend null handling in requests endpoint
+- API key management and persistence
+- UI responsiveness and user experience
+
+## [0.8.0] - 2025-08-17
 
 ### Added
 - Admin timelines with max 6 canonical events and per-row donut gauges
@@ -68,68 +87,3 @@ All notable changes to the Telemetry API project will be documented in this file
 - **Redaction**: Configurable field and header redaction for privacy
 - **Chart.js Integration**: Robust throughput chart initialization with error handling
 - **Data Normalization**: Comprehensive data transformation utilities for UI consistency
-
-## [0.7.8] - 2025-01-XX
-
-### Added
-- **Enhanced Dashboard**: Single throughput chart (events/sec) over 15 minutes with 4 compact stat cards
-- **Requests Page UX**: State boxes (Total, Succeeded, Failed, Avg Latency) with right-side drawer for request details
-- **New Ingest Endpoints**: 
-  - `POST /v1/ingest/zeek` - Dedicated Zeek conn.log ingestion
-  - `POST /v1/ingest/netflow` - Dedicated NetFlow/IPFIX ingestion with canonical schema mapping
-  - `POST /v1/ingest/bulk` - Type-specified bulk ingestion
-- **Threat Intelligence Management**:
-  - `PUT /v1/indicators` - Add/update threat indicators
-  - `DELETE /v1/indicators/:id` - Remove indicators by ID
-- **Export Connectors**:
-  - `POST /v1/export/splunk-hec` - Buffered bulk export to Splunk HEC
-  - `POST /v1/export/elastic` - Bulk export to Elasticsearch
-- **Data Download**: `GET /v1/download/json?limit=10000` - Stream enriched events as JSON lines
-- **Enhanced Requests API**: `GET /api/requests?limit=500&window=15m` - Aggregated request data with time windows
-- **Sample Data**: `samples/zeek_conn_small.json` and `samples/netflow_small.json`
-- **Test Scripts**: `tests/test_endpoints.py` and `scripts/load_test.py` for comprehensive testing
-- **Postman Collection**: Complete API testing collection with sample payloads
-
-### Changed
-- **Dashboard Layout**: Replaced 6-card grid with single chart + 4 state cards for better performance visibility
-- **Requests Table**: Simplified columns (Time, Method, Path, Status, Latency, Source IP, Records, Risk Avg, Actions)
-- **UI Version**: Updated to v0.7.8 across frontend and backend
-- **README**: Complete rewrite with concise v0.7.8 documentation and quick start guide
-
-### Fixed
-- **Request Details**: Right-side drawer now shows comprehensive request information including headers, payload summary, enrichment results, and export actions
-- **Validation Errors**: Multi-status (207) responses with per-record validation errors for malformed payloads
-- **Performance**: Optimized dashboard rendering and request loading
-
-### Technical
-- **Backend Version**: Updated to 0.7.8 in `app/api/version.py`
-- **Threat Intelligence**: Added dynamic indicator management with in-memory storage
-- **Audit System**: Enhanced request tracking with detailed operation logging
-- **Error Handling**: Improved validation and error reporting across all endpoints
-
-## [0.7.5] - 2024-XX-XX
-
-### Added
-- Professional dashboard with 6 KPI cards and live sparklines
-- Request audit system with operations tracking
-- System information endpoint
-- Enhanced UI with status codes and performance indicators
-
-### Changed
-- Improved dashboard design and performance
-- Enhanced request monitoring capabilities
-
-## [0.7.2] - 2024-XX-XX
-
-### Added
-- Basic ingest pipeline
-- GeoIP and ASN enrichment
-- Threat intelligence matching
-- Risk scoring system
-
-### Changed
-- Initial MVP release with core functionality
-
----
-
-For detailed documentation of each stage, see the `/docs/` directory and PDF files.

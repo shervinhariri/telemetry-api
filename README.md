@@ -1,4 +1,4 @@
-# Telemetry API — v0.8.0
+# Telemetry API — v0.8.1
 
 Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability.
 
@@ -15,7 +15,7 @@ Ingest NetFlow/IPFIX and Zeek JSON → enrich with GeoIP/ASN/threat intel → ap
 docker run -d -p 80:80 \
   -e API_KEY=TEST_KEY \
   -e REDACT_HEADERS=authorization \
-  --name telapi shvin/telemetry-api:0.8.0
+  --name telapi shvin/telemetry-api:0.8.1
 
 # 2) Ingest sample Zeek
 curl -s -X POST http://localhost/v1/ingest/zeek \
@@ -41,7 +41,7 @@ docker run -d -p 80:80 \
   -e GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb \
   -e THREATLIST_CSV=/data/threats.csv \
   -v $PWD/data:/data:ro \
-  --name telemetry-api shvin/telemetry-api:0.8.0
+  --name telemetry-api shvin/telemetry-api:0.8.1
 
 # Open dashboard
 open http://localhost
@@ -262,7 +262,7 @@ curl -s http://localhost/v1/health | jq
 version: '3.8'
 services:
   telemetry-api:
-    image: shvin/telemetry-api:0.8.0
+    image: shvin/telemetry-api:0.8.1
     ports:
       - "80:80"
     environment:
@@ -291,7 +291,7 @@ spec:
     spec:
       containers:
       - name: telemetry-api
-        image: shvin/telemetry-api:0.8.0
+        image: shvin/telemetry-api:0.8.1
         ports:
         - containerPort: 80
         env:
@@ -304,7 +304,7 @@ spec:
 
 ## 📋 Changelog
 
-### v0.8.0 (Current)
+### v0.8.1 (Current)
 - ✅ OpenAPI 3.1 specification with Swagger UI
 - ✅ Scoped API keys with RBAC (ingest, manage_indicators, export, read_requests, read_metrics)
 - ✅ Security headers and configurable field redaction
@@ -314,10 +314,15 @@ spec:
 - ✅ Real-time dashboard with Server-Sent Events for live tailing
 - ✅ Comprehensive request audit logging
 
-### v0.7.8
-- Enhanced UI with real-time metrics
-- Improved error handling and logging
-- Better data transformation and normalization
+### v0.8.0
+- ✅ OpenAPI 3.1 specification with Swagger UI
+- ✅ Scoped API keys with RBAC (ingest, manage_indicators, export, read_requests, read_metrics)
+- ✅ Security headers and configurable field redaction
+- ✅ Dead Letter Queue (DLQ) for export failures with exponential backoff
+- ✅ Idempotency support for ingest operations
+- ✅ Enhanced observability with detailed metrics and system monitoring
+- ✅ Real-time dashboard with Server-Sent Events for live tailing
+- ✅ Comprehensive request audit logging
 
 ## 🤝 Contributing
 

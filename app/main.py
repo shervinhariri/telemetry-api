@@ -31,7 +31,7 @@ from .api.prometheus import router as prometheus_router
 from .pipeline import ingest_queue, record_batch_accepted, enqueue
 from .logging_config import setup_logging
 
-API_VERSION = "0.8.0"
+API_VERSION = "0.8.1"
 
 # Import configuration
 from .config import (

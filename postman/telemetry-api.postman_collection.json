@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Telemetry API v0.8.0",
+    	"name": "Telemetry API v0.8.1",
     "description": "Collection for testing Telemetry API endpoints with sample data",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },

@@ -44,7 +44,7 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
           else
-            echo "VERSION=v0.8.0" >> $GITHUB_OUTPUT
+            echo "VERSION=v0.8.1" >> $GITHUB_OUTPUT
           fi
 
       - name: Build & push to Docker Hub

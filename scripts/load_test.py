@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Load test script for Telemetry API v0.8.0
+Load test script for Telemetry API v0.8.1
 Generates 1,000 requests over 2 minutes with mixed methods and payloads
 """
 
@@ -268,7 +268,7 @@ def worker(stats: LoadTestStats):
 
 def main():
     """Main load test function"""
-    print("🚀 Starting Telemetry API v0.8.0 Load Test")
+    print("🚀 Starting Telemetry API v0.8.1 Load Test")
     print(f"Target: {TOTAL_REQUESTS} requests over {DURATION_SECONDS} seconds")
     print(f"Distribution: 60% Zeek, 30% NetFlow, 5% PUT indicators, 5% DELETE indicators")
     print(f"Base URL: {BASE_URL}")
