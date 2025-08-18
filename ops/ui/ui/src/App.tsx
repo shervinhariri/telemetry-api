@@ -100,6 +100,13 @@ export default function App() {
     return client;
   }, [apiBase, apiKey]);
 
+  // Keep globals in sync so helper clients (apiFetch) and legacy code paths work
+  useEffect(() => {
+    try { (window as any).__API_BASE_URL__ = apiBase || ""; } catch {}
+    try { (window as any).API_KEY = apiKey || ""; } catch {}
+    try { localStorage.setItem("API_KEY", apiKey || ""); } catch {}
+  }, [apiBase, apiKey]);
+
   // Initial ping for version + status
   useEffect(() => {
     try { localStorage.setItem("API_KEY", apiKey || ""); } catch {}

@@ -122,9 +122,13 @@ async def get_requests_api_compat(
     from .api.requests import get_requests_api
     return await get_requests_api(limit, window)
 
-# Mount static files for UI
+# Mount static files for UI (support both container and local dev paths)
 app_dir = os.path.dirname(__file__)
-ui_dir = os.path.abspath(os.path.join(app_dir, "..", "ui"))
+_ui_candidates = [
+    os.path.abspath(os.path.join(app_dir, "..", "ui")),             # container path (/app/ui)
+    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui", "ui")) # local path (repo ops/ui/ui)
+]
+ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0])
 
 # Mount static files under /ui
 app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
@@ -1305,7 +1309,11 @@ async def metrics(response: Response, Authorization: Optional[str] = Header(None
 def write_deadletter(record: Dict[str, Any], reason: str):
     """Write failed record to dead letter queue"""
     try:
-        dlq_file = Path("/data/deadletter.ndjson")
+        base = Path("/data")
+        if not os.access(base.parent, os.W_OK):
+            base = Path("data")
+        base.mkdir(parents=True, exist_ok=True)
+        dlq_file = base / "deadletter.ndjson"
         with open(dlq_file, "a") as f:
             f.write(json.dumps({
                 "record": record,

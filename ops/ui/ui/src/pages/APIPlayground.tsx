@@ -45,7 +45,21 @@ export default function APIPlayground({ api }: { api: any }) {
 
   const doIngest = async () => {
     setError("");
-    try { const j = JSON.parse(ingest); const r = await apiFetch("/v1/ingest", "POST", j); setOut(r); } catch (e: any) { setError(String(e.message || e)); }
+    try {
+      let j: any;
+      try {
+        j = JSON.parse(ingest);
+      } catch (e: any) {
+        setError("Invalid JSON payload");
+        return;
+      }
+      const r = await apiFetch("/v1/ingest", "POST", j);
+      setOut(r);
+      if (r.status >= 400) {
+        // Surface a brief error string while still showing the full response
+        setError(`Request failed: ${r.status}`);
+      }
+    } catch (e: any) { setError(String(e.message || e)); }
   };
 
   return (
@@ -68,6 +82,10 @@ export default function APIPlayground({ api }: { api: any }) {
         <JSONView data={sys} />
         <JSONView data={met} />
       </div>
+
+      <Card title="Ingest response">
+        <JSONView data={out} />
+      </Card>
     </div>
   );
 }

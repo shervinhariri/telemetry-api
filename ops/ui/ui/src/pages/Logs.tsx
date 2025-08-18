@@ -62,6 +62,7 @@ export default function Logs({ api }: { api: any }) {
   const download = async () => {
     try {
       const r = await fetch(`${api.base}/v1/logs/tail?max_bytes=2000000&format=text`, { headers: api.headers });
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
       const blob = await r.blob();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);

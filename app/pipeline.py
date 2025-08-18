@@ -30,10 +30,11 @@ STATS = {
 # Ring buffer for recent events (last 1000)
 RECENT_EVENTS = deque(maxlen=1000)
 
-# Data directory
-DATA_DIR = Path("/data")
-DATA_DIR.mkdir(exist_ok=True)
-(DATA_DIR / "uploads").mkdir(exist_ok=True)
+# Data directory (use local 'data' when /data is not writable)
+_default_data = Path("/data")
+DATA_DIR = _default_data if os.access(_default_data.parent, os.W_OK) else Path("data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+(DATA_DIR / "uploads").mkdir(parents=True, exist_ok=True)
 
 # Ingest queue
 ingest_queue: asyncio.Queue = asyncio.Queue(maxsize=10000)

@@ -1,15 +1,16 @@
 from fastapi import APIRouter, Header, HTTPException
+from typing import Optional
 import os, subprocess
 
 router = APIRouter()
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN")  # set for dev-only
 
-def _require_admin(x_admin_token: str | None):
+def _require_admin(x_admin_token: Optional[str]):
     if not ADMIN_TOKEN or x_admin_token != ADMIN_TOKEN:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 @router.post("/admin/update")
-def admin_update(x_admin_token: str | None = Header(None)):
+def admin_update(x_admin_token: Optional[str] = Header(None)):
     _require_admin(x_admin_token)
     image = os.getenv("IMAGE", "shvin/telemetry-api")
     tag = os.getenv("DOCKERHUB_TAG", "latest")
