@@ -1,9 +1,6 @@
-version: '3.8'
-
 services:
   api:
     build: .
-    env_file: .env
     environment:
       - APP_VERSION=0.8.0
       - DOCKERHUB_TAG=0.8.0
