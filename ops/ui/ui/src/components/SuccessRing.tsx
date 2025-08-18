@@ -10,7 +10,7 @@ type Props = {
 
 export default function SuccessRing({
   value,
-  size = 148,
+  size = 120,
   stroke = 10,
   className = "",
   label = "Success Rate",
@@ -19,6 +19,8 @@ export default function SuccessRing({
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.max(0, Math.min(100, value ?? 0));
   const dash = (clamped / 100) * circumference;
+  // No glow for a cleaner, more professional appearance
+  const glow = '';
 
   return (
     <div className={`flex flex-col items-center ${className}`}>
@@ -47,7 +49,7 @@ export default function SuccessRing({
           fill="none"
           strokeDasharray={`${dash} ${circumference - dash}`}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          className="drop-shadow-[0_0_10px_rgba(46,227,196,0.35)]"
+          className={glow}
         />
         <text
           x="50%"

@@ -48,7 +48,9 @@
                     Online
                 </span>
                 <div class="ml-auto flex items-center gap-2 text-xs text-zinc-400">
-                    <label class="flex items-center gap-2"><input id="auto-refresh" type="checkbox" class="rounded" checked> Auto</label>
+                    <button id="api-key-pill" class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-purple-500/15 text-purple-300 ring-1 ring-purple-500/40">
+                        API KEY: <span id="api-key-value" class="ml-1">TEST_KEY</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -58,30 +60,91 @@
             <button id="tab-dashboard" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#14151B] ring-indigo-500/40 text-zinc-100">Dashboard</button>
             <button id="tab-requests" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Requests</button>
             <button id="tab-logs" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Logs</button>
+            <button id="tab-system" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">System</button>
             <button id="tab-api" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">API</button>
         </div>
 
         <!-- Panel: Dashboard -->
         <div id="panel-dashboard" class="panel mt-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
-            <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-6">
-                <div class="mx-auto flex flex-col items-center">
-                    <div id="success-ring" class="h-40 w-40 rounded-full border border-white/10"></div>
-                    <div class="mt-4 text-4xl font-semibold" id="success-percentage">0%</div>
-                    <div class="mt-1 text-sm text-zinc-400">Success Rate</div>
+        <div id="dashboard-error" class="hidden text-xs text-red-400"></div>
+
+        <!-- Top metric tiles -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col gap-2">
+                <div class="text-xs uppercase tracking-wide text-zinc-400">Queue Lag</div>
+                <div class="text-4xl font-semibold leading-none" id="queue-lag">0</div>
+                <div class="text-xs text-zinc-500">ms (p50)</div>
+            </div>
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col gap-2">
+                <div class="text-xs uppercase tracking-wide text-zinc-400">Average Risk</div>
+                <div class="text-4xl font-semibold leading-none" id="avg-risk">0</div>
+                <div class="text-xs text-zinc-500">0–100 scale</div>
+            </div>
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-amber-500/40 hover:shadow-[0_0_0_2px_rgba(245,158,11,.25)] flex flex-col gap-2">
+                <div class="text-xs uppercase tracking-wide text-zinc-400">Threat Matches</div>
+                <div class="text-4xl font-semibold leading-none" id="threat-matches">0</div>
+                <div class="text-xs text-zinc-500">last 15m</div>
+            </div>
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-rose-500/40 hover:shadow-[0_0_0_2px_rgba(244,63,94,.25)] flex flex-col gap-2">
+                <div class="text-xs uppercase tracking-wide text-zinc-400">Error Rate</div>
+                <div class="text-4xl font-semibold leading-none" id="error-rate">0%</div>
+                <div class="text-xs text-zinc-500">overall</div>
+            </div>
+        </div>
+
+        <!-- System Information card -->
+        <div class="mt-6 rounded-2xl bg-white/[0.03] border border-white/5 p-6">
+            <div class="mb-4 flex items-center justify-between">
+                <div class="text-sm text-zinc-300">System Information</div>
+                <div class="flex items-center gap-3 text-xs text-zinc-400">
+                    <button onclick="window.location.reload()" class="rounded-lg px-2 py-1 ring-1 ring-white/10 hover:ring-indigo-400/40">Hard refresh</button>
                 </div>
             </div>
-            <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-6 flex items-center justify-center">
-                <div class="text-center">
-                    <div class="text-sm text-zinc-400 tracking-wide">Avg Latency</div>
-                    <div class="mt-2 text-5xl font-semibold tracking-tight text-white" id="avg-latency">0ms</div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col gap-2">
+                    <div class="text-xs uppercase tracking-wide text-zinc-400">Uptime</div>
+                    <div class="text-2xl font-semibold leading-none" id="uptime">—</div>
                 </div>
             </div>
         </div>
         </div>
 
+        <!-- Panel: System (separate tab) -->
+        <div id="panel-system" class="panel hidden mt-6">
+            <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <div class="text-sm text-zinc-300">System</div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <button onclick="window.open('/docs','_blank')" class="w-full text-left rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] focus:outline-none">
+                        <div class="text-xs uppercase tracking-wide text-zinc-400">Version</div>
+                        <div class="text-2xl font-semibold leading-none mt-1" id="version-system">0.8.1</div>
+                    </button>
+                    <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col gap-2">
+                        <div class="text-xs uppercase tracking-wide text-zinc-400">Uptime</div>
+                        <div class="text-2xl font-semibold leading-none" id="uptime-system">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Panel: Requests -->
         <div id="panel-requests" class="panel hidden mt-6">
+        <!-- Top stats for requests -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+            <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-6">
+                <div class="mx-auto flex flex-col items-center">
+                    <div id="success-ring" class="h-40 w-40 grid place-items-center"></div>
+                    <div class="mt-3 text-sm text-zinc-400">Success Rate</div>
+                </div>
+            </div>
+            <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-6 flex items-center justify-center">
+                <div class="text-center">
+                    <div class="mt-2 text-2xl md:text-3xl font-semibold tracking-tight text-white" id="avg-latency">0ms</div>
+                    <div class="mt-2 text-sm text-zinc-400 tracking-wide">Avg Latency</div>
+                </div>
+            </div>
+        </div>
         <div class="mt-2 mb-3 flex items-center justify-between">
             <h2 class="text-xl font-semibold text-white">Recent Requests</h2>
             <div class="flex items-center gap-3">

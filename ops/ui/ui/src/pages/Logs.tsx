@@ -17,23 +17,37 @@ export default function Logs({ api }: { api: any }) {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const ctrlRef = useRef<EventSource | null>(null);
+  const pollRef = useRef<any>(null);
+
+  const startPolling = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const r = await fetch(`${api.base}/v1/logs/tail?max_bytes=50000&format=text`, { headers: api.headers });
+        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+        const text = await r.text();
+        const next = text.split('\n').filter(Boolean);
+        setLines((prev) => [...next.slice(-100), ...prev].slice(0, 500));
+      } catch (e: any) {
+        setError(String(e.message || e));
+      }
+    }, 2000);
+  };
+
+  const stopPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
 
   const start = async () => {
     setError("");
     setRunning(true);
     try {
-      // Prefer SSE at /v1/logs/stream; fallback to polling /v1/logs?tail=200
-      const url = new URL("/v1/logs/stream", window.location.origin);
-      url.pathname = url.pathname; // noop for clarity
-      const sse = new EventSource((api.base || "") + "/v1/logs/stream", { withCredentials: false });
+      // Prefer SSE at /v1/admin/requests/stream; fallback to polling
+      const sse = new EventSource((api.base || "") + "/v1/admin/requests/stream");
       ctrlRef.current = sse;
-      sse.onmessage = (e) => {
-        setLines((prev) => [e.data, ...prev].slice(0, 500));
-      };
-      sse.onerror = () => { sse.close(); setRunning(false); setError("SSE closed or not available."); };
+      sse.onmessage = (e) => { setLines((prev) => [e.data, ...prev].slice(0, 500)); };
+      sse.onerror = () => { sse.close(); ctrlRef.current = null; startPolling(); };
     } catch (e: any) {
       setError(String(e.message || e));
-      setRunning(false);
+      startPolling();
     }
   };
 
@@ -41,12 +55,13 @@ export default function Logs({ api }: { api: any }) {
     const sse = ctrlRef.current;
     if (sse && sse.close) sse.close();
     ctrlRef.current = null;
+    stopPolling();
     setRunning(false);
   };
 
   const download = async () => {
     try {
-      const r = await fetch(`${api.base}/v1/logs?limit_bytes=2000000`, { headers: api.headers });
+      const r = await fetch(`${api.base}/v1/logs/tail?max_bytes=2000000&format=text`, { headers: api.headers });
       const blob = await r.blob();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);

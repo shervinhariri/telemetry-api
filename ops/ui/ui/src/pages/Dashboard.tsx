@@ -21,7 +21,7 @@ function useAutoRefresh(cb: () => void, enabled: boolean, intervalMs: number) {
 
 // ---------- UI atoms ----------
 const MetricTile = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
-  <div className="rounded-2xl bg-[#111218] ring-1 ring-white/5 p-4 flex flex-col gap-2">
+  <div className="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col gap-2">
     <div className="text-xs uppercase tracking-wide text-zinc-400">{label}</div>
     <div className="text-4xl font-semibold leading-none">{value}</div>
     {sub && <div className="text-xs text-zinc-500">{sub}</div>}
@@ -85,10 +85,17 @@ export default function Dashboard({ api, auto, setAuto }: { api: any; auto: bool
         </div>
       }>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MetricTile label="Version" value={String(system?.version || system?.service || '—')} />
-          <MetricTile label="Uptime" value={system?.uptime_s ? `${Math.floor(system.uptime_s/3600)}h ${Math.floor((system.uptime_s%3600)/60)}m` : '—'} />
-          <MetricTile label="CPU" value={`${numberFmt(system?.cpu_pct ?? 0, 0)}%`} />
-          <MetricTile label="Memory" value={`${numberFmt(system?.mem_pct ?? 0, 0)}%`} />
+          <button
+            onClick={()=>window.open('/docs','_blank')}
+            className="w-full text-left rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] focus:outline-none focus:ring-emerald-500/60">
+            <div className="text-xs uppercase tracking-wide text-zinc-400">Version</div>
+            <div className="text-2xl mt-1 font-semibold">{String(system?.version || system?.service || '—')}</div>
+            <div className="text-xs mt-2 text-zinc-500">Click to open Swagger</div>
+          </button>
+          <div className="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col gap-2">
+            <div className="text-xs uppercase tracking-wide text-zinc-400">Uptime</div>
+            <div className="text-2xl font-semibold leading-none">{system?.uptime_s ? `${Math.floor(system.uptime_s/3600)}h ${Math.floor((system.uptime_s%3600)/60)}m` : '—'}</div>
+          </div>
         </div>
       </Card>
     </div>

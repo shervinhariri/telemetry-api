@@ -20,8 +20,7 @@ const JSONView = ({ data }: { data: any }) => (
 export default function APIPlayground({ api }: { api: any }) {
   const [sys, setSys] = useState<any>(null);
   const [met, setMet] = useState<any>(null);
-  const [ingest, setIngest] = useState("{\n  \"records\": []\n}");
-  const [lookup, setLookup] = useState("");
+  const [ingest, setIngest] = useState('{"collector_id":"tester","format":"flows.v1","records":[{"ts":1723351200.456,"src_ip":"10.0.0.10","dst_ip":"8.8.8.8","src_port":54000,"dst_port":53,"protocol":"udp","bytes":120,"packets":1}] }');
   const [out, setOut] = useState<any>(null);
   const [error, setError] = useState("");
 
@@ -45,40 +44,26 @@ export default function APIPlayground({ api }: { api: any }) {
     try { const j = JSON.parse(ingest); const r = await api.post("/v1/ingest", j); setOut(r); } catch (e: any) { setError(String(e.message || e)); }
   };
 
-  const doLookup = async () => {
-    setError("");
-    try { const r = await api.post("/v1/lookup", { value: lookup }); setOut(r); } catch (e: any) { setError(String(e.message || e)); }
-  };
-
   return (
     <div className="mt-6 space-y-4">
       {error && <div className="text-xs text-red-400">{error}</div>}
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card title="System Info" right={<button onClick={fetchSystem} className="text-xs rounded-lg ring-1 ring-white/10 px-2 py-1 hover:ring-indigo-400/40">Fetch</button>}>
-          <JSONView data={sys} />
-        </Card>
-        <Card title="Metrics" right={<button onClick={fetchMetrics} className="text-xs rounded-lg ring-1 ring-white/10 px-2 py-1 hover:ring-indigo-400/40">Fetch</button>}>
-          <JSONView data={met} />
-        </Card>
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={fetchSystem} className="rounded-xl bg-neutral-700 hover:bg-neutral-600 px-3 py-2 text-sm">/v1/system</button>
+        <button onClick={fetchMetrics} className="rounded-xl bg-neutral-700 hover:bg-neutral-600 px-3 py-2 text-sm">/v1/metrics</button>
+      </div>
+
+      <div>
+        <div className="text-sm mb-2">Send ingest</div>
+        <textarea value={ingest} onChange={(e)=>setIngest(e.target.value)} rows={10}
+          className="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs font-mono" />
+        <div className="mt-2"><button onClick={doIngest} className="rounded-xl bg-emerald-700/50 hover:bg-emerald-700/70 px-3 py-2 text-sm">Send ingest</button></div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <Card title="Ingest (JSON)">
-          <textarea value={ingest} onChange={(e)=>setIngest(e.target.value)} rows={10}
-            className="w-full rounded-xl bg-black/40 p-3 text-xs ring-1 ring-white/5 outline-none" />
-          <div className="mt-2 flex justify-end"><button onClick={doIngest} className="text-xs rounded-lg ring-1 ring-white/10 px-2 py-1 hover:ring-indigo-400/40">Send</button></div>
-        </Card>
-        <Card title="Lookup">
-          <input value={lookup} onChange={(e)=>setLookup(e.target.value)} placeholder="ip, domain, hash…"
-            className="w-full rounded-xl bg-black/40 p-3 text-sm ring-1 ring-white/5 outline-none" />
-          <div className="mt-2 flex justify-end"><button onClick={doLookup} className="text-xs rounded-lg ring-1 ring-white/10 px-2 py-1 hover:ring-indigo-400/40">Run</button></div>
-        </Card>
+        <JSONView data={sys} />
+        <JSONView data={met} />
       </div>
-
-      <Card title="Output">
-        <JSONView data={out} />
-      </Card>
     </div>
   );
 }

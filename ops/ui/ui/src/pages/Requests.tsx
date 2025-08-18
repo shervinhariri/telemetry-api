@@ -173,7 +173,7 @@ export default function Requests({ api }: { api: any }) {
         <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-6 flex items-center justify-center">
           <div className="text-center">
             <div className="text-sm text-zinc-400 tracking-wide">Avg Latency</div>
-            <div className="mt-2 text-5xl font-semibold tracking-tight text-white">
+            <div className="mt-2 text-3xl md:text-4xl font-semibold tracking-tight text-white">
               {fmtLatency(avgLatencyMs)}
             </div>
           </div>
@@ -260,7 +260,7 @@ export default function Requests({ api }: { api: any }) {
                 onClick={() => setSelected(it)}
               >
                 <td className="px-5 py-3">
-                  <DonutGauge value={it.fitness ?? 0} title={fitnessReason(it)} />
+                  {Number.isFinite(it.fitness as number) ? <DonutGauge value={it.fitness ?? 0} title={fitnessReason(it)} /> : <span>—</span>}
                 </td>
                 <td className="px-5 py-3 text-sm text-zinc-300">
                   {new Date(it.ts).toLocaleTimeString()}
@@ -277,7 +277,7 @@ export default function Requests({ api }: { api: any }) {
                   }`}>{it.status}</span>
                 </td>
                 <td className="px-5 py-3 text-sm text-zinc-300">
-                  {typeof it.latency_ms === "number" ? `${it.latency_ms.toFixed(1)} ms` : "—"}
+                  {Number.isFinite(it.latency_ms as number) ? `${Math.round(it.latency_ms as number)} ms` : "—"}
                 </td>
                 <td className="px-5 py-3 text-sm text-zinc-300">{it.summary?.records ?? 0}</td>
                 <td className="px-5 py-3 text-sm text-zinc-300">{it.client_ip ?? "—"}</td>

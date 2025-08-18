@@ -30,15 +30,19 @@ class TelemetryDashboard {
             });
         });
 
-        // Auto-refresh toggle
-        document.getElementById('auto-refresh').addEventListener('change', (e) => {
-            this.autoRefresh = e.target.checked;
-            if (this.autoRefresh) {
-                this.startAutoRefresh();
-            } else {
-                this.stopAutoRefresh();
-            }
-        });
+        // API KEY input
+        const apiKeyPill = document.getElementById('api-key-pill');
+        const apiKeyValue = document.getElementById('api-key-value');
+        if (apiKeyPill && apiKeyValue) {
+            apiKeyValue.textContent = this.apiKey;
+            apiKeyPill.addEventListener('click', async () => {
+                const val = prompt('Enter API KEY', this.apiKey || '');
+                if (val != null) {
+                    this.apiKey = val.trim() || 'TEST_KEY';
+                    apiKeyValue.textContent = this.apiKey;
+                }
+            });
+        }
 
         // Dashboard actions
         const refreshBtn = document.getElementById('refresh-requests');
@@ -116,6 +120,8 @@ class TelemetryDashboard {
             this.loadRequestsData();
         } else if (tabName.toLowerCase() === 'logs') {
             this.loadInitialLogs();
+        } else if (tabName.toLowerCase() === 'system') {
+            this.loadInitialData();
         }
     }
 
@@ -151,7 +157,7 @@ class TelemetryDashboard {
                 console.log('System info loaded:', system);
             } catch (error) {
                 console.error('Failed to load system info:', error);
-                system = { version: '0.8.0' }; // Set default version
+                system = { version: '0.8.1' }; // Set default version
             }
             
             this.updateSystemInfo(system);
@@ -170,15 +176,17 @@ class TelemetryDashboard {
     updateSystemInfo(system) {
         console.log('Updating system info:', system);
         
-        const version = system?.version || system?.service || '0.8.0';
+        const version = '0.8.1';
         console.log('Version to display:', version);
         
-        // Update version in dashboard only
+        // Update version in dashboard and system panels
         const versionElement = document.getElementById('version');
         if (versionElement) {
             versionElement.textContent = version;
             versionElement.title = 'Click to open Swagger UI documentation';
         }
+        const versionElement2 = document.getElementById('version-system');
+        if (versionElement2) versionElement2.textContent = version;
 
         // Update uptime
         let uptime = '—';
@@ -192,6 +200,10 @@ class TelemetryDashboard {
         if (uptimeElement) {
             uptimeElement.textContent = uptime;
         }
+        const uptime2 = document.getElementById('uptime-system');
+        if (uptime2) uptime2.textContent = uptime;
+
+        // CPU/Memory tiles removed from UI
     }
 
     updateDashboardMetrics(metrics) {
@@ -292,9 +304,7 @@ class TelemetryDashboard {
             
             if (successPercentageElement) successPercentageElement.textContent = '0%';
             if (avgLatencyElement) avgLatencyElement.textContent = '0ms';
-            if (successRing) {
-                successRing.style.strokeDasharray = '0 440';
-            }
+            if (successRing) successRing.innerHTML = this.createSuccessRing(0);
             return;
         }
         
@@ -308,18 +318,11 @@ class TelemetryDashboard {
         const avgLatency = latencies.length > 0 ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0;
         
         // Update success rate percentage
-        const successPercentageElement = document.getElementById('success-percentage');
-        if (successPercentageElement) {
-            successPercentageElement.textContent = `${successRate}%`;
-        }
+        // remove standalone percentage label; ring shows number
         
-        // Update circular progress ring
+        // Update circular progress ring (SVG)
         const successRing = document.getElementById('success-ring');
-        if (successRing) {
-            const circumference = 2 * Math.PI * 70; // 2πr where r=70
-            const progress = (successRate / 100) * circumference;
-            successRing.style.strokeDasharray = `${progress} ${circumference}`;
-        }
+        if (successRing) successRing.innerHTML = this.createSuccessRing(successRate);
         
         // Update average latency
         const avgLatencyElement = document.getElementById('avg-latency');
@@ -328,6 +331,26 @@ class TelemetryDashboard {
         }
         
         console.log('Requests summary updated:', { successRate, avgLatency, totalRequests, successfulRequests });
+    }
+
+    createSuccessRing(percentage) {
+        const size = 112; // slightly smaller for better balance
+        const stroke = 10;
+        const radius = (size - stroke) / 2;
+        const circumference = 2 * Math.PI * radius;
+        const dash = Math.max(0, Math.min(100, percentage)) / 100 * circumference;
+        let color = '#ef4444'; // red
+        if (percentage >= 90) color = '#22c55e';
+        else if (percentage >= 60) color = '#f59e0b';
+        // No glow for professional look
+        return `
+          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">
+            <circle cx="${size/2}" cy="${size/2}" r="${radius}" stroke="rgba(255,255,255,0.08)" stroke-width="${stroke}" fill="none"/>
+            <circle cx="${size/2}" cy="${size/2}" r="${radius}" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
+                    stroke-dasharray="${dash} ${circumference - dash}" transform="rotate(-90 ${size/2} ${size/2})"/>
+            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff"
+                  style="font-size:${size*0.22}px;font-weight:700;letter-spacing:-0.02em">${Math.round(percentage)}%</text>
+          </svg>`;
     }
 
     updateRequestsTable(requests = []) {
@@ -366,7 +389,7 @@ class TelemetryDashboard {
             const healthGauge = this.createHealthGauge(fitness, request);
             
             return `
-                <tr class="hover:bg-white/[0.04] cursor-pointer" onclick="dashboard.showRequestDetails(${index})">
+                <tr class="hover:bg-white/[0.04] cursor-pointer" data-index="${index}">
                     <td class="px-5 py-3">${healthGauge}</td>
                     <td class="px-5 py-3 text-sm text-zinc-300">${time}</td>
                     <td class="px-5 py-3 text-sm text-white">
@@ -383,7 +406,13 @@ class TelemetryDashboard {
                 </tr>
             `;
         }).join('');
-        
+        // Attach click handlers after render to be safe across browsers
+        tbody.querySelectorAll('tr').forEach(tr => {
+            tr.addEventListener('click', () => {
+                const idx = Number(tr.getAttribute('data-index'));
+                if (!Number.isNaN(idx)) this.showRequestDetails(idx);
+            });
+        });
         console.log('Requests table updated successfully');
     }
 
@@ -469,15 +498,17 @@ ${JSON.stringify(request, null, 2)}
     }
 
     openSlideOver() {
-        document.getElementById('slide-over-backdrop').classList.add('open');
-        document.getElementById('slide-over').classList.add('open');
-        document.getElementById('slide-over-backdrop').classList.remove('pointer-events-none');
+        const b = document.getElementById('slide-over-backdrop');
+        const p = document.getElementById('slide-over');
+        if (b) { b.style.opacity = '1'; b.classList.remove('pointer-events-none'); }
+        if (p) { p.style.transform = 'translateX(0)'; }
     }
 
     closeSlideOver() {
-        document.getElementById('slide-over-backdrop').classList.remove('open');
-        document.getElementById('slide-over').classList.remove('open');
-        document.getElementById('slide-over-backdrop').classList.add('pointer-events-none');
+        const b = document.getElementById('slide-over-backdrop');
+        const p = document.getElementById('slide-over');
+        if (b) { b.style.opacity = '0'; b.classList.add('pointer-events-none'); }
+        if (p) { p.style.transform = 'translateX(100%)'; }
     }
 
     getCountryFlag(cc) {
