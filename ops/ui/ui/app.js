@@ -545,8 +545,6 @@ class TelemetryDashboard {
             this.loadRequestsData();
         } else if (tabName.toLowerCase() === 'logs') {
             this.loadInitialLogs();
-        } else if (tabName.toLowerCase() === 'system') {
-            this.loadInitialData();
         }
     }
 
