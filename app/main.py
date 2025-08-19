@@ -291,6 +291,35 @@ async def track_requests(request: Request, call_next):
         
         return response
         
+    except HTTPException as e:
+        # Calculate duration
+        latency_ms = (time.perf_counter() - start_time) * 1000.0
+        
+        # Finalize audit with correct client error status
+        finalize_audit(audit, status=e.status_code, latency_ms=latency_ms, summary={"error": str(e.detail)})
+        
+        # Log error with structured logging
+        from .logging_config import log_http_request
+        log_http_request(
+            method=request.method,
+            path=path,
+            status=e.status_code,
+            duration_ms=int(latency_ms),
+            client_ip=client_ip or "unknown",
+            trace_id=trace_id,
+            tenant_id=tenant_id
+        )
+        
+        increment_requests(True)
+        
+        # Update Prometheus metrics
+        from .services.prometheus_metrics import prometheus_metrics
+        prometheus_metrics.increment_requests(e.status_code, path)
+        
+        # Return the original HTTPException as a response (avoid converting to 500)
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"detail": e.detail}, status_code=e.status_code)
+        
     except Exception as e:
         # Calculate duration
         latency_ms = (time.perf_counter() - start_time) * 1000.0
