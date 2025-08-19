@@ -227,7 +227,7 @@ async function doLookup() {
 }
 
 // ===== API KEY STATE (single source of truth) =====
-const API_KEY_STORAGE = 'API_KEY';
+const KEY_STORAGE = 'telemetry_api_key';
 
 function maskKey(k) {
   if (!k) return '—';
@@ -236,13 +236,20 @@ function maskKey(k) {
 }
 
 function   getApiKey() {
-    return localStorage.getItem(API_KEY_STORAGE) || 'DEV_ADMIN_KEY_c84a4e33bd';
+    const urlKey = new URLSearchParams(window.location.search).get('key');
+    if (urlKey && urlKey.trim()) {
+      localStorage.setItem(KEY_STORAGE, urlKey.trim());
+      return urlKey.trim();
+    }
+    const stored = localStorage.getItem(KEY_STORAGE);
+    return (stored && stored.trim()) || '';
   }
 
 function setApiKey(k) {
-  localStorage.setItem(API_KEY_STORAGE, k);
+  if (!k || !k.trim()) return;
+  localStorage.setItem(KEY_STORAGE, k.trim());
   // notify all listeners (other tabs/pages) to refresh UI/client
-  window.dispatchEvent(new CustomEvent('api-key-changed', { detail: { key: k }}));
+  window.dispatchEvent(new CustomEvent('api-key-changed', { detail: { key: k.trim() }}));
 }
 
 // Update all visible key chips/badges
@@ -331,7 +338,7 @@ class TelemetryDashboard {
     constructor() {
         console.log('TelemetryDashboard constructor called');
         this.apiBase = window.location.origin; // Use the current domain
-        this.apiKey = 'DEV_ADMIN_KEY_c84a4e33bd'; // Admin API key for multi-tenancy
+        this.apiKey = getApiKey();
         this.currentRequestsData = [];
         this.logsEventSource = null;
         this.logsInterval = null;
@@ -534,6 +541,17 @@ class TelemetryDashboard {
             console.log('Response headers:', response.headers);
             
             if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    try {
+                        const proposed = getApiKey();
+                        const newKey = window.prompt('Unauthorized. Enter API key:', proposed);
+                        if (newKey && newKey.trim()) {
+                            setApiKey(newKey.trim());
+                            window.API_KEY = newKey.trim();
+                            refreshKeyChips();
+                        }
+                    } catch (_) {}
+                }
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             
