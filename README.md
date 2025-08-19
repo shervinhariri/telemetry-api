@@ -71,6 +71,27 @@ export LOG_FORMAT=text
 export HTTP_LOG_SAMPLE_RATE=1.0  # Log all requests
 ```
 
+## Golden Release and Rollback
+
+This repository maintains a golden tag for the stable build of 0.8.2:
+
+- Git tag: `v0.8.2-golden`
+- Docker image: `shvin/telemetry-api:0.8.2-golden`
+
+Rollback instructions:
+
+```bash
+git fetch --tags
+git checkout v0.8.2-golden
+
+docker pull shvin/telemetry-api:0.8.2-golden
+docker rm -f telemetry-api || true
+docker run -d -p 80:80 \
+  -v $PWD/telemetry.db:/app/telemetry.db \
+  --name telemetry-api \
+  shvin/telemetry-api:0.8.2-golden
+```
+
 ### Production Mode
 ```bash
 # JSON logs with sampling
