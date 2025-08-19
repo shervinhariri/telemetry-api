@@ -1,6 +1,24 @@
 // Modern Telemetry Dashboard - Vanilla JavaScript with Tailwind CSS
 console.log('app.js loaded');
 
+// --- Early key bootstrap from URL fragment or query, then scrub URL ---
+(function bootstrapKeyOnce() {
+  try {
+    const url = new URL(window.location.href);
+    const hashParams = new URLSearchParams(url.hash.startsWith('#') ? url.hash.slice(1) : url.hash);
+    const fromHash = hashParams.get('key');
+    const fromQuery = url.searchParams.get('key');
+    const k = (fromHash || fromQuery || '').trim();
+    if (k) {
+      localStorage.setItem('telemetry_api_key', k);
+      url.searchParams.delete('key');
+      hashParams.delete('key');
+      const clean = url.pathname + (url.searchParams.toString() ? ('?' + url.searchParams.toString()) : '') + (hashParams.toString() ? ('#' + hashParams.toString()) : '');
+      history.replaceState({}, document.title, clean);
+    }
+  } catch (_) {}
+})();
+
 // ---------- VALIDATION HELPERS ----------
 function requireKeys(obj, keys, path = '') {
   const missing = [];
