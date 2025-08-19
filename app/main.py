@@ -28,6 +28,7 @@ from .api.system import router as system_router
 from .api.keys import router as keys_router
 from .api.demo import router as demo_router
 from .api.prometheus import router as prometheus_router
+from .api.sources import router as sources_router
 from .pipeline import ingest_queue, record_batch_accepted, enqueue
 from .logging_config import setup_logging
 from .config import API_VERSION
@@ -200,6 +201,7 @@ app.include_router(system_router, prefix=API_PREFIX)
 app.include_router(keys_router, prefix=API_PREFIX)
 app.include_router(demo_router, prefix=API_PREFIX)
 app.include_router(prometheus_router, prefix=API_PREFIX)
+app.include_router(sources_router, prefix=API_PREFIX)
 
 # Compatibility route for old UI paths
 @app.get("/api/requests")
@@ -586,6 +588,37 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
                 }
             }
             set_request_ops(trace_id, ops)
+
+        # Update source metrics for successful ingest
+        try:
+            from .services.sources import SourceService
+            from .db import SessionLocal
+            
+            # Get collector_id from payload or headers
+            collector_id = payload.get("collector_id") or request.headers.get("X-Collector-ID") or "unknown"
+            
+            # Calculate average risk score from records
+            risk_scores = [rec.get("risk_score", 0) for rec in records if isinstance(rec, dict)]
+            avg_risk = sum(risk_scores) / len(risk_scores) if risk_scores else 0.0
+            
+            # Record metrics
+            SourceService.record_ingest_metrics(
+                collector_id=collector_id,
+                record_count=accepted,
+                success=True,
+                risk_score=avg_risk
+            )
+            
+            # Update last_seen for sources using this collector
+            db = SessionLocal()
+            try:
+                SourceService.update_source_last_seen(db, collector_id, tenant_id)
+            finally:
+                db.close()
+                
+        except Exception as e:
+            # Log but don't fail the ingest
+            logging.getLogger("telemetry").warning(f"Failed to update source metrics: {e}")
 
         return {"accepted": accepted, "rejected": len(records) - accepted, "total": len(records)}
 

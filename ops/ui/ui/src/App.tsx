@@ -3,6 +3,7 @@ import Dashboard from "./pages/Dashboard";
 import Requests from "./pages/Requests";
 import Logs from "./pages/Logs";
 import APIPlayground from "./pages/APIPlayground";
+import Sources from "./pages/Sources";
 
 // ---------- Small helpers ----------
 const cx = (...list: (string | boolean | undefined)[]) => list.filter(Boolean).join(" ");
@@ -132,11 +133,12 @@ export default function App() {
         </label>
       </div>
 
-      <Tabs tab={tab} setTab={setTab} items={["Dashboard", "Requests", "Logs", "API"]} />
+      <Tabs tab={tab} setTab={setTab} items={["Dashboard", "Requests", "Logs", "Sources", "API"]} />
 
       {tab === "Dashboard" && <Dashboard api={api} auto={auto} setAuto={setAuto} />}
       {tab === "Requests" && <Requests api={api} />}
       {tab === "Logs" && <Logs api={api} />}
+      {tab === "Sources" && <Sources api={api} />}
       {tab === "API" && <APIPlayground api={api} />}
     </Page>
   );

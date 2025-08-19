@@ -1,4 +1,4 @@
-# Telemetry API — v0.8.3
+# Telemetry API — v0.8.4
 
 Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability and multi-tenant authentication.
 
@@ -32,6 +32,33 @@ curl -s "http://localhost/v1/download/json?limit=50" \
 ```
 
 ## Quick Start
+
+### Option 1: All-in-One Container (Recommended)
+
+A single container that includes the API, NetFlow collector, and mapper:
+
+```bash
+# Build and start the all-in-one container
+docker compose up -d telemetry-allinone
+
+# Verify everything is working
+./scripts/verify_allinone_final.sh
+
+# Generate test NetFlow data
+python3 scripts/generate_test_netflow.py --count 10 --flows 5
+
+# Check metrics
+curl -s -H "Authorization: Bearer TEST_KEY" "http://localhost/v1/metrics?window=300" | jq
+```
+
+**Features:**
+- ✅ API/GUI on port 80
+- ✅ NetFlow/IPFIX collector on port 2055/udp
+- ✅ Automatic goflow2 → mapper → API pipeline
+- ✅ Multi-architecture support (AMD64/ARM64)
+- ✅ Single container deployment
+
+### Option 2: Standard API Container
 
 ```bash
 # Single container with MaxMind/TI data
@@ -335,12 +362,27 @@ curl -X POST http://localhost/v1/admin/keys \
 git clone https://github.com/shervinhariri/telemetry-api.git
 cd telemetry-api
 
-# Build and run
+# Build and run with Docker Compose (includes NetFlow collector)
+docker compose up -d
+
+# Or build and run standalone
 docker build -t telemetry-api:local .
 docker run -d -p 80:80 -e API_KEY=TEST_KEY --name telemetry-api telemetry-api:local
 
 # Test
 curl -s http://localhost/v1/health | jq
+```
+
+### NetFlow Collection
+```bash
+# Start NetFlow collector
+docker compose up -d collector
+
+# Test with sample data
+python3 scripts/generate_test_netflow.py --count 5 --flows 3
+
+# Monitor flow data
+docker compose logs -f collector
 ```
 
 ### Testing

@@ -2,6 +2,28 @@
 
 All notable changes to the Telemetry API project will be documented in this file.
 
+## [0.8.4] - 2025-08-19
+
+### Added
+- **All-in-One Container**: Single container with goflow2→FIFO→mapper→API pipeline
+- **Sources Backend**: Complete sources management with database, API endpoints, and metrics tracking
+- **Sources UI Tab**: New Sources page with table, filters, pagination, and real-time updates
+- **Real-time Metrics**: In-memory EPS, error rate, and risk scoring for sources
+- **Status Management**: Automatic healthy/degraded/stale status based on activity and errors
+- **10-second Polling**: Lightweight updates for Status, EPS(1m), Last Seen without full table reload
+
+### Changed
+- **Port Configuration**: API/GUI now serves on port 80 (was 8080)
+- **NetFlow Collection**: UDP port 2055 exposed for NetFlow/IPFIX ingestion
+- **Multi-architecture Support**: goflow2 compiled from source for AMD64/ARM64 compatibility
+
+### Technical
+- **Database**: Added sources table with proper indexes and migration
+- **API Endpoints**: POST/GET /v1/sources, GET /v1/sources/{id}/metrics
+- **Ingest Hook**: Automatic source last_seen updates and metrics recording
+- **Authentication**: Proper scope-based access (admin for create, read_metrics for view)
+- **UI Components**: Sources table, filters, pagination, and right-drawer details
+
 ## [0.8.3] - 2025-08-19
 
 ### Added

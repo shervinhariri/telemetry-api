@@ -631,6 +631,8 @@ class TelemetryDashboard {
             this.loadRequestsData();
         } else if (tabName.toLowerCase() === 'logs') {
             this.loadInitialLogs();
+        } else if (tabName.toLowerCase() === 'sources') {
+            this.loadSourcesData();
         }
     }
 
@@ -695,7 +697,7 @@ class TelemetryDashboard {
                 console.log('System info loaded:', system);
             } catch (error) {
                 console.error('Failed to load system info:', error);
-                system = { version: '0.8.3' }; // Set default version
+                system = { version: '0.8.4' }; // Set default version
             }
             
             this.updateSystemInfo(system);
@@ -714,7 +716,7 @@ class TelemetryDashboard {
     updateSystemInfo(system) {
         console.log('Updating system info:', system);
         
-        const version = '0.8.3';
+        const version = '0.8.4';
         console.log('Version to display:', version);
         
         // Update version in dashboard and system panels
@@ -1416,3 +1418,214 @@ function addHealthLegend() {
     
     table.parentNode.insertBefore(legend, table.nextSibling);
 }
+
+// ====== SOURCES FUNCTIONALITY ======
+function addSourcesFunctionality() {
+    const dashboard = window.telemetryDashboard;
+    if (!dashboard) return;
+
+    // Add Sources methods to dashboard
+    dashboard.sourcesData = [];
+    dashboard.sourcesFilters = {
+        tenant: '',
+        type: '',
+        status: '',
+        page: 1,
+        size: 50
+    };
+    dashboard.sourcesPollingInterval = null;
+
+    dashboard.loadSourcesData = async function() {
+        try {
+            console.log('Loading sources data...');
+            this.hideError('sources');
+            
+            const params = new URLSearchParams();
+            if (this.sourcesFilters.tenant) params.append('tenant', this.sourcesFilters.tenant);
+            if (this.sourcesFilters.type) params.append('type', this.sourcesFilters.type);
+            if (this.sourcesFilters.status) params.append('status', this.sourcesFilters.status);
+            params.append('page', this.sourcesFilters.page.toString());
+            params.append('size', this.sourcesFilters.size.toString());
+            
+            const response = await this.apiCall(`/sources?${params}`);
+            console.log('Sources response:', response);
+            
+            if (response.sources) {
+                this.sourcesData = response.sources;
+                this.renderSourcesTable();
+                this.updateSourcesPagination(response);
+                this.startSourcesPolling();
+            } else {
+                throw new Error('Invalid response format');
+            }
+        } catch (error) {
+            console.error('Failed to load sources:', error);
+            this.showError('sources', error.message);
+        }
+    };
+
+    dashboard.renderSourcesTable = function() {
+        const tbody = document.getElementById('sources-table');
+        if (!tbody) return;
+
+        if (this.sourcesData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="px-6 py-8 text-center text-zinc-400">No sources found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = this.sourcesData.map(source => `
+            <tr class="hover:bg-white/5 cursor-pointer transition-colors" onclick="window.telemetryDashboard.openSourceDetails('${source.id}')">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ${getStatusBadgeClass(source.status)}">
+                        ${source.status.charAt(0).toUpperCase() + source.status.slice(1)}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-white font-medium">${source.display_name}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.type}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.tenant_id}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.collector}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">—</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">—</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.last_seen ? new Date(source.last_seen).toLocaleString() : '—'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">—</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">—</td>
+            </tr>
+        `).join('');
+    };
+
+    dashboard.updateSourcesPagination = function(response) {
+        const pagination = document.getElementById('sources-pagination');
+        const count = document.getElementById('sources-count');
+        const page = document.getElementById('sources-page');
+        const prevBtn = document.getElementById('sources-prev');
+        const nextBtn = document.getElementById('sources-next');
+
+        if (pagination && response.total > 0) {
+            pagination.classList.remove('hidden');
+            if (count) count.textContent = response.sources.length;
+            if (page) page.textContent = response.page;
+            if (prevBtn) prevBtn.disabled = response.page <= 1;
+            if (nextBtn) nextBtn.disabled = response.sources.length < response.size;
+        } else if (pagination) {
+            pagination.classList.add('hidden');
+        }
+    };
+
+    dashboard.startSourcesPolling = function() {
+        if (this.sourcesPollingInterval) {
+            clearInterval(this.sourcesPollingInterval);
+        }
+        
+        this.sourcesPollingInterval = setInterval(async () => {
+            // Update metrics for visible sources without full reload
+            for (const source of this.sourcesData) {
+                try {
+                    const metrics = await this.apiCall(`/sources/${source.id}/metrics?window=900`);
+                    if (metrics) {
+                        // Update the source row with new metrics
+                        this.updateSourceMetrics(source.id, metrics);
+                    }
+                } catch (error) {
+                    console.error(`Failed to update metrics for ${source.id}:`, error);
+                }
+            }
+        }, 10000); // 10 seconds
+    };
+
+    dashboard.updateSourceMetrics = function(sourceId, metrics) {
+        const row = document.querySelector(`tr[onclick*="${sourceId}"]`);
+        if (!row) return;
+
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 10) {
+            // Update EPS (1m)
+            cells[5].textContent = this.formatNumber(metrics.eps_1m, 2);
+            // Update Records (24h)
+            cells[6].textContent = this.formatNumber(metrics.records_24h);
+            // Update Error %
+            cells[8].textContent = this.formatNumber(metrics.error_pct_15m, 1) + '%';
+            // Update Avg Risk
+            cells[9].textContent = this.formatNumber(metrics.avg_risk_15m, 2);
+        }
+    };
+
+    dashboard.openSourceDetails = function(sourceId) {
+        // For now, just show a simple alert with source details
+        const source = this.sourcesData.find(s => s.id === sourceId);
+        if (source) {
+            alert(`Source Details:\nID: ${source.id}\nType: ${source.type}\nStatus: ${source.status}\nLast Seen: ${source.last_seen || 'Never'}`);
+        }
+    };
+
+    // Wire up filter event listeners
+    const tenantFilter = document.getElementById('sources-tenant-filter');
+    const typeFilter = document.getElementById('sources-type-filter');
+    const statusFilter = document.getElementById('sources-status-filter');
+    const sizeFilter = document.getElementById('sources-size-filter');
+
+    if (tenantFilter) {
+        tenantFilter.addEventListener('change', (e) => {
+            dashboard.sourcesFilters.tenant = e.target.value;
+            dashboard.sourcesFilters.page = 1;
+            dashboard.loadSourcesData();
+        });
+    }
+
+    if (typeFilter) {
+        typeFilter.addEventListener('change', (e) => {
+            dashboard.sourcesFilters.type = e.target.value;
+            dashboard.sourcesFilters.page = 1;
+            dashboard.loadSourcesData();
+        });
+    }
+
+    if (statusFilter) {
+        statusFilter.addEventListener('change', (e) => {
+            dashboard.sourcesFilters.status = e.target.value;
+            dashboard.sourcesFilters.page = 1;
+            dashboard.loadSourcesData();
+        });
+    }
+
+    if (sizeFilter) {
+        sizeFilter.addEventListener('change', (e) => {
+            dashboard.sourcesFilters.size = parseInt(e.target.value);
+            dashboard.sourcesFilters.page = 1;
+            dashboard.loadSourcesData();
+        });
+    }
+
+    // Wire up pagination
+    const prevBtn = document.getElementById('sources-prev');
+    const nextBtn = document.getElementById('sources-next');
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (dashboard.sourcesFilters.page > 1) {
+                dashboard.sourcesFilters.page--;
+                dashboard.loadSourcesData();
+            }
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            dashboard.sourcesFilters.page++;
+            dashboard.loadSourcesData();
+        });
+    }
+}
+
+function getStatusBadgeClass(status) {
+    const classes = {
+        healthy: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/40',
+        degraded: 'bg-yellow-500/15 text-yellow-300 ring-yellow-500/40',
+        stale: 'bg-zinc-500/15 text-zinc-300 ring-zinc-500/40'
+    };
+    return classes[status] || classes.stale;
+}
+
+// Initialize Sources functionality when dashboard is ready
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(addSourcesFunctionality, 100);
+});
