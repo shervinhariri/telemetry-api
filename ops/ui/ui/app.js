@@ -252,6 +252,32 @@ function setApiKey(k) {
   window.dispatchEvent(new CustomEvent('api-key-changed', { detail: { key: k.trim() }}));
 }
 
+// --- Auth/key helpers & resiliency ---
+function promptForKey(msg = 'Unauthorized') {
+  try {
+    const proposed = getApiKey();
+    const k = window.prompt(`API key required (${msg}). Paste key:`, proposed || '');
+    if (k && k.trim()) {
+      const trimmed = k.trim();
+      setApiKey(trimmed);
+      // Reload with ?key to propagate across code paths and tabs
+      const url = new URL(window.location.href);
+      url.searchParams.set('key', trimmed);
+      window.location.replace(url.toString());
+    }
+  } catch (_) {}
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+async function withBackoff(fn, {retries=2, base=400}={}) {
+  let err;
+  for (let i=0;i<=retries;i++) {
+    try { return await fn(); }
+    catch(e){ err=e; if(i===retries) break; await sleep(base*Math.pow(2,i)); }
+  }
+  throw err;
+}
+
 // Update all visible key chips/badges
 function refreshKeyChips() {
   const k = getApiKey();
