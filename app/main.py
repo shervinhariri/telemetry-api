@@ -51,6 +51,13 @@ async def lifespan(app: FastAPI):
     # Startup
     from .pipeline import worker_loop
     from .logging_config import log_system_event
+    from .db import SessionLocal
+    try:
+        from .models.apikey import ApiKey as _ApiKey
+        from .models.tenant import Tenant as _Tenant
+    except Exception:
+        _ApiKey = None
+        _Tenant = None
     
     log_system_event("startup", "Telemetry API starting up", {
         "details": "Initializing pipeline workers and metrics"
@@ -68,6 +75,24 @@ async def lifespan(app: FastAPI):
     
     asyncio.create_task(metrics_ticker())
     
+    # DB persistence self-check
+    try:
+        db = SessionLocal()
+        tenants = db.query(_Tenant).count() if _Tenant else 0
+        keys = db.query(_ApiKey).count() if _ApiKey else 0
+        db_path = os.getenv("DATABASE_URL", "sqlite:///./telemetry.db")
+        logging.getLogger("telemetry").info(
+            "DB_CHECK: existing_db=%s tenants=%s keys=%s url=%s",
+            (tenants + keys) > 0, tenants, keys, db_path,
+        )
+    except Exception:
+        logging.getLogger("telemetry").exception("DB_CHECK failed")
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+
     log_system_event("success", "Telemetry API ready", {
         "details": "All services started successfully",
         "workers": 2,
