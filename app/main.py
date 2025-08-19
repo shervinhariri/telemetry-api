@@ -453,6 +453,17 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
         if content_length and int(content_length) > 5 * 1024 * 1024:
             raise HTTPException(status_code=413, detail="Payload too large (max 5MB)")
         
+        # Rate limiting per key and per tenant (opt-in via cache fallback-safe)
+        from .services.ratelimit import check_limit, PER_MIN
+        from .services.idempotency import seen_or_store
+
+        tenant_id = request.headers.get("X-Tenant-ID") or getattr(request.state, 'tenant_id', 'default')
+        api_key_id = getattr(request.state, 'key_id', 'unknown')
+
+        if not check_limit(tenant_id, api_key_id):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"error": "rate_limited", "limit_per_min": PER_MIN}, status_code=429)
+
         raw = await request.body()
         raw = _maybe_gunzip(raw, content_encoding)
         
@@ -482,6 +493,11 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
                 raise HTTPException(status_code=400, detail="Records must be JSON objects.")
             _validate_record(rec)
         
+        # Idempotency check: if same batch seen within TTL, return 209
+        if seen_or_store(tenant_id, api_key_id, raw):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"status": "duplicate"}, status_code=209)
+
         # Enqueue records using batch processing
         from .pipeline import enqueue_batch
         accepted = enqueue_batch(records)
