@@ -1,4 +1,4 @@
-# Telemetry API — v0.8.2
+# Telemetry API — v0.8.3
 
 Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability and multi-tenant authentication.
 
@@ -15,7 +15,7 @@ Ingest NetFlow/IPFIX and Zeek JSON → enrich with GeoIP/ASN/threat intel → ap
 docker run -d -p 80:80 \
   -e API_KEY=TEST_KEY \
   -e REDACT_HEADERS=authorization \
-  --name telapi shvin/telemetry-api:0.8.2
+  --name telapi shvin/telemetry-api:0.8.3
 
 # 2) Ingest sample Zeek
 curl -s -X POST http://localhost/v1/ingest/zeek \
@@ -41,7 +41,7 @@ docker run -d -p 80:80 \
   -e GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb \
   -e THREATLIST_CSV=/data/threats.csv \
   -v $PWD/data:/data:ro \
-  --name telemetry-api shvin/telemetry-api:0.8.2
+  --name telemetry-api shvin/telemetry-api:0.8.3
 
 # Open dashboard
 open http://localhost
@@ -73,23 +73,23 @@ export HTTP_LOG_SAMPLE_RATE=1.0  # Log all requests
 
 ## Golden Release and Rollback
 
-This repository maintains a golden tag for the stable build of 0.8.2:
+This repository maintains a golden tag for the stable build of 0.8.3:
 
-- Git tag: `v0.8.2-golden`
-- Docker image: `shvin/telemetry-api:0.8.2-golden`
+- Git tag: `v0.8.3-golden`
+- Docker image: `shvin/telemetry-api:0.8.3-golden`
 
 Rollback instructions:
 
 ```bash
 git fetch --tags
-git checkout v0.8.2-golden
+git checkout v0.8.3-golden
 
-docker pull shvin/telemetry-api:0.8.2-golden
+docker pull shvin/telemetry-api:0.8.3-golden
 docker rm -f telemetry-api || true
 docker run -d -p 80:80 \
   -v $PWD/telemetry.db:/app/telemetry.db \
   --name telemetry-api \
-  shvin/telemetry-api:0.8.2-golden
+  shvin/telemetry-api:0.8.3-golden
 ```
 
 ### Production Mode
@@ -114,7 +114,7 @@ docker run -d -p 80:80 \
   -e DEMO_MODE=true \
   -e DEMO_EPS=50 \
   -e DEMO_DURATION_SEC=120 \
-  --name telemetry-api-demo shvin/telemetry-api:0.8.2
+  --name telemetry-api-demo shvin/telemetry-api:0.8.3
 
 # 2) Start demo generator
 curl -s -X POST http://localhost/v1/demo/start \
@@ -152,7 +152,7 @@ curl -s -X POST http://localhost/v1/demo/stop \
 - **No metrics**: Verify `/v1/metrics/prometheus` endpoint is accessible
 - **Grafana import fails**: Ensure Prometheus data source is configured correctly
 
-## 🏢 Multi-Tenancy (v0.8.2)
+## 🏢 Multi-Tenancy (v0.8.3)
 
 The API now supports multi-tenant deployments with complete data isolation:
 
@@ -169,7 +169,7 @@ The API now supports multi-tenant deployments with complete data isolation:
 # 1) Run with database persistence
 docker run -d -p 80:80 \
   -v $PWD/telemetry.db:/app/telemetry.db \
-  --name telemetry-api shvin/telemetry-api:0.8.2
+  --name telemetry-api shvin/telemetry-api:0.8.3
 
 # 2) Database will auto-initialize with default tenant
 # 3) Get admin API key from logs or use seed script
@@ -197,7 +197,7 @@ curl -H "Authorization: Bearer ADMIN_KEY" \
 | `DEV_BYPASS_SCOPES` | `false` | Development scope bypass |
 ```
 
-## 🏢 Multi-Tenancy (v0.8.2)
+## 🏢 Multi-Tenancy (v0.8.3)
 
 The API now supports multi-tenant deployments with complete data isolation:
 
@@ -216,7 +216,7 @@ docker run -d -p 80:80 \
   -e DATABASE_URL=sqlite:///./telemetry.db \
   -e ADMIN_API_KEY=YOUR_ADMIN_KEY \
   -v $PWD/data:/data \
-  --name telemetry-api shvin/telemetry-api:0.8.2
+  --name telemetry-api shvin/telemetry-api:0.8.3
 
 # 2) Create default tenant and admin key
 docker exec telemetry-api python3 scripts/seed_default_tenant.py
@@ -379,7 +379,7 @@ curl -s http://localhost/v1/health | jq
 version: '3.8'
 services:
   telemetry-api:
-    image: shvin/telemetry-api:0.8.2
+    image: shvin/telemetry-api:0.8.3
     ports:
       - "80:80"
     environment:
@@ -408,7 +408,7 @@ spec:
     spec:
       containers:
       - name: telemetry-api
-        image: shvin/telemetry-api:0.8.2
+        image: shvin/telemetry-api:0.8.3
         ports:
         - containerPort: 80
         env:
@@ -421,7 +421,7 @@ spec:
 
 ## 📋 Changelog
 
-### v0.8.2 (Current)
+### v0.8.3 (Current)
 - ✅ **Multi-Tenancy Support**: Complete tenant isolation with database-backed tenants
 - ✅ **Database Models**: SQLAlchemy models for Tenant, ApiKey, OutputConfig, and Job
 - ✅ **Tenant-Scoped Authentication**: Per-tenant API keys with scope validation

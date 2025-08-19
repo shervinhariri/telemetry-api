@@ -695,7 +695,7 @@ class TelemetryDashboard {
                 console.log('System info loaded:', system);
             } catch (error) {
                 console.error('Failed to load system info:', error);
-                system = { version: '0.8.2' }; // Set default version
+                system = { version: '0.8.3' }; // Set default version
             }
             
             this.updateSystemInfo(system);
@@ -714,7 +714,7 @@ class TelemetryDashboard {
     updateSystemInfo(system) {
         console.log('Updating system info:', system);
         
-        const version = '0.8.2';
+        const version = '0.8.3';
         console.log('Version to display:', version);
         
         // Update version in dashboard and system panels

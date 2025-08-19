@@ -6,7 +6,7 @@ Configuration module for Telemetry API
 import os
 
 # Version information
-API_VERSION = "0.8.2"
+API_VERSION = "0.8.3"
 
 # Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./telemetry.db")
