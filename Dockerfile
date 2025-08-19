@@ -29,6 +29,13 @@ COPY docs /app/docs
 # Copy tests
 COPY tests /app/tests
 
+# Copy alembic files for database migrations
+COPY alembic.ini /app/alembic.ini
+COPY alembic /app/alembic
+
+# Copy scripts for database seeding
+COPY scripts /app/scripts
+
 EXPOSE 80
 ENV API_KEY=TEST_KEY
 ENV APP_PORT=80

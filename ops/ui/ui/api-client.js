@@ -5,7 +5,7 @@
 const DEFAULT_CONFIG = {
     API_BASE_URL: 'http://localhost',
     API_PREFIX: '/v1',
-    API_KEY: 'TEST_KEY'
+    API_KEY: 'DEV_ADMIN_KEY_c84a4e33bd'
 };
 
 // Get config from window.__CFG__ or use defaults

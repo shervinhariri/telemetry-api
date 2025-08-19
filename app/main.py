@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Header, HTTPException, Request, Response, Query
+from fastapi import FastAPI, Header, HTTPException, Request, Response, Query, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +31,8 @@ from .api.prometheus import router as prometheus_router
 from .pipeline import ingest_queue, record_batch_accepted, enqueue
 from .logging_config import setup_logging
 from .config import API_VERSION
+from .auth.deps import require_scopes
+from .auth.tenant import require_tenant
 
 # Import configuration
 from .config import (
@@ -94,6 +96,68 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ------------------------------------------------------------
+# Public endpoint allowlist and middleware helpers
+# ------------------------------------------------------------
+log = logging.getLogger("telemetry")
+
+# Make Prometheus path public configurable (default: true)
+PUBLIC_PROMETHEUS = os.getenv("PUBLIC_PROMETHEUS", "true").lower() == "true"
+
+BASE_PUBLIC = (
+    "/",
+    f"{API_PREFIX}/health",
+    f"{API_PREFIX}/version",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/favicon.ico",
+    "/ui/",
+    "/static/",
+)
+
+PUBLIC_ALLOWLIST = BASE_PUBLIC + ((f"{API_PREFIX}/metrics/prometheus",) if PUBLIC_PROMETHEUS else ())
+
+def _is_public(path: str) -> bool:
+    # Use exact matching for specific paths, prefix matching only for directories
+    for p in PUBLIC_ALLOWLIST:
+        if p == '/':  # Root path - exact match only
+            if path == '/':
+                return True
+        elif p.endswith('/'):  # Directory prefix
+            if path.startswith(p):
+                return True
+        else:  # Exact path
+            if path == p:
+                return True
+    return False
+
+# Authentication middleware
+@app.middleware("http")
+async def tenancy_middleware(request: Request, call_next):
+    path = request.url.path
+    log.debug("middleware: path=%s", path)
+
+    # Skip auth for public paths
+    if _is_public(path):
+        log.debug("middleware: skipping public path=%s", path)
+        return await call_next(request)
+
+    log.debug("middleware: authenticating path=%s", path)
+    # Authenticate and set tenant_id
+    try:
+        from .auth.deps import authenticate
+        await authenticate(request)
+    except HTTPException:
+        # Let FastAPI return proper 401/403
+        raise
+    except Exception:
+        # Only unexpected errors should become 500
+        log.exception("Unhandled error in middleware for %s", path)
+        return JSONResponse({"detail": "internal_error"}, status_code=500)
+
+    return await call_next(request)
+
 # Include API routers
 app.include_router(version_router, prefix=API_PREFIX)
 app.include_router(admin_update_router, prefix=API_PREFIX)
@@ -145,18 +209,6 @@ async def openapi_yaml():
 async def docs():
     """Serve Swagger UI"""
     return FileResponse("docs/swagger.html", media_type="text/html")
-
-# Authentication middleware
-@app.middleware("http")
-async def tenancy_middleware(request: Request, call_next):
-    # Skip authentication for static files and health checks
-    if request.url.path.startswith("/ui/") or request.url.path == "/v1/health":
-        return await call_next(request)
-    
-    # Authenticate and set tenant_id
-    from .auth.deps import authenticate
-    await authenticate(request)
-    return await call_next(request)
 
 # Middleware to track requests and audit logging
 @app.middleware("http")
@@ -1329,12 +1381,29 @@ async def configure_alerts(request: Request, response: Response, Authorization: 
     # TODO: Implement alert rules configuration
     return {"status": "not_implemented"}
 
-@app.get(f"{API_PREFIX}/metrics")
+@app.get(f"{API_PREFIX}/_debug/auth", dependencies=[Depends(require_scopes("admin"))])
+async def debug_auth(request: Request):
+    return {
+        "path": str(request.url.path),
+        "token_scopes": getattr(request.state, "scopes", None),
+        "token_tenant_id": getattr(request.state, "tenant_id", None),
+        "header_tenant": request.headers.get("x-tenant-id")
+    }
+
+@app.get(f"{API_PREFIX}/_debug/test_auth")
+async def test_auth(request: Request):
+    """Test endpoint to debug authentication"""
+    print("TEST_AUTH: Starting test")
+    from .auth.deps import authenticate
+    try:
+        await authenticate(request)
+        return {"status": "success", "scopes": getattr(request.state, "scopes", None)}
+    except Exception as e:
+        print(f"TEST_AUTH ERROR: {e}")
+        return {"status": "error", "error": str(e)}
+
+@app.get(f"{API_PREFIX}/metrics", dependencies=[Depends(require_scopes("read_metrics", "admin")), Depends(require_tenant(optional=False))])
 async def metrics(response: Response, Authorization: Optional[str] = Header(None), request: Request = None):
-    # Check if user has read_metrics scope
-    scopes = getattr(request.state, 'scopes', []) if request else []
-    if "read_metrics" not in scopes and "admin" not in scopes:
-        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'read_metrics' scope")
     add_version_header(response)
     return get_metrics()
 

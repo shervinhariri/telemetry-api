@@ -4,16 +4,18 @@ System information endpoint
 
 import time
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any, List
 
 from ..api.version import APP_VERSION, GIT_SHA, IMAGE, DOCKERHUB_TAG
 from ..metrics import metrics
 from ..pipeline import STATS
 
+from app.auth.deps import require_scopes
+
 router = APIRouter()
 
-@router.get("/system")
+@router.get("/system", dependencies=[Depends(require_scopes("admin"))])
 async def get_system_info() -> Dict[str, Any]:
     """Get structured system information"""
     try:

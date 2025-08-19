@@ -235,9 +235,9 @@ function maskKey(k) {
   return `${k.slice(0,3)}…${k.slice(-3)}`;
 }
 
-function getApiKey() {
-  return localStorage.getItem(API_KEY_STORAGE) || 'TEST_KEY';
-}
+function   getApiKey() {
+    return localStorage.getItem(API_KEY_STORAGE) || 'DEV_ADMIN_KEY_c84a4e33bd';
+  }
 
 function setApiKey(k) {
   localStorage.setItem(API_KEY_STORAGE, k);
@@ -331,7 +331,7 @@ class TelemetryDashboard {
     constructor() {
         console.log('TelemetryDashboard constructor called');
         this.apiBase = window.location.origin; // Use the current domain
-        this.apiKey = 'TEST_KEY'; // Change this to your desired API key
+        this.apiKey = 'DEV_ADMIN_KEY_c84a4e33bd'; // Admin API key for multi-tenancy
         this.currentRequestsData = [];
         this.logsEventSource = null;
         this.logsInterval = null;
@@ -370,7 +370,7 @@ class TelemetryDashboard {
             apiKeyPill.addEventListener('click', async () => {
                 const val = prompt('Enter API KEY', this.apiKey || '');
                 if (val != null) {
-                    this.apiKey = val.trim() || 'TEST_KEY';
+                    this.apiKey = val.trim() || 'DEV_ADMIN_KEY_c84a4e33bd';
                     apiKeyValue.textContent = this.apiKey;
                 }
             });
@@ -572,7 +572,7 @@ class TelemetryDashboard {
                 console.log('System info loaded:', system);
             } catch (error) {
                 console.error('Failed to load system info:', error);
-                system = { version: '0.8.1' }; // Set default version
+                system = { version: '0.8.2' }; // Set default version
             }
             
             this.updateSystemInfo(system);
@@ -591,7 +591,7 @@ class TelemetryDashboard {
     updateSystemInfo(system) {
         console.log('Updating system info:', system);
         
-        const version = '0.8.1';
+        const version = '0.8.2';
         console.log('Version to display:', version);
         
         // Update version in dashboard and system panels
