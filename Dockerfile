@@ -37,7 +37,7 @@ COPY alembic /app/alembic
 COPY scripts /app/scripts
 
 EXPOSE 80
-ENV API_KEY=TEST_KEY
+# Remove default API key; keys must be provided at runtime via env/secrets
 ENV APP_PORT=80
 
 # Default MMDB/CSV mount points (read-only)
