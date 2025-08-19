@@ -542,15 +542,8 @@ class TelemetryDashboard {
             
             if (!response.ok) {
                 if (response.status === 401 || response.status === 403) {
-                    try {
-                        const proposed = getApiKey();
-                        const newKey = window.prompt('Unauthorized. Enter API key:', proposed);
-                        if (newKey && newKey.trim()) {
-                            setApiKey(newKey.trim());
-                            window.API_KEY = newKey.trim();
-                            refreshKeyChips();
-                        }
-                    } catch (_) {}
+                    this.showError?.('dashboard', `HTTP ${response.status}: Unauthorized`);
+                    promptForKey(`HTTP ${response.status}`);
                 }
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -582,11 +575,13 @@ class TelemetryDashboard {
     async loadInitialData() {
         try {
             console.log('Loading initial data...');
+            const k = getApiKey();
+            if (!k) { this.showError('dashboard','API key required.'); promptForKey('no key found'); return; }
             
-            // Load system info first
+            // Load system info first (with backoff)
             let system;
             try {
-                system = await this.apiCall('/system');
+                system = await withBackoff(() => this.apiCall('/system'), {retries:2, base:400});
                 console.log('System info loaded:', system);
             } catch (error) {
                 console.error('Failed to load system info:', error);
@@ -596,7 +591,7 @@ class TelemetryDashboard {
             this.updateSystemInfo(system);
 
             // Load metrics
-            const metrics = await this.apiCall('/metrics');
+            const metrics = await withBackoff(() => this.apiCall('/metrics'), {retries:2, base:400});
             console.log('Metrics loaded:', metrics);
             this.updateDashboardMetrics(metrics);
             
@@ -862,7 +857,7 @@ class TelemetryDashboard {
                     </button>
                 </div>
                 <pre class="bg-black/40 border border-white/10 rounded-xl p-4 overflow-auto text-xs leading-relaxed text-zinc-300">
-${JSON.stringify(request, null, 2)}
+${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } catch { return String(request); } })()}
                 </pre>
             </div>
         `;
