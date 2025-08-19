@@ -1,6 +1,6 @@
 # Telemetry API — v0.8.2
 
-Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability.
+Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability and multi-tenant authentication.
 
 ![Build](https://github.com/shervinhariri/telemetry-api/actions/workflows/docker.yml/badge.svg)
 
@@ -130,6 +130,50 @@ curl -s -X POST http://localhost/v1/demo/stop \
 - **Demo not starting**: Check `DEMO_MODE=true` and API key has admin scope
 - **No metrics**: Verify `/v1/metrics/prometheus` endpoint is accessible
 - **Grafana import fails**: Ensure Prometheus data source is configured correctly
+
+## 🏢 Multi-Tenancy (v0.8.2)
+
+The API now supports multi-tenant deployments with complete data isolation:
+
+### Tenant Features
+- **Database-backed tenants**: SQLite/PostgreSQL with proper foreign keys
+- **Per-tenant API keys**: Scoped authentication with admin override
+- **Data isolation**: All events, DLQ, and logs separated by tenant
+- **Configurable retention**: Per-tenant retention policies (default: 7 days)
+- **Admin override**: `X-Tenant-ID` header for cross-tenant operations
+
+### Quick Multi-Tenant Setup
+
+```bash
+# 1) Run with database persistence
+docker run -d -p 80:80 \
+  -v $PWD/telemetry.db:/app/telemetry.db \
+  --name telemetry-api shvin/telemetry-api:0.8.2
+
+# 2) Database will auto-initialize with default tenant
+# 3) Get admin API key from logs or use seed script
+docker logs telemetry-api | grep "API Key:"
+
+# 4) Use admin key for cross-tenant operations
+curl -H "Authorization: Bearer ADMIN_KEY" \
+     -H "X-Tenant-ID: tenant1" \
+     http://localhost/v1/metrics
+```
+
+### Authentication & Authorization
+
+- **API Keys**: Database-backed with SHA256 hashing
+- **Scopes**: `admin`, `read_metrics`, `read_requests`, `export`
+- **Admin Privileges**: Super-user access across all tenants
+- **Public Endpoints**: `/v1/health`, `/v1/version`, `/docs`, `/ui/`
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `sqlite:///./telemetry.db` | Database connection |
+| `PUBLIC_PROMETHEUS` | `true` | Make metrics endpoint public |
+| `DEV_BYPASS_SCOPES` | `false` | Development scope bypass |
 ```
 
 ## 🏢 Multi-Tenancy (v0.8.2)

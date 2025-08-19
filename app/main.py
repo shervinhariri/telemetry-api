@@ -136,14 +136,11 @@ def _is_public(path: str) -> bool:
 @app.middleware("http")
 async def tenancy_middleware(request: Request, call_next):
     path = request.url.path
-    log.debug("middleware: path=%s", path)
 
     # Skip auth for public paths
     if _is_public(path):
-        log.debug("middleware: skipping public path=%s", path)
         return await call_next(request)
 
-    log.debug("middleware: authenticating path=%s", path)
     # Authenticate and set tenant_id
     try:
         from .auth.deps import authenticate
@@ -1381,26 +1378,7 @@ async def configure_alerts(request: Request, response: Response, Authorization: 
     # TODO: Implement alert rules configuration
     return {"status": "not_implemented"}
 
-@app.get(f"{API_PREFIX}/_debug/auth", dependencies=[Depends(require_scopes("admin"))])
-async def debug_auth(request: Request):
-    return {
-        "path": str(request.url.path),
-        "token_scopes": getattr(request.state, "scopes", None),
-        "token_tenant_id": getattr(request.state, "tenant_id", None),
-        "header_tenant": request.headers.get("x-tenant-id")
-    }
 
-@app.get(f"{API_PREFIX}/_debug/test_auth")
-async def test_auth(request: Request):
-    """Test endpoint to debug authentication"""
-    print("TEST_AUTH: Starting test")
-    from .auth.deps import authenticate
-    try:
-        await authenticate(request)
-        return {"status": "success", "scopes": getattr(request.state, "scopes", None)}
-    except Exception as e:
-        print(f"TEST_AUTH ERROR: {e}")
-        return {"status": "error", "error": str(e)}
 
 @app.get(f"{API_PREFIX}/metrics", dependencies=[Depends(require_scopes("read_metrics", "admin")), Depends(require_tenant(optional=False))])
 async def metrics(response: Response, Authorization: Optional[str] = Header(None), request: Request = None):
