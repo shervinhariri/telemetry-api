@@ -140,6 +140,21 @@
                         <span class="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
                         Online
                     </span>
+                    <!-- Global API Key Chip (visible on all pages) -->
+                    <div id="api-key-container" class="chip chip--dark" style="position:relative;">
+                      <div id="api-key-display" class="api-key-mode">
+                        <span class="chip-label">API KEY:</span>
+                        <span id="api-key-mask">TEST_KEY</span>
+                        <svg aria-hidden="true" width="14" height="14" style="margin-left:8px;opacity:.7;cursor:pointer;">
+                          <path fill="currentColor" d="M2 10l4 4 8-8-4-4L2 10z"/>
+                        </svg>
+                      </div>
+                      <div id="api-key-edit" class="api-key-mode hidden">
+                        <input id="api-key-input" class="chip-input" placeholder="Enter API key" />
+                        <button id="api-key-save" class="chip-btn chip-btn--save">✓</button>
+                        <button id="api-key-cancel" class="chip-btn chip-btn--cancel">✕</button>
+                      </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -185,23 +200,6 @@
             <div class="mb-4 flex items-center justify-between">
                 <div class="text-sm text-zinc-300">System Information</div>
                 <div class="flex items-center gap-3 text-xs text-zinc-400">
-                    <!-- API Key chip moved here (near uptime on main page) -->
-                    <div id="api-key-container" class="chip chip--dark" style="position:relative;">
-                      <!-- Display mode (normal state) -->
-                      <div id="api-key-display" class="api-key-mode">
-                        <span class="chip-label">API KEY:</span>
-                        <span id="api-key-mask">TEST_KEY</span>
-                        <svg aria-hidden="true" width="14" height="14" style="margin-left:8px;opacity:.7;cursor:pointer;">
-                          <path fill="currentColor" d="M2 10l4 4 8-8-4-4L2 10z"/>
-                        </svg>
-                      </div>
-                      <!-- Edit mode (hidden by default) -->
-                      <div id="api-key-edit" class="api-key-mode hidden">
-                        <input id="api-key-input" class="chip-input" placeholder="Enter API key" />
-                        <button id="api-key-save" class="chip-btn chip-btn--save">✓</button>
-                        <button id="api-key-cancel" class="chip-btn chip-btn--cancel">✕</button>
-                      </div>
-                    </div>
                     <button onclick="window.location.reload()" class="rounded-lg px-2 py-1 ring-1 ring-white/10 hover:ring-indigo-400/40">Hard refresh</button>
                 </div>
             </div>
