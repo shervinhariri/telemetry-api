@@ -306,6 +306,60 @@ function refreshKeyChips() {
   // e.g. window.API_CLIENT.setKey(k);
 }
 
+// ===== Set API Key Modal =====
+function openKeyModal() {
+  const modal = document.getElementById('key-modal');
+  const input = document.getElementById('key-modal-input');
+  const status = document.getElementById('key-modal-status');
+  if (!modal || !input || !status) return;
+  input.value = getApiKey();
+  status.textContent = '';
+  modal.classList.remove('hidden');
+  setTimeout(() => input.focus(), 0);
+}
+
+function closeKeyModal() {
+  const modal = document.getElementById('key-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function testEnteredKey() {
+  const input = document.getElementById('key-modal-input');
+  const status = document.getElementById('key-modal-status');
+  if (!input || !status) return;
+  const key = (input.value || '').trim();
+  if (!key) { status.textContent = 'Enter a key to test.'; return; }
+  status.textContent = 'Testing…';
+  try {
+    const base = (window.telemetryDashboard && window.telemetryDashboard.apiBase) || window.location.origin;
+    const resp = await fetch(`${base}/v1/system`, { headers: { 'Authorization': `Bearer ${key}` }});
+    if (resp.ok) {
+      status.textContent = '✓ Valid key. Saved.';
+      setApiKey(key);
+      refreshKeyChips();
+      setTimeout(() => closeKeyModal(), 500);
+    } else if (resp.status === 401 || resp.status === 403) {
+      status.textContent = 'Invalid key (401/403). You can still Save to store it.';
+    } else {
+      status.textContent = `Test failed: HTTP ${resp.status}`;
+    }
+  } catch (e) {
+    status.textContent = `Test error: ${e.message}`;
+  }
+}
+
+function saveEnteredKey() {
+  const input = document.getElementById('key-modal-input');
+  const status = document.getElementById('key-modal-status');
+  if (!input) return;
+  const key = (input.value || '').trim();
+  if (!key) { if (status) status.textContent = 'Key is empty.'; return; }
+  setApiKey(key);
+  refreshKeyChips();
+  if (status) status.textContent = 'Saved.';
+  setTimeout(() => closeKeyModal(), 300);
+}
+
 // ===== Inline API Key Editing =====
 function initKeyPopover() {
   const container = document.getElementById('api-key-container');
@@ -369,6 +423,20 @@ document.addEventListener('DOMContentLoaded', function() {
     
     refreshKeyChips();
     initKeyPopover();
+
+    // Wire Set API Key modal controls
+    const btnOpen = document.getElementById('btn-set-key');
+    const btnClose = document.getElementById('key-modal-close');
+    const btnCancel = document.getElementById('key-modal-cancel');
+    const btnTest = document.getElementById('key-modal-test');
+    const btnSave = document.getElementById('key-modal-save');
+    const backdrop = document.getElementById('key-modal-backdrop');
+    if (btnOpen) btnOpen.addEventListener('click', openKeyModal);
+    if (btnClose) btnClose.addEventListener('click', closeKeyModal);
+    if (btnCancel) btnCancel.addEventListener('click', closeKeyModal);
+    if (backdrop) backdrop.addEventListener('click', closeKeyModal);
+    if (btnTest) btnTest.addEventListener('click', testEnteredKey);
+    if (btnSave) btnSave.addEventListener('click', saveEnteredKey);
 
     // Ensure your apiCall() uses latest key:
     // In apiCall(), read from localStorage each time or from window.API_KEY
