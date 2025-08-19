@@ -86,6 +86,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Live Network Threat Telemetry API (MVP)", lifespan=lifespan)
 
+# Optional auto-migrate on startup
+if os.getenv("AUTO_MIGRATE", "0") in ("1", "true", "True"):
+    try:
+        import subprocess
+        subprocess.run(["alembic", "upgrade", "head"], check=True)
+        logging.getLogger("telemetry").info("Alembic auto-migrate: upgrade head OK")
+    except Exception:
+        logging.getLogger("telemetry").exception("Alembic auto-migrate failed")
+
 # Add CORS middleware
 from .security import get_cors_headers
 app.add_middleware(

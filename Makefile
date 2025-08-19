@@ -1,3 +1,9 @@
+db-init:
+	alembic upgrade head
+
+db-rev:
+	alembic revision --autogenerate -m "$(m)"
+
 IMAGE?=${DOCKERHUB_USERNAME}/telemetry-api
 TAG?=dev
 
