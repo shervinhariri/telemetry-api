@@ -1,6 +1,6 @@
 services:
   telemetry-api:
-    image: shvin/telemetry-api:latest
+    image: shvin/telemetry-api:golden
     # If building from source, use:
     # build: ../../
     container_name: telemetry-api

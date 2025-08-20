@@ -2,7 +2,7 @@ version: "3.9"
 services:
   telemetry-allinone:
     build: .
-    image: shvin/telemetry-api:allinone-latest
+    image: shvin/telemetry-api:golden
     container_name: telemetry-allinone
     environment:
       - API_HOST=0.0.0.0
