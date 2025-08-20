@@ -1,4 +1,4 @@
-# Telemetry API — v0.8.5
+# Telemetry API — v0.8.4
 
 Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability and multi-tenant authentication.
 

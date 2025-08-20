@@ -123,3 +123,13 @@ All notable changes to the Telemetry API project will be documented in this file
 - **Redaction**: Configurable field and header redaction for privacy
 - **Chart.js Integration**: Robust throughput chart initialization with error handling
 - **Data Normalization**: Comprehensive data transformation utilities for UI consistency
+
+## 0.8.5 — Golden (2025-08-20)
+- Sources "Access & Limits" drawer (View/Edit/Delete) ✅
+- "Add Source" modal (right-side drawer version) ✅
+- HTTP & UDP admission control with allowlists and EPS caps ✅
+- Feature flags with runtime toggles + audit trail ✅
+- Prometheus metrics for blocked/rate-limit/FIFO/UDP ✅
+- nftables allowlist API with dry-run & status ✅
+- Resilience caps (FIFO bounds, container resources) ✅
+- Docs & Makefile targets for ops flows ✅

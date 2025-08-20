@@ -12,8 +12,8 @@ services:
       - MAPPER_COLLECTOR_ID=gw-local
       # Optional: tweak goflow2 flags
       # - GOFLOW_ARGS=-format=json -listen udp://:2055
-      - APP_VERSION=0.8.5
-      - DOCKERHUB_TAG=0.8.5
+      - APP_VERSION=0.8.4
+      - DOCKERHUB_TAG=0.8.4
       - GEOIP_CITY_DB=/data/geo/GeoLite2-City.mmdb
       - GEOIP_ASN_DB=/data/geo/GeoLite2-ASN.mmdb
       - TI_PATH=/data/ti/indicators.txt
