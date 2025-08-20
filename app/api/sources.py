@@ -63,7 +63,7 @@ async def list_sources(
             db=db,
             tenant_id=tenant_id,
             source_type=type,
-            status=status,
+            health_status=status,  # Use health_status for filtering
             site=site,
             page=page,
             size=size
@@ -135,5 +135,127 @@ async def get_source_metrics(
         
         metrics = SourceService.get_source_metrics(source.collector, source.last_seen)
         return metrics
+    finally:
+        db.close()
+
+
+@router.post("/sources/{source_id}/admission/test")
+async def test_admission(
+    source_id: str,
+    request: Request
+):
+    """Test admission control for a specific source and client IP"""
+    # Check if user has admin scope or owns the source
+    scopes = getattr(request.state, 'scopes', [])
+    tenant_id = getattr(request.state, 'tenant_id', None)
+    
+    if "admin" not in scopes:
+        # Non-admin users can only test their own sources
+        db = SessionLocal()
+        try:
+            source = SourceService.get_source_by_id(db, source_id, tenant_id)
+            if not source:
+                raise HTTPException(status_code=404, detail="Source not found")
+        finally:
+            db.close()
+    else:
+        # Admin can test any source
+        db = SessionLocal()
+        try:
+            source = SourceService.get_source_by_id_admin(db, source_id)
+            if not source:
+                raise HTTPException(status_code=404, detail="Source not found")
+        finally:
+            db.close()
+    
+    try:
+        body = await request.json()
+        client_ip = body.get("client_ip")
+        
+        if not client_ip:
+            raise HTTPException(status_code=400, detail="client_ip is required")
+        
+        # Test admission using the same logic as B1
+        from ..security import validate_source_admission
+        allowed, reason = validate_source_admission(source, client_ip)
+        
+        return {
+            "allowed": allowed,
+            "reason": reason,
+            "source_id": source_id,
+            "client_ip": client_ip,
+            "source_status": source.status,
+            "source_allowed_ips": source.allowed_ips
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid request: {str(e)}")
+
+@router.put("/sources/{source_id}")
+async def update_source(
+    source_id: str,
+    source_data: dict,
+    request: Request
+):
+    """Update a source"""
+    # Check if user has admin scope or owns the source
+    scopes = getattr(request.state, 'scopes', [])
+    tenant_id = getattr(request.state, 'tenant_id', 'default')
+    
+    db = SessionLocal()
+    try:
+        if "admin" not in scopes:
+            # Non-admin users can only update their own sources
+            source = SourceService.get_source_by_id(db, source_id, tenant_id)
+            if not source:
+                raise HTTPException(status_code=404, detail="Source not found")
+        else:
+            # Admin can update any source
+            source = SourceService.get_source_by_id_admin(db, source_id)
+            if not source:
+                raise HTTPException(status_code=404, detail="Source not found")
+        
+        # Validate the update data
+        from ..services.validation import validate_source_limits
+        is_valid, error = validate_source_limits(source_data)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error)
+        
+        # Update the source
+        updated_source = SourceService.update_source(db, source_id, source_data)
+        return SourceResponse(**updated_source.to_dict())
+        
+    finally:
+        db.close()
+
+@router.delete("/sources/{source_id}")
+async def delete_source(
+    source_id: str,
+    request: Request
+):
+    """Delete a source"""
+    # Check if user has admin scope or owns the source
+    scopes = getattr(request.state, 'scopes', [])
+    tenant_id = getattr(request.state, 'tenant_id', 'default')
+    
+    db = SessionLocal()
+    try:
+        if "admin" not in scopes:
+            # Non-admin users can only delete their own sources
+            source = SourceService.get_source_by_id(db, source_id, tenant_id)
+            if not source:
+                raise HTTPException(status_code=404, detail="Source not found")
+        else:
+            # Admin can delete any source
+            source = SourceService.get_source_by_id_admin(db, source_id)
+            if not source:
+                raise HTTPException(status_code=404, detail="Source not found")
+        
+        # Delete the source
+        SourceService.delete_source(db, source_id)
+        return {"message": "Source deleted successfully"}
+        
     finally:
         db.close()

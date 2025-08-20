@@ -417,6 +417,171 @@ window.addEventListener('api-key-changed', (e) => {
   }
 });
 
+
+
+// === VEFIX: make handlers global so buttons can call them ===
+window.openSourceDetails = async function (sourceId, mode = 'edit') {
+  console.log('[UI] openSourceDetails', { sourceId, mode });
+  try {
+    const res = await fetch(`/v1/sources/${encodeURIComponent(sourceId)}`, { 
+      headers: { 'Authorization': `Bearer ${getApiKey()}` }
+    });
+    if (!res.ok) throw new Error(`GET /v1/sources/${sourceId} -> ${res.status}`);
+    const src = await res.json();
+    // Always use our drawer
+    window.showSourceDrawer(src, mode);
+  } catch (e) {
+    console.error('openSourceDetails failed', e);
+    alert('Failed to open source (see console).');
+  }
+};
+
+window.editSource = (sourceId) => window.openSourceDetails(sourceId, 'edit');
+
+window.deleteSource = async function (sourceId) {
+  console.log('[UI] deleteSource', { sourceId });
+  
+  // Show custom delete modal
+  const backdrop = document.getElementById('delete-modal-backdrop');
+  const modal = document.getElementById('delete-modal');
+  const sourceName = document.getElementById('delete-source-name');
+  
+  if (!backdrop || !modal || !sourceName) {
+    console.warn('[UI] delete modal elements missing');
+    return;
+  }
+  
+  // Set the source name in the modal
+  sourceName.textContent = sourceId;
+  
+  // Show modal
+  backdrop.classList.remove('hidden');
+  modal.classList.remove('hidden');
+  
+  // Wire up the buttons
+  const cancelBtn = document.getElementById('delete-modal-cancel');
+  const confirmBtn = document.getElementById('delete-modal-confirm');
+  
+  const closeModal = () => {
+    backdrop.classList.add('hidden');
+    modal.classList.add('hidden');
+  };
+  
+  const performDelete = async () => {
+    try {
+      closeModal();
+      
+      // Use the existing dashboard API call method if available
+      if (window.telemetryDashboard?.apiCall) {
+        await window.telemetryDashboard.apiCall(`/sources/${sourceId}`, { method: 'DELETE' });
+        // Refresh the sources table
+        if (window.telemetryDashboard?.loadSourcesData) {
+          await window.telemetryDashboard.loadSourcesData();
+        } else {
+          location.reload();
+        }
+      } else {
+        // Fallback: use the existing dashboard method directly
+        if (window.telemetryDashboard?.deleteSource) {
+          await window.telemetryDashboard.deleteSource(sourceId);
+        } else {
+          alert('Dashboard not available.');
+        }
+      }
+    } catch (e) {
+      console.error('deleteSource failed', e);
+      alert('Delete failed (see console).');
+    }
+  };
+  
+  // Remove any existing listeners
+  cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+  confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+  
+  // Add new listeners
+  document.getElementById('delete-modal-cancel').addEventListener('click', closeModal);
+  document.getElementById('delete-modal-confirm').addEventListener('click', performDelete);
+  
+  // Close on backdrop click
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) closeModal();
+  });
+  
+  // Close on ESC
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      closeModal();
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+};
+
+// Add My IP functionality (defined before DOM ready)
+async function addMyIpToAllowlist() {
+    try {
+        // Try backend helper first
+        let ip;
+        try {
+            const response = await fetch('/v1/v1/utils/client-ip', { 
+                headers: { 'Authorization': `Bearer ${getApiKey()}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                ip = data.client_ip;
+            }
+        } catch (e) {
+            console.log('Backend helper failed, trying fallback');
+        }
+
+        // Fallback to ipify if backend helper isn't available
+        if (!ip) {
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                ip = data.ip;
+            } catch (e) {
+                console.log('ipify fallback failed');
+            }
+        }
+
+        if (!ip) {
+            window.telemetryDashboard.showToast('Could not determine your IP', 'error');
+            return;
+        }
+
+        const cidr = `${ip}/32`;
+        
+        // Add to the UI list
+        const container = document.getElementById('allowed-ips-container');
+        if (container) {
+            // Check if already exists
+            const existingChips = Array.from(container.children);
+            const alreadyExists = existingChips.some(chip => 
+                chip.querySelector('span').textContent === cidr
+            );
+            
+            if (!alreadyExists) {
+                // Create new chip
+                const chip = document.createElement('div');
+                chip.className = 'inline-flex items-center gap-2 px-3 py-1 bg-[#0F1116] text-zinc-300 rounded-lg text-sm';
+                chip.innerHTML = `
+                    <span>${cidr}</span>
+                    <button onclick="this.parentElement.remove()" class="text-zinc-500 hover:text-red-400">×</button>
+                `;
+                container.appendChild(chip);
+                
+                window.telemetryDashboard.showToast(`Added ${cidr}`, 'success');
+            } else {
+                window.telemetryDashboard.showToast(`${cidr} already present`, 'info');
+            }
+        }
+    } catch (error) {
+        window.telemetryDashboard.showToast('Add My IP failed', 'error');
+        console.error('Add My IP error:', error);
+    }
+}
+
 // Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM ready, initializing dashboard...');
@@ -438,12 +603,337 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btnTest) btnTest.addEventListener('click', testEnteredKey);
     if (btnSave) btnSave.addEventListener('click', saveEnteredKey);
 
+
+
+    // Wire Add My IP button
+    const addMyIpBtn = document.getElementById('btn-add-my-ip');
+    if (addMyIpBtn) addMyIpBtn.addEventListener('click', addMyIpToAllowlist);
+
     // Ensure your apiCall() uses latest key:
     // In apiCall(), read from localStorage each time or from window.API_KEY
     window.API_KEY = getApiKey();
     
     // Create dashboard instance and make it globally accessible
     window.telemetryDashboard = new TelemetryDashboard();
+    
+    // === VEFIX: event delegation so re-renders don't break clicks ===
+    document.addEventListener('click', function (e) {
+      console.log('[vefix] Click event detected on:', e.target);
+      const el = e.target.closest?.('[data-action]');
+      console.log('[vefix] Closest data-action element:', el);
+      if (!el) return;
+      e.preventDefault();
+      e.stopPropagation(); // prevents overlays swallowing the event
+      const { action, id } = el.dataset || {};
+      console.log('[vefix] Action and ID:', { action, id });
+      
+      if (action === 'add-source') {
+        window.openCreateSourceDrawer();
+        return;
+      }
+      
+      if (!id) return console.warn('[vefix] missing data-id on action button');
+      if (action === 'edit')   return window.openSourceDetails(id, 'edit');
+      if (action === 'delete') return window.deleteSource(id);
+    }, true);
+
+// === Drawer controller ===
+const _$ = (sel) => document.querySelector(sel);
+function renderSourceSummary(src, mode){
+  const ips = (() => {
+    try { return JSON.parse(src.allowed_ips||'[]'); } catch { return []; }
+  })();
+  
+  if (mode === 'view') {
+    return `
+      <div class="space-y-2">
+        <div class="text-xs text-white/60">Mode: <span class="text-white">${mode}</span></div>
+        <div><span class="text-white/70">ID:</span> ${src.id}</div>
+        <div><span class="text-white/70">Display Name:</span> ${src.display_name||'-'}</div>
+        <div><span class="text-white/70">Type:</span> ${src.type}</div>
+        <div><span class="text-white/70">Tenant:</span> ${src.tenant_id}</div>
+        <div><span class="text-white/70">Collector:</span> ${src.collector}</div>
+        <div><span class="text-white/70">Status:</span> ${src.status}</div>
+        <div><span class="text-white/70">Allowed IPs:</span> ${ips.length} ${ips.length ? `(${ips.join(', ')})` : ''}</div>
+        <div><span class="text-white/70">Max EPS:</span> ${src.max_eps ?? 0}</div>
+      </div>
+      <div class="pt-4 flex gap-2">
+        <button id="drawer-edit-btn" class="px-3 py-1 bg-white/10 hover:bg-white/20 rounded">Edit</button>
+        <button id="drawer-close-btn" class="px-3 py-1 bg-white/5 hover:bg-white/10 rounded">Close</button>
+      </div>
+    `;
+  } else {
+    // Edit mode - show form fields
+    return `
+      <form id="edit-src-form" class="space-y-4" onsubmit="return window.submitEditSource(event)">
+        <div>
+          <label class="text-sm text-white/70">Source ID</label>
+          <input id="edit-src-id" value="${src.id}" readonly
+                 class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+        </div>
+
+        <div>
+          <label class="text-sm text-white/70">Display Name</label>
+          <input id="edit-src-display" value="${src.display_name || ''}" placeholder="Human-readable name"
+                 class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm text-white/70">Tenant</label>
+            <input id="edit-src-tenant" value="${src.tenant_id}"
+                   class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+          </div>
+          <div>
+            <label class="text-sm text-white/70">Type</label>
+            <input id="edit-src-type" value="${src.type}" placeholder="e.g., cisco_asa / test"
+                   class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-sm text-white/70">Collector</label>
+          <input id="edit-src-collector" value="${src.collector}" placeholder="e.g., gw-local"
+                 class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm text-white/70">Status</label>
+            <select id="edit-src-status"
+                    class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500">
+              <option value="enabled" ${src.status === 'enabled' ? 'selected' : ''}>Enabled</option>
+              <option value="disabled" ${src.status === 'disabled' ? 'selected' : ''}>Disabled</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm text-white/70">Max EPS (0 = unlimited)</label>
+            <input id="edit-src-maxeps" type="number" min="0" value="${src.max_eps ?? 0}"
+                   class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <input id="edit-src-block" type="checkbox" class="accent-blue-500" ${src.block_on_exceed ? 'checked' : ''}>
+          <label class="text-sm text-white/80">Block on exceed</label>
+        </div>
+
+        <div>
+          <label class="text-sm text-white/70">Allowed IPs (CIDRs, one per line)</label>
+          <textarea id="edit-src-ips" rows="4" placeholder="127.0.0.1/32&#10;203.0.113.0/24"
+                    class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500">${ips.join('\n')}</textarea>
+          <p class="mt-1 text-xs text-white/50">Leave empty to block all (whitelist-only).</p>
+        </div>
+
+        <!-- Footer -->
+        <div class="pt-2 flex justify-end gap-3">
+          <button type="button" onclick="window.hideSourceDrawer()"
+                  class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
+            Cancel
+          </button>
+          <button type="submit"
+                  class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium">
+            Save Changes
+          </button>
+        </div>
+      </form>
+    `;
+  }
+}
+
+window.showSourceDrawer = function(src, mode='view'){
+  const backdrop = _$('#drawer-backdrop');
+  const drawer   = _$('#source-drawer');
+  const title    = _$('#drawer-title');
+  const body     = _$('#drawer-content');
+  if (!backdrop || !drawer || !title || !body) {
+    console.warn('[drawer] elements missing');
+    return alert('Drawer elements missing from HTML.');
+  }
+  title.textContent = `Edit: ${src.display_name || src.id}`;
+  body.innerHTML = renderSourceSummary(src, mode);
+  // open
+  backdrop.classList.remove('hidden');
+  drawer.classList.remove('translate-x-full');
+  // wire close/edit buttons inside
+  _$('#drawer-close').onclick = window.hideSourceDrawer;
+  _$('#drawer-close-btn')?.addEventListener('click', window.hideSourceDrawer);
+  _$('#drawer-edit-btn')?.addEventListener('click', () => window.openSourceDetails(src.id, 'edit'));
+  // backdrop click closes
+  backdrop.onclick = (e) => { if (e.target === backdrop) window.hideSourceDrawer(); };
+};
+
+window.hideSourceDrawer = function(){
+  const backdrop = _$('#drawer-backdrop');
+  const drawer   = _$('#source-drawer');
+  if (backdrop) backdrop.classList.add('hidden');
+  if (drawer)   drawer.classList.add('translate-x-full');
+};
+
+// ESC to close
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') window.hideSourceDrawer();
+});
+
+// --- Create Source drawer controls ---
+window.openCreateSourceDrawer = function () {
+  const d = document.getElementById('create-src-drawer');
+  const b = document.getElementById('create-src-backdrop');
+  if (!d || !b) return console.warn('[UI] create drawer missing');
+  d.classList.remove('hidden');
+  b.classList.remove('hidden');
+  // start translated -> slide in
+  requestAnimationFrame(() => {
+    d.classList.remove('translate-x-full');
+  });
+  // autofocus first field
+  setTimeout(() => document.getElementById('create-src-id')?.focus(), 50);
+};
+
+window.closeCreateSourceDrawer = function () {
+  const d = document.getElementById('create-src-drawer');
+  const b = document.getElementById('create-src-backdrop');
+  if (!d || !b) return;
+  d.classList.add('translate-x-full');
+  setTimeout(() => {
+    d.classList.add('hidden');
+    b.classList.add('hidden');
+  }, 180);
+};
+
+// ESC closes
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') window.closeCreateSourceDrawer();
+});
+
+// Submit handler
+window.submitCreateSource = async function (evt) {
+  evt.preventDefault();
+  try {
+    const id        = document.getElementById('create-src-id').value.trim();
+    const display   = document.getElementById('create-src-display').value.trim();
+    const tenant    = document.getElementById('create-src-tenant').value.trim() || 'default';
+    const type      = document.getElementById('create-src-type').value.trim() || 'test';
+    const collector = document.getElementById('create-src-collector').value.trim() || 'gw-local';
+    const status    = document.getElementById('create-src-status').value;
+    const max_eps   = parseInt(document.getElementById('create-src-maxeps').value || '0', 10);
+    const block     = document.getElementById('create-src-block').checked;
+    const ipsRaw    = document.getElementById('create-src-ips').value.trim();
+
+    // API expects stringified JSON for allowed_ips (backward-compat)
+    const ipsArray = ipsRaw
+      ? ipsRaw.split('\n').map(s => s.trim()).filter(Boolean)
+      : [];
+    const allowed_ips = JSON.stringify(ipsArray);
+
+    const payload = {
+      id, tenant_id: tenant, type,
+      display_name: display || id,
+      collector, status,
+      allowed_ips, max_eps, block_on_exceed: block
+    };
+
+    const res = await fetch('/v1/sources', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${window.getApiKey?.() || ''}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const t = await res.text();
+      console.error('[create source] failed', res.status, t);
+      alert(`Create failed (${res.status}): ${t}`);
+      return false;
+    }
+
+    // success: close drawer, refresh table, and open details in edit mode
+    window.closeCreateSourceDrawer();
+    
+    // Refresh the sources table to show the new source
+    if (window.telemetryDashboard?.loadSourcesData) {
+      await window.telemetryDashboard.loadSourcesData();
+    } else {
+      // Fallback: reload the page
+      location.reload();
+    }
+    
+    // Open the new source in edit mode
+    window.openSourceDetails?.(id, 'edit');
+    return false;
+  } catch (e) {
+    console.error(e);
+    alert('Unexpected error creating source');
+    return false;
+  }
+};
+
+// Edit Source submit handler
+window.submitEditSource = async function (evt) {
+  evt.preventDefault();
+  try {
+    const id        = document.getElementById('edit-src-id').value.trim();
+    const display   = document.getElementById('edit-src-display').value.trim();
+    const tenant    = document.getElementById('edit-src-tenant').value.trim() || 'default';
+    const type      = document.getElementById('edit-src-type').value.trim() || 'test';
+    const collector = document.getElementById('edit-src-collector').value.trim() || 'gw-local';
+    const status    = document.getElementById('edit-src-status').value;
+    const max_eps   = parseInt(document.getElementById('edit-src-maxeps').value || '0', 10);
+    const block     = document.getElementById('edit-src-block').checked;
+    const ipsRaw    = document.getElementById('edit-src-ips').value.trim();
+
+    // API expects stringified JSON for allowed_ips (backward-compat)
+    const ipsArray = ipsRaw
+      ? ipsRaw.split('\n').map(s => s.trim()).filter(Boolean)
+      : [];
+    const allowed_ips = JSON.stringify(ipsArray);
+
+    const payload = {
+      display_name: display || id,
+      tenant_id: tenant,
+      type,
+      collector,
+      status,
+      allowed_ips, 
+      max_eps, 
+      block_on_exceed: block
+    };
+
+    const res = await fetch(`/v1/sources/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${window.getApiKey?.() || ''}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const t = await res.text();
+      console.error('[edit source] failed', res.status, t);
+      alert(`Update failed (${res.status}): ${t}`);
+      return false;
+    }
+
+    // success: close drawer and refresh table
+    window.hideSourceDrawer();
+    
+    // Refresh the sources table to show updated data
+    if (window.telemetryDashboard?.loadSourcesData) {
+      await window.telemetryDashboard.loadSourcesData();
+    } else {
+      // Fallback: reload the page
+      location.reload();
+    }
+    return false;
+  } catch (e) {
+    console.error(e);
+    alert('Unexpected error updating source');
+    return false;
+  }
+};
 });
 
 class TelemetryDashboard {
@@ -1473,24 +1963,40 @@ function addSourcesFunctionality() {
             return;
         }
 
-        tbody.innerHTML = this.sourcesData.map(source => `
-            <tr class="hover:bg-white/5 cursor-pointer transition-colors" onclick="window.telemetryDashboard.openSourceDetails('${source.id}')">
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ${getStatusBadgeClass(source.status)}">
-                        ${source.status.charAt(0).toUpperCase() + source.status.slice(1)}
-                    </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-white font-medium">${source.display_name}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.type}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.tenant_id}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.collector}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">—</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">—</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.last_seen ? new Date(source.last_seen).toLocaleString() : '—'}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">—</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">—</td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = this.sourcesData.map(source => {
+            // Parse allowed_ips
+            let allowedIps = [];
+            try {
+                allowedIps = typeof source.allowed_ips === 'string' ? JSON.parse(source.allowed_ips) : source.allowed_ips || [];
+            } catch (e) {
+                allowedIps = [];
+            }
+            
+            return `
+                <tr class="hover:bg-white/5 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ${getStatusBadgeClass(source.status)}">
+                            ${source.status.charAt(0).toUpperCase() + source.status.slice(1)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white font-medium cursor-pointer" onclick="window.telemetryDashboard.openSourceDetails('${source.id}')">${source.display_name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.type}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.tenant_id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${allowedIps.length} IPs</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.max_eps || 0}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">—</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.last_seen ? new Date(source.last_seen).toLocaleString() : '—'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">—</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">
+                        <div class="flex items-center bg-white/10 border border-white/20 rounded-full px-3 py-2 shadow-lg">
+                            <button class="px-3 py-1 text-green-400 hover:text-green-300 hover:bg-green-500/30 rounded-md transition-all duration-200 text-xs font-medium hover:shadow-md" data-action="edit" data-id="${source.id}">Edit</button>
+                            <div class="w-px h-4 bg-white/30 mx-1"></div>
+                            <button class="px-3 py-1 text-red-400 hover:text-red-300 hover:bg-red-500/30 rounded-md transition-all duration-200 text-xs font-medium hover:shadow-md" data-action="delete" data-id="${source.id}">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     };
 
     dashboard.updateSourcesPagination = function(response) {
@@ -1549,11 +2055,241 @@ function addSourcesFunctionality() {
         }
     };
 
-    dashboard.openSourceDetails = function(sourceId) {
-        // For now, just show a simple alert with source details
-        const source = this.sourcesData.find(s => s.id === sourceId);
-        if (source) {
-            alert(`Source Details:\nID: ${source.id}\nType: ${source.type}\nStatus: ${source.status}\nLast Seen: ${source.last_seen || 'Never'}`);
+    dashboard.openSourceDetails = async function(sourceId) {
+        try {
+            // Fetch fresh source data from API
+            const source = await this.apiCall(`/sources/${sourceId}`);
+            if (!source) {
+                this.showToast('Source not found', 'error');
+                return;
+            }
+
+            // Store current source for updates
+            this.currentSource = source;
+
+            // Populate modal with source data
+            document.getElementById('source-id').value = source.id;
+            document.getElementById('source-display-name').value = source.display_name || '';
+            document.getElementById('source-type').value = source.type;
+            document.getElementById('source-tenant').value = source.tenant_id;
+            document.getElementById('source-status').value = source.status || 'enabled';
+            document.getElementById('source-max-eps').value = source.max_eps || 0;
+            document.getElementById('source-block-on-exceed').checked = source.block_on_exceed !== false;
+
+            // Parse and display allowed IPs (normalize to array for UI editing)
+            let allowedIps = [];
+            try {
+                allowedIps = Array.isArray(source.allowed_ips) 
+                    ? source.allowed_ips 
+                    : JSON.parse(source.allowed_ips || '[]');
+            } catch (e) {
+                console.error('Failed to parse allowed_ips:', e);
+                allowedIps = [];
+            }
+            this.renderAllowedIPs(JSON.stringify(allowedIps));
+
+            // Show admin controls if user has admin scope
+            const isAdmin = this.hasAdminScope();
+            document.getElementById('admin-controls').classList.toggle('hidden', !isAdmin);
+
+            // Clear test results
+            document.getElementById('test-result').classList.add('hidden');
+            document.getElementById('sync-result').classList.add('hidden');
+
+            // Show modal
+            document.getElementById('source-modal').classList.remove('hidden');
+        } catch (error) {
+            this.showToast(`Failed to load source: ${error.message}`, 'error');
+        }
+    };
+
+    dashboard.renderAllowedIPs = function(allowedIpsJson) {
+        const container = document.getElementById('allowed-ips-container');
+        container.innerHTML = '';
+
+        try {
+            const ips = JSON.parse(allowedIpsJson);
+            ips.forEach(ip => {
+                const chip = document.createElement('div');
+                chip.className = 'inline-flex items-center gap-2 px-3 py-1 bg-[#0F1116] text-zinc-300 rounded-lg text-sm';
+                chip.innerHTML = `
+                    <span>${ip}</span>
+                    <button onclick="this.parentElement.remove()" class="text-zinc-500 hover:text-red-400">×</button>
+                `;
+                container.appendChild(chip);
+            });
+        } catch (e) {
+            console.error('Failed to parse allowed IPs:', e);
+        }
+    };
+
+    dashboard.hasAdminScope = function() {
+        // Check if current API key has admin scope
+        // This is a simplified check - in a real implementation, you'd check the actual scopes
+        return true; // For now, assume admin access
+    };
+
+    dashboard.saveSourceChanges = async function() {
+        const sourceId = document.getElementById('source-id').value;
+        const displayName = document.getElementById('source-display-name').value;
+        const status = document.getElementById('source-status').value;
+        const maxEps = parseInt(document.getElementById('source-max-eps').value) || 0;
+        const blockOnExceed = document.getElementById('source-block-on-exceed').checked;
+
+        // Collect allowed IPs from chips
+        const allowedIps = Array.from(document.getElementById('allowed-ips-container').children)
+            .map(chip => chip.querySelector('span').textContent);
+
+        const updateData = {
+            display_name: displayName,
+            status: status,
+            allowed_ips: allowedIps, // Send as array, backend will handle JSON conversion
+            max_eps: maxEps,
+            block_on_exceed: blockOnExceed
+        };
+
+        try {
+            const response = await this.apiCall(`/sources/${sourceId}`, {
+                method: 'PUT',
+                body: JSON.stringify(updateData)
+            });
+
+            // Update local data
+            const sourceIndex = this.sourcesData.findIndex(s => s.id === sourceId);
+            if (sourceIndex !== -1) {
+                this.sourcesData[sourceIndex] = { ...this.sourcesData[sourceIndex], ...updateData };
+                this.renderSourcesTable();
+            }
+
+            this.showToast('Source updated successfully', 'success');
+            this.closeSourceModal();
+        } catch (error) {
+            this.showToast(`Failed to update source: ${error.message}`, 'error');
+        }
+    };
+
+    dashboard.testAdmission = async function() {
+        const sourceId = document.getElementById('source-id').value;
+        const testIp = document.getElementById('test-ip-input').value.trim();
+        const resultDiv = document.getElementById('test-result');
+
+        if (!testIp) {
+            this.showToast('Please enter an IP address to test', 'error');
+            return;
+        }
+
+        try {
+            const response = await this.apiCall(`/sources/${sourceId}/admission/test`, {
+                method: 'POST',
+                body: JSON.stringify({ client_ip: testIp })
+            });
+
+            resultDiv.classList.remove('hidden');
+            if (response.allowed) {
+                resultDiv.className = 'mt-2 text-sm text-green-400';
+                resultDiv.textContent = `✅ Allowed: ${response.reason || 'IP is allowed'}`;
+            } else {
+                resultDiv.className = 'mt-2 text-sm text-red-400';
+                resultDiv.textContent = `❌ Blocked: ${response.reason || 'IP is not allowed'}`;
+            }
+        } catch (error) {
+            resultDiv.classList.remove('hidden');
+            resultDiv.className = 'mt-2 text-sm text-red-400';
+            resultDiv.textContent = `❌ Error: ${error.message}`;
+        }
+    };
+
+    dashboard.syncFirewall = async function() {
+        const resultDiv = document.getElementById('sync-result');
+
+        try {
+            const response = await this.apiCall('/admin/security/sync-allowlist', {
+                method: 'POST'
+            });
+
+            resultDiv.classList.remove('hidden');
+            resultDiv.className = 'mt-2 text-sm text-green-400';
+            resultDiv.textContent = `✅ Firewall synced: ${response.ipv4_added} IPv4, ${response.ipv6_added} IPv6 CIDRs`;
+        } catch (error) {
+            resultDiv.classList.remove('hidden');
+            resultDiv.className = 'mt-2 text-sm text-red-400';
+            resultDiv.textContent = `❌ Sync failed: ${error.message}`;
+        }
+    };
+
+    dashboard.closeSourceModal = function() {
+        document.getElementById('source-modal').classList.add('hidden');
+        document.getElementById('test-result').classList.add('hidden');
+        document.getElementById('sync-result').classList.add('hidden');
+    };
+
+    dashboard.addAllowedIP = function() {
+        const input = document.getElementById('new-ip-input');
+        const ip = input.value.trim();
+        
+        if (!ip) return;
+
+        // Basic CIDR validation
+        const cidrRegex = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
+        if (!cidrRegex.test(ip)) {
+            this.showToast('Please enter a valid CIDR (e.g., 192.168.1.0/24)', 'error');
+            return;
+        }
+
+        // Check if IP already exists
+        const existingIps = Array.from(document.getElementById('allowed-ips-container').children)
+            .map(chip => chip.querySelector('span').textContent);
+        
+        if (existingIps.includes(ip)) {
+            this.showToast('IP already exists in the list', 'error');
+            return;
+        }
+
+        // Add IP chip
+        const container = document.getElementById('allowed-ips-container');
+        const chip = document.createElement('div');
+        chip.className = 'inline-flex items-center gap-2 px-3 py-1 bg-[#0F1116] text-zinc-300 rounded-lg text-sm';
+        chip.innerHTML = `
+            <span>${ip}</span>
+            <button onclick="this.parentElement.remove()" class="text-zinc-500 hover:text-red-400">×</button>
+        `;
+        container.appendChild(chip);
+
+        input.value = '';
+    };
+
+    dashboard.showToast = function(message, type = 'info') {
+        // Simple toast implementation
+        const toast = document.createElement('div');
+        toast.className = `fixed top-4 right-4 px-4 py-2 rounded-lg text-white text-sm z-50 ${
+            type === 'success' ? 'bg-green-600' : 
+            type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+        }`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    };
+
+    dashboard.deleteSource = async function(sourceId) {
+        if (!confirm('Are you sure you want to delete this source? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            await this.apiCall(`/sources/${sourceId}`, {
+                method: 'DELETE'
+            });
+
+            // Remove from local data
+            this.sourcesData = this.sourcesData.filter(s => s.id !== sourceId);
+            this.renderSourcesTable();
+
+            this.showToast('Source deleted successfully', 'success');
+        } catch (error) {
+            this.showToast(`Failed to delete source: ${error.message}`, 'error');
         }
     };
 
@@ -1612,6 +2348,64 @@ function addSourcesFunctionality() {
         nextBtn.addEventListener('click', () => {
             dashboard.sourcesFilters.page++;
             dashboard.loadSourcesData();
+        });
+    }
+
+    // Wire up Source Details modal event listeners
+    const sourceModal = document.getElementById('source-modal');
+    const sourceModalBackdrop = document.getElementById('source-modal-backdrop');
+    const sourceModalClose = document.getElementById('source-modal-close');
+    const sourceCancelBtn = document.getElementById('source-cancel-btn');
+    const sourceSaveBtn = document.getElementById('source-save-btn');
+    const addIpBtn = document.getElementById('add-ip-btn');
+    const testAdmissionBtn = document.getElementById('test-admission-btn');
+    const syncFirewallBtn = document.getElementById('sync-firewall-btn');
+
+    if (sourceModalBackdrop) {
+        sourceModalBackdrop.addEventListener('click', () => dashboard.closeSourceModal());
+    }
+
+    if (sourceModalClose) {
+        sourceModalClose.addEventListener('click', () => dashboard.closeSourceModal());
+    }
+
+    if (sourceCancelBtn) {
+        sourceCancelBtn.addEventListener('click', () => dashboard.closeSourceModal());
+    }
+
+    if (sourceSaveBtn) {
+        sourceSaveBtn.addEventListener('click', () => dashboard.saveSourceChanges());
+    }
+
+    if (addIpBtn) {
+        addIpBtn.addEventListener('click', () => dashboard.addAllowedIP());
+    }
+
+    if (testAdmissionBtn) {
+        testAdmissionBtn.addEventListener('click', () => dashboard.testAdmission());
+    }
+
+    if (syncFirewallBtn) {
+        syncFirewallBtn.addEventListener('click', () => dashboard.syncFirewall());
+    }
+
+    // Allow Enter key to add IP
+    const newIpInput = document.getElementById('new-ip-input');
+    if (newIpInput) {
+        newIpInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                dashboard.addAllowedIP();
+            }
+        });
+    }
+
+    // Allow Enter key to test admission
+    const testIpInput = document.getElementById('test-ip-input');
+    if (testIpInput) {
+        testIpInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                dashboard.testAdmission();
+            }
         });
     }
 }

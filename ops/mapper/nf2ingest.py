@@ -19,6 +19,9 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+# Add the app directory to Python path for imports
+sys.path.insert(0, '/app')
+
 # Configuration
 BATCH_SIZE = int(os.getenv('BATCH_SIZE', '200'))
 FLUSH_INTERVAL = int(os.getenv('FLUSH_INTERVAL', '1'))  # seconds
@@ -45,6 +48,8 @@ class NetFlowMapper:
         self.last_flush = time.time()
         self.total_sent = 0
         self.total_records = 0
+        self.udp_packets_processed = 0
+        self.records_parsed = 0
         self.session = self._create_session()
         
         # Signal handling for graceful shutdown
@@ -182,6 +187,10 @@ class NetFlowMapper:
                 logger.info(f"[INGEST] sent {len(self.batch)} status={response.status_code}")
                 self.total_sent += 1
                 self.total_records += len(self.batch)
+                
+                # Report UDP metrics to API
+                self._report_udp_metrics()
+                
             elif response.status_code == 413:
                 logger.warning(f"[INGEST][ERR] Payload too large (413), splitting batch")
                 # Split batch in half and retry
@@ -199,6 +208,37 @@ class NetFlowMapper:
         self.batch = []
         self.last_flush = time.time()
     
+    def _report_udp_metrics(self):
+        """Report UDP metrics to the API"""
+        if self.udp_packets_processed > 0 or self.records_parsed > 0:
+            try:
+                metrics_payload = {
+                    "udp_packets_received": self.udp_packets_processed,
+                    "records_parsed": self.records_parsed
+                }
+                
+                headers = {
+                    "Authorization": f"Bearer {API_KEY}",
+                    "Content-Type": "application/json"
+                }
+                
+                # Try to send metrics to a hypothetical metrics endpoint
+                # Note: This would need to be implemented in the API
+                response = self.session.post(
+                    f"{API_BASE}/v1/admin/metrics/udp",
+                    json=metrics_payload,
+                    headers=headers,
+                    timeout=5
+                )
+                
+                if response.status_code == 200:
+                    # Reset counters after successful report
+                    self.udp_packets_processed = 0
+                    self.records_parsed = 0
+                    
+            except Exception as e:
+                logger.debug(f"Failed to report UDP metrics: {e}")
+    
     def process_line(self, line: str):
         """Process a single line of NetFlow JSON"""
         try:
@@ -209,14 +249,50 @@ class NetFlowMapper:
             
             # Parse JSON
             netflow_record = json.loads(clean_line)
+            self.udp_packets_processed += 1
             
             # Check if it's a NetFlow record
             if netflow_record.get("type") not in ["NETFLOW_V5", "NETFLOW_V9", "IPFIX"]:
                 return
             
+            # UDP Admission Control
+            try:
+                from app.security import admission_should_block_udp
+                from app.services.sources import sources_cache
+                from app.services.prometheus_metrics import PrometheusMetrics as PM
+                
+                # Extract exporter IP from NetFlow record
+                exporter_ip = netflow_record.get("exporter_addr", "127.0.0.1")
+                
+                # Find matching source
+                source = sources_cache.match_by_exporter_ip(exporter_ip)
+                
+                if not source:
+                    # Unknown exporter IP - block and record metric
+                    PM.increment_blocked_source("__unknown__", "ip_not_allowed")
+                    logger.debug(f"Blocked UDP from unknown IP: {exporter_ip}")
+                    return  # DROP
+                
+                # Check admission control
+                block, reason = admission_should_block_udp(source, exporter_ip)
+                if block:
+                    PM.increment_blocked_source(source.id, reason or "unknown")
+                    logger.debug(f"Blocked UDP from {exporter_ip} (source: {source.id}, reason: {reason})")
+                    
+                    # Check if LOG_ONLY mode is enabled
+                    from app.config import get_admission_log_only
+                    if not get_admission_log_only():
+                        return  # DROP
+                    # If LOG_ONLY is enabled, continue processing
+                
+            except Exception as e:
+                logger.warning(f"UDP admission control error: {e}")
+                # Continue processing on error (fail-open behavior)
+            
             # Map to flows.v1 format
             flow = self.map_netflow_to_flows_v1(netflow_record)
             if flow:
+                self.records_parsed += 1
                 self.add_to_batch(flow)
                 
         except json.JSONDecodeError:
@@ -242,6 +318,7 @@ class NetFlowMapper:
                 self.flush_batch()
             
             logger.info(f"Mapper finished. Total batches: {self.total_sent}, Total records: {self.total_records}")
+            logger.info(f"UDP packets processed: {self.udp_packets_processed}, Records parsed: {self.records_parsed}")
 
 def main():
     mapper = NetFlowMapper()

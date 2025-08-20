@@ -40,6 +40,31 @@ THREAT_MATCHES_TOTAL = Counter(
     'Total number of threat matches'
 )
 
+# Blocked sources
+BLOCKED_SOURCES_TOTAL = Counter(
+    'telemetry_blocked_source_total',
+    'Count of blocked events by admission control',
+    ['source', 'reason']
+)
+
+# FIFO drops
+FIFO_DROPPED_TOTAL = Counter(
+    'telemetry_fifo_dropped_total',
+    'Dropped events due to FIFO/backpressure'
+)
+
+# UDP packets received
+UDP_PACKETS_RECEIVED_TOTAL = Counter(
+    'telemetry_udp_packets_received_total',
+    'Raw UDP packets accepted by collector'
+)
+
+# Records parsed
+RECORDS_PARSED_TOTAL = Counter(
+    'telemetry_records_parsed_total',
+    'Records successfully parsed and mapped'
+)
+
 # Events per second (gauge)
 EPS = Gauge(
     'telemetry_eps',
@@ -113,6 +138,22 @@ class PrometheusMetrics:
     def increment_threat_matches(self, count: int = 1):
         """Increment threat matches counter."""
         THREAT_MATCHES_TOTAL.inc(count)
+    
+    def increment_blocked_source(self, source_id: str, reason: str):
+        """Increment blocked source counter."""
+        BLOCKED_SOURCES_TOTAL.labels(source=source_id, reason=reason).inc()
+    
+    def increment_fifo_dropped(self, count: int = 1):
+        """Increment FIFO dropped counter."""
+        FIFO_DROPPED_TOTAL.inc(count)
+    
+    def increment_udp_packets_received(self, count: int = 1):
+        """Increment UDP packets received counter."""
+        UDP_PACKETS_RECEIVED_TOTAL.inc(count)
+    
+    def increment_records_parsed(self, count: int = 1):
+        """Increment records parsed counter."""
+        RECORDS_PARSED_TOTAL.inc(count)
     
     def set_eps(self, eps: float):
         """Set events per second gauge."""

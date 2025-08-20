@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  telemetry-allinone:
+    environment:
+      # Enable HTTP admission control
+      ADMISSION_HTTP_ENABLED: "true"
+      # Keep other flags disabled by default for safety
+      ADMISSION_UDP_ENABLED: "false"
+      ADMISSION_LOG_ONLY: "false"
+      ADMISSION_FAIL_OPEN: "false"
+      ADMISSION_COMPAT_ALLOW_EMPTY_IPS: "false"
+      ADMISSION_BLOCK_ON_EXCEED_DEFAULT: "true"
+      TRUST_PROXY: "false"

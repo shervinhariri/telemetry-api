@@ -324,6 +324,15 @@
                 </div>
             </div>
 
+            <!-- Add Source Button -->
+            <div class="flex justify-end">
+                <button id="btn-add-source"
+                        data-action="add-source"
+                        class="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/20">
+                  Add Source
+                </button>
+            </div>
+
             <!-- Sources Table -->
             <div class="bg-[#14151B] rounded-xl border border-white/5 overflow-hidden">
                 <div class="overflow-x-auto">
@@ -334,12 +343,12 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Source</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Type</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Tenant</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Collector</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Allowed IPs</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">EPS Cap</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">EPS (1m)</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Records (24h)</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Last Seen</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Error %</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Avg Risk</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="sources-table" class="divide-y divide-white/5">
@@ -420,13 +429,265 @@
         <input id="key-modal-input" type="password" class="input" placeholder="Paste your API key" />
         <div id="key-modal-status" class="mt-2 text-xs text-zinc-400"></div>
         <div class="mt-4 flex items-center gap-2 justify-end">
-          <button id="key-modal-test" class="btn">Test</button>
-          <button id="key-modal-save" class="btn btn--primary">Save</button>
-          <button id="key-modal-cancel" class="btn btn--ghost">Cancel</button>
+                  <button id="key-modal-test" class="btn">Test</button>
+        <button id="key-modal-save" class="btn btn--primary">Save</button>
+        <button id="key-modal-cancel" class="btn btn--ghost">Cancel</button>
+    </div>
+</div>
+
+<!-- Source Details Modal -->
+<div id="source-modal" class="fixed inset-0 z-50 hidden">
+    <div id="source-modal-backdrop" class="absolute inset-0 bg-black/50"></div>
+    <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div class="bg-[#14151B] rounded-xl border border-white/5 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-white/5 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-white">Source Details</h3>
+                <button id="source-modal-close" class="btn btn--ghost">✕</button>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <!-- Basic Info -->
+                <div>
+                    <h4 class="text-sm font-medium text-zinc-400 mb-3">Basic Information</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-400 mb-1">Source ID</label>
+                            <input id="source-id" type="text" class="input" readonly />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-400 mb-1">Display Name</label>
+                            <input id="source-display-name" type="text" class="input" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-400 mb-1">Type</label>
+                            <input id="source-type" type="text" class="input" readonly />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-400 mb-1">Tenant</label>
+                            <input id="source-tenant" type="text" class="input" readonly />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Access & Limits -->
+                <div>
+                    <h4 class="text-sm font-medium text-zinc-400 mb-3">Access & Limits</h4>
+                    <div class="space-y-4">
+                        <!-- Status Toggle -->
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-400 mb-1">Status</label>
+                            <select id="source-status" class="input">
+                                <option value="enabled">Enabled</option>
+                                <option value="disabled">Disabled</option>
+                            </select>
+                        </div>
+
+                        <!-- Allowed IPs -->
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-400 mb-1">Allowed IPs (CIDR)</label>
+                            <div class="space-y-2">
+                                <div id="allowed-ips-container" class="space-y-2">
+                                    <!-- IP chips will be added here -->
+                                </div>
+                                <div class="flex gap-2">
+                                    <input id="new-ip-input" type="text" class="input flex-1" placeholder="e.g., 192.168.1.0/24" />
+                                    <button id="add-ip-btn" class="btn">Add</button>
+                                    <button id="btn-add-my-ip" class="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/20">Add My IP</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Rate Limits -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-zinc-400 mb-1">Max EPS</label>
+                                <input id="source-max-eps" type="number" class="input" placeholder="0 = unlimited" min="0" />
+                            </div>
+                            <div class="flex items-center mt-6">
+                                <input id="source-block-on-exceed" type="checkbox" class="mr-2" />
+                                <label class="text-sm text-zinc-400">Block on exceed</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Test Admission -->
+                <div>
+                    <h4 class="text-sm font-medium text-zinc-400 mb-3">Test Admission</h4>
+                    <div class="flex gap-2">
+                        <input id="test-ip-input" type="text" class="input flex-1" placeholder="Enter IP to test" />
+                        <button id="test-admission-btn" class="btn">Test</button>
+                    </div>
+                    <div id="test-result" class="mt-2 text-sm hidden"></div>
+                </div>
+
+                <!-- Sync Firewall (Admin Only) -->
+                <div id="admin-controls" class="hidden">
+                    <h4 class="text-sm font-medium text-zinc-400 mb-3">Admin Controls</h4>
+                    <button id="sync-firewall-btn" class="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/20">Sync Firewall</button>
+                    <div id="sync-result" class="mt-2 text-sm hidden"></div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-2 pt-4 border-t border-white/5">
+                    <button id="source-save-btn" class="flex-1 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/20">Save Changes</button>
+                    <button id="source-cancel-btn" class="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-400 border border-white/10 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg hover:shadow-white/10">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    </div>
+
+
+
+    <!-- Defer + cache bust so we always get the latest code and after DOM is parsed -->
+    <!-- Drawer markup -->
+  <div id="drawer-backdrop" class="fixed inset-0 bg-black/40 hidden"></div>
+  <aside id="source-drawer"
+         class="fixed top-0 right-0 h-full w-[480px] max-w-[95vw] bg-[#0b1020]
+                border-l border-white/10 shadow-2xl translate-x-full
+                transition-transform duration-200 z-50">
+    <div class="p-4 flex items-center justify-between border-b border-white/10">
+      <h2 id="drawer-title" class="text-white text-sm font-semibold">Source</h2>
+      <button id="drawer-close" class="text-white/70 hover:text-white" aria-label="Close">✕</button>
+    </div>
+    <div id="drawer-content" class="p-4 text-white/90 text-sm space-y-3">
+      <!-- content injected by app.js -->
+    </div>
+  </aside>
+
+  <!-- Backdrop for Create Source drawer -->
+  <div id="create-src-backdrop"
+       class="fixed inset-0 z-[98] bg-black/50 backdrop-blur-sm hidden"
+       onclick="window.closeCreateSourceDrawer()"></div>
+
+  <!-- Right-side Create Source drawer -->
+  <aside id="create-src-drawer"
+         class="fixed right-0 top-0 h-full w-[540px] max-w-[90vw] z-[99]
+                translate-x-full transition-transform duration-200 ease-out
+                bg-[#0f1115] border-l border-white/10 shadow-2xl hidden">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-6 py-5 border-b border-white/10">
+      <h2 class="text-lg font-semibold">Create New Source</h2>
+      <button class="text-white/60 hover:text-white" onclick="window.closeCreateSourceDrawer()">
+        ✕
+      </button>
+    </div>
+
+    <!-- Body -->
+    <form id="create-src-form" class="p-6 space-y-4" onsubmit="return window.submitCreateSource(event)">
+      <div>
+        <label class="text-sm text-white/70">Source ID *</label>
+        <input id="create-src-id" required pattern="[a-z0-9_\-]+"
+               placeholder="e.g., my-source-01"
+               class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+        <p class="mt-1 text-xs text-white/50">lowercase letters, numbers, hyphens, underscores only</p>
+      </div>
+
+      <div>
+        <label class="text-sm text-white/70">Display Name</label>
+        <input id="create-src-display" placeholder="Human-readable name"
+               class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm text-white/70">Tenant</label>
+          <input id="create-src-tenant" value="default"
+                 class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+        </div>
+        <div>
+          <label class="text-sm text-white/70">Type</label>
+          <input id="create-src-type" placeholder="e.g., cisco_asa / test"
+                 class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+        </div>
+      </div>
+
+      <div>
+        <label class="text-sm text-white/70">Collector</label>
+        <input id="create-src-collector" value="gw-local"
+               class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm text-white/70">Status</label>
+          <select id="create-src-status"
+                  class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500">
+            <option value="enabled">Enabled</option>
+            <option value="disabled">Disabled</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-white/70">Max EPS (0 = unlimited)</label>
+          <input id="create-src-maxeps" type="number" min="0" value="0"
+                 class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input id="create-src-block" type="checkbox" class="accent-blue-500" checked>
+        <label class="text-sm text-white/80">Block on exceed</label>
+      </div>
+
+      <div>
+        <label class="text-sm text-white/70">Allowed IPs (CIDRs, one per line)</label>
+        <textarea id="create-src-ips" rows="4" placeholder="127.0.0.1/32&#10;203.0.113.0/24"
+                  class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"></textarea>
+        <p class="mt-1 text-xs text-white/50">Leave empty to block all (whitelist-only).</p>
+      </div>
+
+      <!-- Footer -->
+      <div class="pt-2 flex justify-end gap-3">
+        <button type="button" onclick="window.closeCreateSourceDrawer()"
+                class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
+          Cancel
+        </button>
+        <button type="submit"
+                class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium">
+          Create Source
+        </button>
+      </div>
+    </form>
+  </aside>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="delete-modal-backdrop" class="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm hidden"></div>
+  <div id="delete-modal" class="fixed inset-0 z-[101] flex items-center justify-center p-4 hidden">
+    <div class="bg-[#0f1115] border border-white/10 rounded-xl shadow-2xl w-full max-w-md">
+      <div class="p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+            <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold text-white">Delete Source</h3>
+            <p class="text-sm text-white/60">This action cannot be undone</p>
+          </div>
+        </div>
+        
+        <p class="text-white/80 mb-6">
+          Are you sure you want to delete <span id="delete-source-name" class="font-medium text-white">this source</span>?
+        </p>
+        
+        <div class="flex gap-3 justify-end">
+          <button id="delete-modal-cancel" 
+                  class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 transition-colors">
+            Cancel
+          </button>
+          <button id="delete-modal-confirm" 
+                  class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium transition-colors">
+            Delete Source
+          </button>
         </div>
       </div>
     </div>
+  </div>
 
-    <script src="/ui/app.js?v=6.5"></script>
+  <!-- Load script last, defer + cache bust -->
+  <script src="/ui/app.js?v=vefix13" defer></script>
 </body>
 </html>

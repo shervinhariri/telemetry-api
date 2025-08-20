@@ -37,9 +37,22 @@ services:
       - ADMIN_AUDIT_MAX=1000
       - ADMIN_AUDIT_TTL_MINUTES=60
       - ADMIN_SHOW_LOG_TAIL=false
+      - ADMISSION_HTTP_ENABLED=true
+      - TRUST_PROXY=false
+      - FIFO_MAX_RECORDS=50000
+      - FIFO_DROP_POLICY=newest
+      - UDP_PORT=2055
     ports:
       - "80:80"           # GUI/API on host:80
       - "2055:2055/udp"   # NetFlow/IPFIX listener
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     volumes:
       - ./data:/data
       - ./geo:/data/geo:ro

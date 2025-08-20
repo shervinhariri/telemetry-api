@@ -5,6 +5,11 @@ Configuration module for Telemetry API
 # Application configuration
 import os
 
+def env_bool(key: str, default: bool = False) -> bool:
+    """Get boolean value from environment variable"""
+    value = os.getenv(key, str(default)).lower()
+    return value in ("true", "1", "yes", "on")
+
 # Version information
 API_VERSION = "0.8.4"
 
@@ -40,6 +45,16 @@ HTTP_LOG_EXCLUDE_PATHS = set(os.getenv("HTTP_LOG_EXCLUDE_PATHS", "/v1/metrics,/v
 REDACT_HEADERS = os.getenv("REDACT_HEADERS", "authorization,x-api-key").split(",")
 REDACT_FIELDS = os.getenv("REDACT_FIELDS", "password,token").split(",")
 
+# Admission control configuration
+ADMISSION_HTTP_ENABLED: bool = env_bool("ADMISSION_HTTP_ENABLED", False)
+ADMISSION_UDP_ENABLED: bool = env_bool("ADMISSION_UDP_ENABLED", False)
+ADMISSION_LOG_ONLY: bool = env_bool("ADMISSION_LOG_ONLY", False)  # block→log-only
+ADMISSION_FAIL_OPEN: bool = env_bool("ADMISSION_FAIL_OPEN", False)  # on internal errors, allow
+ADMISSION_COMPAT_ALLOW_EMPTY_IPS: bool = env_bool("ADMISSION_COMPAT_ALLOW_EMPTY_IPS", False)  # [] means allow-any (legacy)
+ADMISSION_BLOCK_ON_EXCEED_DEFAULT: bool = env_bool("ADMISSION_BLOCK_ON_EXCEED_DEFAULT", True)
+
+TRUST_PROXY: bool = env_bool("TRUST_PROXY", False)
+
 # Admin configuration
 ADMIN_AUDIT_MAX = int(os.getenv("ADMIN_AUDIT_MAX", "1000"))
 ADMIN_AUDIT_TTL_MINUTES = int(os.getenv("ADMIN_AUDIT_TTL_MINUTES", "60"))
@@ -69,3 +84,67 @@ LOG_FILE = os.getenv("LOG_FILE", "/app/data/logs/app.log")
 
 # Retention configuration
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "7"))
+
+# Runtime configuration manager for feature flags
+class RuntimeConfig:
+    """Runtime configuration manager for feature flags"""
+    
+    def __init__(self):
+        self._flags = {}
+        self._load_from_env()
+    
+    def _load_from_env(self):
+        """Load flags from environment variables"""
+        self._flags = {
+            "ADMISSION_HTTP_ENABLED": env_bool("ADMISSION_HTTP_ENABLED", False),
+            "ADMISSION_UDP_ENABLED": env_bool("ADMISSION_UDP_ENABLED", False),
+            "ADMISSION_LOG_ONLY": env_bool("ADMISSION_LOG_ONLY", False),
+            "ADMISSION_FAIL_OPEN": env_bool("ADMISSION_FAIL_OPEN", False),
+            "ADMISSION_COMPAT_ALLOW_EMPTY_IPS": env_bool("ADMISSION_COMPAT_ALLOW_EMPTY_IPS", False),
+            "ADMISSION_BLOCK_ON_EXCEED_DEFAULT": env_bool("ADMISSION_BLOCK_ON_EXCEED_DEFAULT", True),
+            "TRUST_PROXY": env_bool("TRUST_PROXY", False),
+        }
+    
+    def get(self, key: str, default=None):
+        """Get a flag value"""
+        return self._flags.get(key, default)
+    
+    def set(self, key: str, value: bool):
+        """Set a flag value"""
+        if key in self._flags:
+            self._flags[key] = bool(value)
+    
+    def update(self, updates: dict):
+        """Update multiple flags"""
+        for key, value in updates.items():
+            if key in self._flags:
+                self._flags[key] = bool(value)
+    
+    def get_all(self) -> dict:
+        """Get all flags"""
+        return self._flags.copy()
+
+# Global runtime config instance
+runtime_config = RuntimeConfig()
+
+# Feature flag accessors
+def get_admission_http_enabled() -> bool:
+    return runtime_config.get("ADMISSION_HTTP_ENABLED", False)
+
+def get_admission_udp_enabled() -> bool:
+    return runtime_config.get("ADMISSION_UDP_ENABLED", False)
+
+def get_admission_log_only() -> bool:
+    return runtime_config.get("ADMISSION_LOG_ONLY", False)
+
+def get_admission_fail_open() -> bool:
+    return runtime_config.get("ADMISSION_FAIL_OPEN", False)
+
+def get_admission_compat_allow_empty_ips() -> bool:
+    return runtime_config.get("ADMISSION_COMPAT_ALLOW_EMPTY_IPS", False)
+
+def get_admission_block_on_exceed_default() -> bool:
+    return runtime_config.get("ADMISSION_BLOCK_ON_EXCEED_DEFAULT", True)
+
+def get_trust_proxy() -> bool:
+    return runtime_config.get("TRUST_PROXY", False)

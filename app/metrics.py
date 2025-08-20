@@ -16,12 +16,20 @@ class MetricsAggregator:
             "threat_matches": 0,
             "unique_sources": set(),
             "risk_sum": 0,
-            "risk_count": 0
+            "risk_count": 0,
+            "blocked_sources": 0
         }
         
         # Request counters
         self.requests_total = 0
         self.requests_failed = 0
+        
+        # Blocked source counters by reason
+        self.blocked_sources = {
+            "disabled": 0,
+            "ip_not_allowed": 0,
+            "rate_limit": 0
+        }
         
         # Sliding windows (5 minutes @ 1s resolution)
         self.window_size = 300  # 5 minutes
@@ -58,6 +66,16 @@ class MetricsAggregator:
             # Update Prometheus metrics
             status_code = 500 if failed else 200
             prometheus_metrics.increment_requests(status_code)
+    
+    def record_blocked_source(self, source_id: str, reason: str):
+        """Record a blocked source admission"""
+        with self.lock:
+            self.totals["blocked_sources"] += 1
+            if reason in self.blocked_sources:
+                self.blocked_sources[reason] += 1
+            
+            # Update Prometheus metrics
+            prometheus_metrics.increment_blocked_source(source_id, reason)
                 
     def record_batch(self, record_count: int, threat_matches: int, risk_scores: List[int], sources: List[str]):
         """Record a processed batch"""
@@ -166,8 +184,11 @@ class MetricsAggregator:
                     "threat_matches": self.totals["threat_matches"],
                     "unique_sources": len(self.totals["unique_sources"]),
                     "risk_sum": self.totals["risk_sum"],
-                    "risk_count": self.totals["risk_count"]
+                    "risk_count": self.totals["risk_count"],
+                    "blocked_sources": self.totals["blocked_sources"]
                 },
+                
+                "blocked_sources": self.blocked_sources.copy(),
                 
                 "rates": {
                     "eps_1m": eps_1m,
@@ -223,6 +244,22 @@ def record_queue_lag(lag_ms: int):
 def record_event(risk_score: int, threat_matches: int):
     """Record a single event for window tracking"""
     metrics.record_event(risk_score, threat_matches)
+
+def record_blocked_source(source_id: str, reason: str):
+    """Record a blocked source admission"""
+    metrics.record_blocked_source(source_id, reason)
+
+def record_fifo_dropped(count: int = 1):
+    """Record FIFO dropped events"""
+    prometheus_metrics.increment_fifo_dropped(count)
+
+def record_udp_packets_received(count: int = 1):
+    """Record UDP packets received"""
+    prometheus_metrics.increment_udp_packets_received(count)
+
+def record_records_parsed(count: int = 1):
+    """Record successfully parsed records"""
+    prometheus_metrics.increment_records_parsed(count)
 
 def tick():
     """Background tick to roll windows"""

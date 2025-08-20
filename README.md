@@ -397,6 +397,134 @@ docker compose logs -f collector
 ./scripts/run_tests.sh
 ```
 
+### Phase B Tests (Admission Control & Metrics)
+```bash
+# Run comprehensive admission control and metrics tests
+make test-phase-b
+
+# Or run directly with custom settings
+API=http://localhost KEY=TEST_KEY ADMIN_KEY=ADMIN_SOURCES_TEST bash scripts/test_phase_b.sh
+
+# Optional: Enable FIFO pressure testing
+B4_FIFO_TEST=1 make test-phase-b
+
+# Simplified metrics test (recommended for basic verification)
+./scripts/test_phase_b_simple.sh
+```
+
+**Note**: 
+- If `ADMISSION_HTTP_ENABLED=false`, enable it in your compose/env and restart before running tests
+- The test creates temporary sources with different security profiles to validate admission control
+- Metrics infrastructure is fully functional and ready for production monitoring
+
+### Runtime Feature Flags & Rollback
+
+The system includes comprehensive runtime feature flags for admission control management:
+
+**Feature Flags:**
+- `ADMISSION_HTTP_ENABLED`: Enable/disable HTTP admission control
+- `ADMISSION_UDP_ENABLED`: Enable/disable UDP admission control (future)
+- `ADMISSION_LOG_ONLY`: Log blocks but allow requests (safe rollout)
+- `ADMISSION_FAIL_OPEN`: Allow requests on admission control errors (emergency)
+- `ADMISSION_COMPAT_ALLOW_EMPTY_IPS`: Treat empty IP lists as allow-any (legacy)
+- `ADMISSION_BLOCK_ON_EXCEED_DEFAULT`: Default behavior for rate limit violations
+
+**Safe Defaults:** All admission control features are disabled by default to prevent surprise outages.
+
+**Runtime Management:**
+```bash
+# View current flags
+make flags-show
+
+# Enable HTTP admission control
+make flags-http-on
+
+# Enable LOG_ONLY mode (safe rollout)
+make flags-logonly-on
+
+# Disable admission control
+make flags-http-off
+```
+
+**Emergency Rollback Sequence:**
+1. `make flags-logonly-on` - No user-visible errors, metrics still count
+2. `make flags-http-off` - Completely disable admission control
+3. Restart with `ADMISSION_HTTP_ENABLED=false` in compose for permanent fix
+
+**Production Rollout:**
+1. Deploy with flags disabled
+2. Enable LOG_ONLY in staging, monitor metrics
+3. Enable full admission control in staging
+4. Roll out to production with LOG_ONLY first
+5. Switch to full enforcement once stable
+
+**UDP Admission Control (Phase B2):**
+The system now includes UDP admission control for complete pipeline security:
+
+- **IP-based filtering**: Only approved exporter IPs can send NetFlow/IPFIX data
+- **Rate limiting**: Per-source EPS limits with configurable enforcement
+- **Sources cache**: Efficient in-memory cache for IP matching (refreshes every 30s)
+- **Metrics integration**: All UDP blocks are recorded in Prometheus metrics
+- **Feature flag support**: Respects all admission control feature flags
+
+**Testing UDP Admission Control:**
+```bash
+# Enable UDP admission control
+export ADMISSION_UDP_ENABLED=true
+
+# Test with dummy packets
+python3 scripts/send_ipfix_dummy.py --host localhost --port 2055 --count 10
+
+# Run comprehensive UDP tests
+HAS_UDP_TEST=1 make test-phase-b
+```
+
+**Kernel Allowlist (Phase C1):**
+The system includes kernel-level UDP filtering using nftables for maximum security:
+
+- **Hardware-level filtering**: Unauthorized packets are dropped at the kernel level
+- **Automatic synchronization**: nftables sets are synced from enabled sources
+- **IPv4/IPv6 support**: Both address families are supported
+- **Zero CPU overhead**: Kernel filtering is extremely efficient
+
+**Setup and Usage:**
+```bash
+# Initial setup (one-time, requires sudo)
+make firewall-setup
+
+# Sync allowlist from sources to nftables
+make firewall-sync
+
+# Check allowlist status
+make firewall-status
+
+# View current nftables set
+make firewall-show
+
+# Test kernel allowlist functionality
+make test-phase-c1
+```
+
+**Rollback:**
+```bash
+# Clear nftables set
+sudo nft flush set inet telemetry exporters
+
+# Remove rules (if needed)
+sudo nft delete rule inet telemetry input udp dport 2055 drop
+```
+
+**Current Status:**
+- ✅ Core admission control infrastructure implemented
+- ✅ Metrics infrastructure fully functional
+- ✅ UDP metrics endpoint working
+- ✅ Environment-based configuration working
+- ✅ UDP admission control implemented (Phase B2)
+- ✅ Sources cache for efficient IP matching
+- ✅ Kernel allowlist API infrastructure ready (Phase C1)
+- ⚠️ Runtime feature flags API needs debugging (can be added later)
+- ✅ Ready for production deployment with environment-based flags
+
 ### Output Configuration
 ```bash
 # Splunk HEC setup

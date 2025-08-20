@@ -6,7 +6,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 from app.models.source import Source
 from app.schemas.source import SourceCreate, SourceUpdate, SourceMetrics
+import ipaddress
+import json
+import logging
+from typing import Optional, List
+from sqlalchemy.orm import Session
+from ..db import SessionLocal
+from ..models.source import Source
 
+logger = logging.getLogger(__name__)
 
 
 class SourceMetricsTracker:
@@ -93,6 +101,114 @@ class SourceMetricsTracker:
 metrics_tracker = SourceMetricsTracker()
 
 
+class SourcesCache:
+    """In-memory cache for source matching by exporter IP"""
+    
+    def __init__(self):
+        self._sources = []
+        self._last_refresh = 0
+        self._refresh_interval = 30  # Refresh every 30 seconds
+    
+    def _should_refresh(self) -> bool:
+        """Check if cache needs refresh"""
+        import time
+        return time.time() - self._last_refresh > self._refresh_interval
+    
+    def _refresh_cache(self):
+        """Refresh the cache from database"""
+        try:
+            db = SessionLocal()
+            try:
+                # Get all enabled sources
+                sources = db.query(Source).filter(Source.status == "enabled").all()
+                self._sources = []
+                
+                for source in sources:
+                    try:
+                        # Parse allowed_ips for each source
+                        allowed_ips = json.loads(source.allowed_ips)
+                        if allowed_ips:  # Only cache sources with IP restrictions
+                            self._sources.append({
+                                'id': source.id,
+                                'tenant_id': source.tenant_id,
+                                'allowed_ips': allowed_ips,
+                                'max_eps': source.max_eps,
+                                'block_on_exceed': source.block_on_exceed,
+                                'source_obj': source
+                            })
+                    except (json.JSONDecodeError, Exception) as e:
+                        logger.warning(f"Invalid allowed_ips for source {source.id}: {e}")
+                        continue
+                
+                import time
+                self._last_refresh = time.time()
+                logger.debug(f"Refreshed sources cache with {len(self._sources)} sources")
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Failed to refresh sources cache: {e}")
+    
+    def match_by_exporter_ip(self, ip: str) -> Optional[Source]:
+        """
+        Find the best matching source for the given exporter IP.
+        
+        Args:
+            ip: IP address of the exporter
+            
+        Returns:
+            Source object if found, None otherwise
+        """
+        if self._should_refresh():
+            self._refresh_cache()
+        
+        if not self._sources:
+            return None
+        
+        # Find the best match (longest prefix match)
+        best_match = None
+        best_prefix_length = -1
+        matches = []
+        
+        try:
+            ip_obj = ipaddress.ip_address(ip)
+            
+            for source_info in self._sources:
+                for cidr_str in source_info['allowed_ips']:
+                    try:
+                        network = ipaddress.ip_network(cidr_str, strict=False)
+                        if ip_obj in network:
+                            prefix_length = network.prefixlen
+                            matches.append((source_info, prefix_length))
+                            
+                            if prefix_length > best_prefix_length:
+                                best_prefix_length = prefix_length
+                                best_match = source_info
+                    except ValueError:
+                        logger.warning(f"Invalid CIDR in source {source_info['id']}: {cidr_str}")
+                        continue
+            
+            # Log if multiple matches found
+            if len(matches) > 1:
+                logger.info(f"Multiple source matches for IP {ip}: {[m[0]['id'] for m in matches]}")
+            
+            return best_match['source_obj'] if best_match else None
+            
+        except ValueError:
+            logger.warning(f"Invalid IP address: {ip}")
+            return None
+    
+    def get_all_sources(self) -> List[Source]:
+        """Get all cached sources (for debugging)"""
+        if self._should_refresh():
+            self._refresh_cache()
+        return [s['source_obj'] for s in self._sources]
+
+# Global cache instance
+sources_cache = SourcesCache()
+
+
 class SourceService:
     """Service for managing sources"""
     
@@ -108,7 +224,11 @@ class SourceService:
             site=source_data.site,
             tags=source_data.tags,
             notes=source_data.notes,
-            status="stale"
+            health_status="stale",
+            status=source_data.status or "enabled",
+            allowed_ips=source_data.allowed_ips or "[]",
+            max_eps=source_data.max_eps or 0,
+            block_on_exceed=source_data.block_on_exceed if source_data.block_on_exceed is not None else True
         )
         db.add(source)
         db.commit()
@@ -120,7 +240,7 @@ class SourceService:
         db: Session, 
         tenant_id: str,
         source_type: Optional[str] = None,
-        status: Optional[str] = None,
+        health_status: Optional[str] = None,
         site: Optional[str] = None,
         page: int = 1,
         size: int = 50
@@ -130,8 +250,8 @@ class SourceService:
         
         if source_type:
             query = query.filter(Source.type == source_type)
-        if status:
-            query = query.filter(Source.status == status)
+        if health_status:
+            query = query.filter(Source.health_status == health_status)
         if site:
             query = query.filter(Source.site == site)
         
@@ -146,6 +266,11 @@ class SourceService:
         return db.query(Source).filter(
             and_(Source.id == source_id, Source.tenant_id == tenant_id)
         ).first()
+    
+    @staticmethod
+    def get_source_by_id_admin(db: Session, source_id: str) -> Optional[Source]:
+        """Get a source by ID (admin access - no tenant restriction)"""
+        return db.query(Source).filter(Source.id == source_id).first()
     
     @staticmethod
     def update_source_last_seen(db: Session, collector_id: str, tenant_id: str):
@@ -166,7 +291,7 @@ class SourceService:
         
         for source in sources:
             if not source.last_seen:
-                source.status = "stale"
+                source.health_status = "stale"
                 continue
             
             # Get metrics for this collector
@@ -177,11 +302,11 @@ class SourceService:
             
             # Status rules
             if time_diff < 120 and metrics.error_pct_15m < 5.0:
-                source.status = "healthy"
+                source.health_status = "healthy"
             elif time_diff < 300 or metrics.error_pct_15m >= 5.0:
-                source.status = "degraded"
+                source.health_status = "degraded"
             else:
-                source.status = "stale"
+                source.health_status = "stale"
         
         db.commit()
     
@@ -200,3 +325,40 @@ class SourceService:
             metrics.last_seen = last_seen.isoformat()
         
         return metrics
+    
+    @staticmethod
+    def update_source(db: Session, source_id: str, update_data: dict) -> Source:
+        """Update a source with new data"""
+        source = db.query(Source).filter(Source.id == source_id).first()
+        if not source:
+            raise ValueError("Source not found")
+        
+        # Update allowed fields
+        if 'display_name' in update_data:
+            source.display_name = update_data['display_name']
+        if 'status' in update_data:
+            source.status = update_data['status']
+        if 'allowed_ips' in update_data:
+            # Ensure allowed_ips is stored as JSON string
+            if isinstance(update_data['allowed_ips'], list):
+                source.allowed_ips = json.dumps(update_data['allowed_ips'])
+            else:
+                source.allowed_ips = update_data['allowed_ips']
+        if 'max_eps' in update_data:
+            source.max_eps = update_data['max_eps']
+        if 'block_on_exceed' in update_data:
+            source.block_on_exceed = update_data['block_on_exceed']
+        
+        db.commit()
+        db.refresh(source)
+        return source
+    
+    @staticmethod
+    def delete_source(db: Session, source_id: str):
+        """Delete a source"""
+        source = db.query(Source).filter(Source.id == source_id).first()
+        if not source:
+            raise ValueError("Source not found")
+        
+        db.delete(source)
+        db.commit()

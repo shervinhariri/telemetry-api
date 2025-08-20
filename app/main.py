@@ -29,6 +29,9 @@ from .api.keys import router as keys_router
 from .api.demo import router as demo_router
 from .api.prometheus import router as prometheus_router
 from .api.sources import router as sources_router
+from .api.admin_security import router as admin_security_router
+from .api.admin_flags import router as admin_flags_router
+from .api.utils import router as utils_router
 from .pipeline import ingest_queue, record_batch_accepted, enqueue
 from .logging_config import setup_logging
 from .config import API_VERSION
@@ -202,6 +205,37 @@ app.include_router(keys_router, prefix=API_PREFIX)
 app.include_router(demo_router, prefix=API_PREFIX)
 app.include_router(prometheus_router, prefix=API_PREFIX)
 app.include_router(sources_router, prefix=API_PREFIX)
+app.include_router(admin_security_router, prefix=API_PREFIX)
+app.include_router(admin_flags_router, prefix=API_PREFIX)
+app.include_router(utils_router, prefix=API_PREFIX)
+
+# UDP Metrics endpoint for mapper reporting
+@app.post(f"{API_PREFIX}/admin/metrics/udp")
+async def report_udp_metrics(request: Request):
+    """Accept UDP metrics from the mapper"""
+    # Check if user has admin scope
+    scopes = getattr(request.state, 'scopes', [])
+    if "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Admin scope required")
+    
+    try:
+        payload = await request.json()
+        udp_packets = payload.get("udp_packets_received", 0)
+        records_parsed = payload.get("records_parsed", 0)
+        
+        # Record metrics
+        from .metrics import record_udp_packets_received, record_records_parsed
+        if udp_packets > 0:
+            record_udp_packets_received(udp_packets)
+        if records_parsed > 0:
+            record_records_parsed(records_parsed)
+        
+        return {"status": "ok", "recorded": {"udp_packets": udp_packets, "records_parsed": records_parsed}}
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid metrics payload: {str(e)}")
+
+
 
 # Compatibility route for old UI paths
 @app.get("/api/requests")
@@ -520,6 +554,77 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
                 raise HTTPException(status_code=400, detail="Records must be JSON objects.")
             _validate_record(rec)
         
+        # Admission control - check source security rules
+        from .config import (
+            get_admission_http_enabled, get_admission_log_only, get_admission_fail_open, get_trust_proxy
+        )
+        
+        if get_admission_http_enabled():
+            from .security import get_client_ip, validate_source_admission
+            from .services.sources import SourceService
+            from .metrics import record_blocked_source
+            from .db import SessionLocal
+            import logging
+            
+            logger = logging.getLogger(__name__)
+            
+            # Get client IP
+            client_ip = get_client_ip(request, get_trust_proxy())
+            
+            # Get source_id from payload
+            source_id = payload.get("collector_id") or payload.get("source_id")
+            
+            if source_id:
+                # Look up source in database
+                db = SessionLocal()
+                try:
+                    source = SourceService.get_source_by_id(db, source_id, tenant_id)
+                    if source:
+                        try:
+                            # Validate admission
+                            allowed, reason = validate_source_admission(
+                                source=source,
+                                client_ip=client_ip,
+                                record_count=len(records)
+                            )
+                            
+                            if not allowed:
+                                # Record blocked source metrics
+                                record_blocked_source(source_id, reason)
+                                
+                                # Handle LOG_ONLY mode
+                                if get_admission_log_only():
+                                    logger.warning(f"Admission blocked (LOG_ONLY): source={source_id}, reason={reason}, client_ip={client_ip}")
+                                    # Continue processing (return 200)
+                                else:
+                                    # Return appropriate error response
+                                    error_detail = {
+                                        "disabled": "Source is disabled",
+                                        "ip_not_allowed": f"Client IP {client_ip} not in allowed list",
+                                        "rate_limit": "Rate limit exceeded"
+                                    }.get(reason, "Admission denied")
+                                    
+                                    return JSONResponse(
+                                        {"error": reason, "detail": error_detail},
+                                        status_code=403 if reason != "rate_limit" else 429
+                                    )
+                                    
+                        except Exception as e:
+                            # Handle internal errors in admission control
+                            logger.error(f"Admission control error: {e}")
+                            record_blocked_source(source_id, "admission_error")
+                            
+                            if get_admission_fail_open():
+                                logger.warning(f"Admission error, FAIL_OPEN enabled - allowing request: {e}")
+                                # Continue processing (return 200)
+                            else:
+                                return JSONResponse(
+                                    {"error": "admission_error", "detail": "Internal admission control error"},
+                                    status_code=500
+                                )
+                finally:
+                    db.close()
+        
         # Idempotency check: if same batch seen within TTL, return 209
         if seen_or_store(tenant_id, api_key_id, raw):
             from fastapi.responses import JSONResponse
@@ -531,6 +636,10 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
         
         if accepted < len(records):
             raise HTTPException(status_code=429, detail="Ingest temporarily overloaded, please retry.")
+        
+        # Record parsed records metric
+        from .metrics import record_records_parsed
+        record_records_parsed(accepted)
         
         # Add enriched event (simulated for now)
         if trace_id:

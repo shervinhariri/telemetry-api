@@ -1,0 +1,56 @@
+groups:
+- name: telemetry_admission
+  rules:
+  - alert: TelemetryBlockedSpike
+    expr: increase(telemetry_blocked_source_total[5m]) > 500
+    for: 2m
+    labels: 
+      severity: warning
+    annotations:
+      summary: "Spike in blocked telemetry"
+      description: "Blocked events >500 in 5m."
+
+  - alert: TelemetryFifoDropping
+    expr: increase(telemetry_fifo_dropped_total[5m]) > 0
+    for: 1m
+    labels: 
+      severity: critical
+    annotations:
+      summary: "FIFO drops detected"
+      description: "Events dropped due to backpressure."
+
+  - alert: SourceEnabledNoTraffic
+    expr: (on(source) sum by (source) (rate(telemetry_records_parsed_total[10m])) == 0)
+    for: 15m
+    labels: 
+      severity: warning
+    annotations:
+      summary: "Enabled source has zero EPS"
+      description: "Source is enabled but shows no traffic for 15m."
+
+  - alert: HighErrorRate
+    expr: rate(telemetry_blocked_source_total[5m]) / rate(telemetry_records_parsed_total[5m]) > 0.1
+    for: 5m
+    labels: 
+      severity: warning
+    annotations:
+      summary: "High error rate detected"
+      description: "Error rate >10% in last 5 minutes."
+
+  - alert: UDPPacketLoss
+    expr: rate(telemetry_udp_packets_received_total[5m]) > 0 and rate(telemetry_records_parsed_total[5m]) == 0
+    for: 2m
+    labels: 
+      severity: critical
+    annotations:
+      summary: "UDP packets received but not parsed"
+      description: "UDP packets are being received but not successfully parsed."
+
+  - alert: APIHighLatency
+    expr: histogram_quantile(0.95, rate(telemetry_api_request_latency_ms_bucket[5m])) > 1000
+    for: 5m
+    labels: 
+      severity: warning
+    annotations:
+      summary: "High API latency detected"
+      description: "95th percentile API latency >1s in last 5 minutes."

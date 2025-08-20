@@ -12,6 +12,11 @@ class SourceCreate(BaseModel):
     site: Optional[str] = Field(None, description="Site location (Krakow, HQ, etc.)")
     tags: Optional[str] = Field(None, description="JSON array string of tags")
     notes: Optional[str] = Field(None, description="Additional notes")
+    # Security fields
+    status: Optional[str] = Field("enabled", description="Source status: enabled or disabled")
+    allowed_ips: Optional[str] = Field("[]", description="JSON array of allowed CIDR strings")
+    max_eps: Optional[int] = Field(0, description="Maximum events per second (0 = unlimited)")
+    block_on_exceed: Optional[bool] = Field(True, description="Block traffic when EPS limit exceeded")
 
 
 class SourceUpdate(BaseModel):
@@ -19,6 +24,11 @@ class SourceUpdate(BaseModel):
     site: Optional[str] = Field(None, description="Site location")
     tags: Optional[str] = Field(None, description="JSON array string of tags")
     notes: Optional[str] = Field(None, description="Additional notes")
+    # Security fields
+    status: Optional[str] = Field(None, description="Source status: enabled or disabled")
+    allowed_ips: Optional[str] = Field(None, description="JSON array of allowed CIDR strings")
+    max_eps: Optional[int] = Field(None, description="Maximum events per second (0 = unlimited)")
+    block_on_exceed: Optional[bool] = Field(None, description="Block traffic when EPS limit exceeded")
 
 
 class SourceResponse(BaseModel):
@@ -29,9 +39,14 @@ class SourceResponse(BaseModel):
     collector: str
     site: Optional[str]
     tags: Optional[str]
-    status: str
+    health_status: str
     last_seen: Optional[str]
     notes: Optional[str]
+    # Security fields
+    status: str
+    allowed_ips: str
+    max_eps: int
+    block_on_exceed: bool
 
 
 class SourceMetrics(BaseModel):
