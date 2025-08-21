@@ -21,6 +21,18 @@ REQUESTS_TOTAL = Counter(
     ['status_class', 'path_group']
 )
 
+# HTTP admission decisions
+HTTP_ADMITTED_TOTAL = Counter(
+    'telemetry_http_admitted_total',
+    'Total number of HTTP requests admitted by admission middleware'
+)
+
+HTTP_DROPPED_TOTAL = Counter(
+    'telemetry_http_dropped_total',
+    'Total number of HTTP requests dropped by admission middleware',
+    ['reason']
+)
+
 # Request fitness buckets
 REQUEST_FITNESS = Histogram(
     'telemetry_request_fitness',
@@ -57,6 +69,73 @@ FIFO_DROPPED_TOTAL = Counter(
 UDP_PACKETS_RECEIVED_TOTAL = Counter(
     'telemetry_udp_packets_received_total',
     'Raw UDP packets accepted by collector'
+)
+
+# UDP admission decisions
+UDP_ADMITTED_TOTAL = Counter(
+    'telemetry_udp_admitted_total',
+    'Total number of UDP packets admitted by UDP head'
+)
+
+UDP_DROPPED_TOTAL = Counter(
+    'telemetry_udp_dropped_total',
+    'Total number of UDP packets dropped by UDP head',
+    ['reason']
+)
+
+# HTTP IP allow-list blocks
+HTTP_BLOCKED_IP_TOTAL = Counter(
+    'telemetry_http_blocked_ip_total',
+    'Total number of HTTP requests blocked by IP allow-list',
+    ['source_id']
+)
+
+# Source type mismatches
+SOURCE_TYPE_MISMATCH_TOTAL = Counter(
+    'telemetry_source_type_mismatch_total',
+    'Total number of source type mismatches (declared vs actual origin)',
+    ['source_id']
+)
+
+# Export test counters
+EXPORT_TEST_TOTAL = Counter(
+    'telemetry_export_test_total',
+    'Total number of export test attempts',
+    ['dest', 'code']
+)
+
+# Export operation counters
+EXPORT_SENT_TOTAL = Counter(
+    'telemetry_export_sent_total',
+    'Total number of events successfully exported',
+    ['dest']
+)
+
+EXPORT_FAILED_TOTAL = Counter(
+    'telemetry_export_failed_total',
+    'Total number of export failures',
+    ['dest', 'reason']
+)
+
+# Export latency histogram
+EXPORT_LATENCY = Histogram(
+    'telemetry_export_latency_ms',
+    'Export latency in milliseconds',
+    ['dest'],
+    buckets=[10, 50, 100, 250, 500, 1000, 2500, 5000]
+)
+
+# Export backlog and DLQ gauges
+EXPORT_BACKLOG = Gauge(
+    'telemetry_export_backlog',
+    'Number of events waiting to be exported',
+    ['dest']
+)
+
+EXPORT_DLQ_DEPTH = Gauge(
+    'telemetry_export_dlq_depth',
+    'Number of failed events in DLQ',
+    ['dest']
 )
 
 # Records parsed
@@ -126,6 +205,20 @@ class PrometheusMetrics:
             path_group = "other"
         
         REQUESTS_TOTAL.labels(status_class=status_class, path_group=path_group).inc()
+
+    def increment_http_admitted(self, count: int = 1):
+        HTTP_ADMITTED_TOTAL.inc(count)
+
+    def increment_http_dropped(self, reason: str, count: int = 1):
+        HTTP_DROPPED_TOTAL.labels(reason=reason).inc(count)
+    
+    def increment_http_blocked_ip(self, source_id: str, count: int = 1):
+        """Increment HTTP blocked IP counter."""
+        HTTP_BLOCKED_IP_TOTAL.labels(source_id=source_id).inc(count)
+    
+    def increment_source_type_mismatch(self, source_id: str, count: int = 1):
+        """Increment source type mismatch counter."""
+        SOURCE_TYPE_MISMATCH_TOTAL.labels(source_id=source_id).inc(count)
     
     def observe_request_fitness(self, fitness: float):
         """Observe request fitness score."""
@@ -154,6 +247,38 @@ class PrometheusMetrics:
     def increment_records_parsed(self, count: int = 1):
         """Increment records parsed counter."""
         RECORDS_PARSED_TOTAL.inc(count)
+
+    def increment_udp_admitted(self, count: int = 1):
+        """Increment UDP admitted counter."""
+        UDP_ADMITTED_TOTAL.inc(count)
+
+    def increment_udp_dropped(self, reason: str, count: int = 1):
+        """Increment UDP dropped counter with reason."""
+        UDP_DROPPED_TOTAL.labels(reason=reason).inc(count)
+
+    def increment_export_test(self, dest: str, code: str):
+        """Increment export test counter."""
+        EXPORT_TEST_TOTAL.labels(dest=dest, code=code).inc()
+
+    def increment_export_sent(self, dest: str, count: int = 1):
+        """Increment export sent counter."""
+        EXPORT_SENT_TOTAL.labels(dest=dest).inc(count)
+
+    def increment_export_failed(self, dest: str, reason: str, count: int = 1):
+        """Increment export failed counter."""
+        EXPORT_FAILED_TOTAL.labels(dest=dest, reason=reason).inc(count)
+
+    def observe_export_latency(self, dest: str, latency_ms: float):
+        """Observe export latency."""
+        EXPORT_LATENCY.labels(dest=dest).observe(latency_ms)
+
+    def set_export_backlog(self, dest: str, count: int):
+        """Set export backlog gauge."""
+        EXPORT_BACKLOG.labels(dest=dest).set(count)
+
+    def set_export_dlq_depth(self, dest: str, count: int):
+        """Set export DLQ depth gauge."""
+        EXPORT_DLQ_DEPTH.labels(dest=dest).set(count)
     
     def set_eps(self, eps: float):
         """Set events per second gauge."""

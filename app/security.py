@@ -154,6 +154,18 @@ def get_client_ip(request, trust_proxy: bool = False) -> str:
     # Fallback to direct client IP
     return request.client.host if request.client else "127.0.0.1"
 
+def get_http_client_ip(request) -> str:
+    """Extract client IP for HTTP requests with configurable XFF trust"""
+    from .config import get_http_trust_xff
+    
+    if get_http_trust_xff():
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            return xff.split(",")[0].strip()
+    
+    # Fallback to direct client IP
+    return request.client.host if request.client else "127.0.0.1"
+
 
 def validate_source_admission(
     source,
@@ -178,6 +190,50 @@ def validate_source_admission(
     
     if not ip_in_cidrs(client_ip, allowed_ips):
         return False, "ip_not_allowed"
+    
+    # Check rate limiting
+    max_eps = int(source.max_eps or 0)
+    if max_eps > 0 and source.block_on_exceed:
+        bucket = get_bucket(source.id, max_eps)
+        if not bucket.allow(record_count):
+            return False, "rate_limit"
+    
+    return True, "allowed"
+
+def validate_http_source_admission(
+    source,
+    request,
+    record_count: int = 1
+) -> tuple[bool, str]:
+    """
+    Validate HTTP source admission with optional IP allow-list
+    
+    Returns:
+        (allowed: bool, reason: str)
+    """
+    from .config import get_http_ip_allowlist_enabled
+    from .services.prometheus_metrics import prometheus_metrics
+    
+    # Check if source is enabled
+    if source.status != "enabled":
+        return False, "disabled"
+    
+    # Check HTTP IP allow-list if enabled and source is HTTP type
+    if (get_http_ip_allowlist_enabled() and 
+        source.type == "http" and 
+        source.allowed_ips):
+        
+        client_ip = get_http_client_ip(request)
+        
+        try:
+            allowed_ips = json.loads(source.allowed_ips) if source.allowed_ips else []
+        except (json.JSONDecodeError, TypeError):
+            allowed_ips = []
+        
+        if allowed_ips and not ip_in_cidrs(client_ip, allowed_ips):
+            # Increment blocked IP metric
+            prometheus_metrics.increment_http_blocked_ip(source.id)
+            return False, "ip_not_allowed"
     
     # Check rate limiting
     max_eps = int(source.max_eps or 0)

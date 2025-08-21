@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal
 
 from app.schemas.source import (
-    SourceCreate, SourceResponse, SourceListResponse, SourceMetrics
+    SourceCreate, SourceResponse, SourceListResponse, SourceMetrics, SourceStatus
 )
 from app.services.sources import SourceService
 from app.models.source import Source
@@ -42,11 +42,13 @@ async def create_source(
 async def list_sources(
     request: Request,
     tenant: Optional[str] = Query(None, description="Filter by tenant"),
-    type: Optional[str] = Query(None, description="Filter by source type"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    type: Optional[str] = Query(None, description="Filter by source type (udp, http)"),
+    status: Optional[str] = Query(None, description="Filter by status (enabled, disabled)"),
+    enabled: Optional[bool] = Query(None, description="Filter by enabled status"),
     site: Optional[str] = Query(None, description="Filter by site"),
     page: int = Query(1, ge=1, description="Page number"),
-    size: int = Query(50, ge=1, le=100, description="Page size")
+    size: int = Query(50, ge=1, le=100, description="Page size"),
+    page_size: Optional[int] = Query(None, ge=1, le=100, description="Alias for page size")
 ):
     """Get paginated list of sources"""
     # Check if user has read_metrics scope
@@ -59,6 +61,7 @@ async def list_sources(
     
     db = SessionLocal()
     try:
+        eff_size = page_size or size
         sources, total = SourceService.get_sources(
             db=db,
             tenant_id=tenant_id,
@@ -66,21 +69,25 @@ async def list_sources(
             health_status=status,  # Use health_status for filtering
             site=site,
             page=page,
-            size=size
+            size=eff_size
         )
         
         # Update statuses before returning
         SourceService.update_source_statuses(db)
         
-        pages = (total + size - 1) // size
+        pages = (total + eff_size - 1) // eff_size
         
-        return SourceListResponse(
+        resp = SourceListResponse(
             sources=[SourceResponse(**source.to_dict()) for source in sources],
             total=total,
             page=page,
-            size=size,
+            size=eff_size,
             pages=pages
         )
+        # Fill alias fields for UI compatibility
+        resp.items = resp.sources
+        resp.page_size = resp.size
+        return resp
     finally:
         db.close()
 
@@ -109,6 +116,40 @@ async def get_source(
         db.refresh(source)
         
         return SourceResponse(**source.to_dict())
+    finally:
+        db.close()
+
+
+@router.get("/sources/{source_id}/status", response_model=SourceStatus)
+async def get_source_status(
+    source_id: str,
+    request: Request
+):
+    """Get source status with EPS and error percentage"""
+    # Check if user has read_metrics scope
+    scopes = getattr(request.state, 'scopes', [])
+    tenant_id = getattr(request.state, 'tenant_id', 'default')
+    
+    if "read_metrics" not in scopes:
+        raise HTTPException(status_code=403, detail="read_metrics scope required")
+    
+    db = SessionLocal()
+    try:
+        source = SourceService.get_source_by_id(db, source_id, tenant_id)
+        if not source:
+            raise HTTPException(status_code=404, detail="Source not found")
+        
+        # Get metrics from the metrics module
+        from ..metrics import get_source_eps_1m, get_source_error_pct_1m
+        
+        eps_1m = get_source_eps_1m(source_id)
+        error_pct_1m = get_source_error_pct_1m(source_id)
+        
+        return SourceStatus(
+            last_seen_ts=source.last_seen_ts,
+            eps_1m=eps_1m,
+            error_pct_1m=error_pct_1m
+        )
     finally:
         db.close()
 
@@ -193,7 +234,7 @@ async def test_admission(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid request: {str(e)}")
 
-@router.put("/sources/{source_id}")
+@router.patch("/sources/{source_id}")
 async def update_source(
     source_id: str,
     source_data: dict,

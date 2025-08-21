@@ -1410,22 +1410,38 @@ class TelemetryDashboard {
     }
 
     createSuccessRing(percentage) {
-        const size = 112; // slightly smaller for better balance
-        const stroke = 10;
+        const size = 80; // smaller to fit the new compact box
+        const stroke = 4; // thinner stroke like refresh button
         const radius = (size - stroke) / 2;
         const circumference = 2 * Math.PI * radius;
         const dash = Math.max(0, Math.min(100, percentage)) / 100 * circumference;
         let color = '#ef4444'; // red
-        if (percentage >= 90) color = '#22c55e';
-        else if (percentage >= 60) color = '#f59e0b';
-        // No glow for professional look
+        let glowColor = 'rgba(239,68,68,0.6)'; // red glow
+        if (percentage >= 90) {
+            color = '#22c55e'; // green
+            glowColor = 'rgba(34,197,94,0.7)'; // brighter green glow
+        } else if (percentage >= 60) {
+            color = '#f59e0b'; // amber
+            glowColor = 'rgba(245,158,11,0.7)'; // brighter amber glow
+        }
+        
         return `
-          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block">
+          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;filter:drop-shadow(0 0 8px ${glowColor})">
+            <defs>
+              <filter id="glow-${Math.round(percentage)}">
+                <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                <feMerge> 
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
             <circle cx="${size/2}" cy="${size/2}" r="${radius}" stroke="rgba(255,255,255,0.08)" stroke-width="${stroke}" fill="none"/>
             <circle cx="${size/2}" cy="${size/2}" r="${radius}" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
-                    stroke-dasharray="${dash} ${circumference - dash}" transform="rotate(-90 ${size/2} ${size/2})"/>
+                    stroke-dasharray="${dash} ${circumference - dash}" transform="rotate(-90 ${size/2} ${size/2})"
+                    filter="url(#glow-${Math.round(percentage)})" style="box-shadow: 0 0 12px ${glowColor}"/>
             <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff"
-                  style="font-size:${size*0.22}px;font-weight:700;letter-spacing:-0.02em">${Math.round(percentage)}%</text>
+                  style="font-size:${size*0.2}px;font-weight:700;letter-spacing:-0.02em">${Math.round(percentage)}%</text>
           </svg>`;
     }
 

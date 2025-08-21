@@ -282,6 +282,43 @@ class SourceService:
         db.commit()
     
     @staticmethod
+    def track_source_origin(db: Session, source_id: str, tenant_id: str, traffic_origin: str):
+        """
+        Track the actual origin of traffic for a source and detect type mismatches
+        
+        Args:
+            db: Database session
+            source_id: Source identifier
+            tenant_id: Tenant identifier
+            traffic_origin: Actual origin of traffic ("udp", "http", "unknown")
+        """
+        from .prometheus_metrics import prometheus_metrics
+        
+        # Get the source
+        source = SourceService.get_source_by_id(db, source_id, tenant_id)
+        if not source:
+            return
+        
+        # If origin is not set yet, set it based on first traffic
+        if not source.origin:
+            source.origin = traffic_origin
+            db.commit()
+            logger.info(f"Set origin for source {source_id} to {traffic_origin}")
+            return
+        
+        # If origin is already set, check for type mismatch
+        if source.origin != traffic_origin:
+            # Traffic origin changed - this is unusual but not necessarily wrong
+            logger.warning(f"Source {source_id} traffic origin changed from {source.origin} to {traffic_origin}")
+            return
+        
+        # Check for type mismatch (declared type vs actual origin)
+        if source.type != source.origin:
+            # Increment mismatch metric
+            prometheus_metrics.increment_source_type_mismatch(source_id)
+            logger.warning(f"Source type mismatch for {source_id}: declared={source.type}, actual={source.origin}")
+    
+    @staticmethod
     def update_source_statuses(db: Session):
         """Update source statuses based on last_seen and metrics"""
         now = datetime.utcnow()

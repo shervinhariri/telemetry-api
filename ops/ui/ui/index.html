@@ -175,9 +175,9 @@
           background: rgba(16,185,129,0.16);          /* emerald-500 @ ~16% */
           color: rgba(209,250,229,0.95);              /* text-emerald-100ish */
           border: 1px solid rgba(16,185,129,0.40);
-          border-radius: 12px;                        /* rounded-xl like dropdowns */
-          padding: 8px 12px;                          /* px-3 py-2 like dropdowns */
-          font-size: 14px;                            /* text-sm like dropdowns */
+          border-radius: 16px;                        /* rounded-2xl like Create Source */
+          padding: 8px 16px;                          /* px-4 py-2 like Create Source */
+          font-size: 14px;                            /* text-sm like Create Source */
           box-shadow: 0 0 22px rgba(16,185,129,0.38);
           backdrop-filter: blur(6px);
           transition: box-shadow .2s, background .2s, transform .05s;
@@ -187,9 +187,9 @@
           background: rgba(239,68,68,0.16);           /* red-500 @ ~16% */
           color: rgba(254,226,226,0.95);              /* text-red-100ish */
           border: 1px solid rgba(239,68,68,0.40);
-          border-radius: 12px;                        /* rounded-xl like dropdowns */
-          padding: 8px 12px;                          /* px-3 py-2 like dropdowns */
-          font-size: 14px;                            /* text-sm like dropdowns */
+          border-radius: 16px;                        /* rounded-2xl like Create Source */
+          padding: 8px 16px;                          /* px-4 py-2 like Create Source */
+          font-size: 14px;                            /* text-sm like Create Source */
           box-shadow: 0 0 22px rgba(239,68,68,0.38);
           backdrop-filter: blur(6px);
           transition: box-shadow .2s, background .2s, transform .05s;
@@ -209,9 +209,9 @@
           background: rgba(255,255,255,0.06);
           color: rgba(255,255,255,0.85);
           border: 1px solid rgba(255,255,255,0.12);
-          border-radius: 12px;                        /* rounded-xl like dropdowns */
-          padding: 8px 12px;                          /* px-3 py-2 like dropdowns */
-          font-size: 14px;                            /* text-sm like dropdowns */
+          border-radius: 16px;                        /* rounded-2xl like Create Source */
+          padding: 8px 16px;                          /* px-4 py-2 like Create Source */
+          font-size: 14px;                            /* text-sm like Create Source */
           transition: background .15s, transform .05s;
           backdrop-filter: blur(4px);
         }
@@ -232,8 +232,8 @@
           background: rgba(16,185,129,0.16) !important;
           color: rgba(209,250,229,0.95) !important;
           border: 1px solid rgba(16,185,129,0.40) !important;
-          border-radius: 12px !important;
-          padding: 8px 12px !important;
+          border-radius: 16px !important;
+          padding: 8px 16px !important;
           font-size: 14px !important;
           box-shadow: 0 0 22px rgba(16,185,129,0.38) !important;
           backdrop-filter: blur(6px) !important;
@@ -249,8 +249,8 @@
           background: rgba(16,185,129,0.16) !important;
           color: rgba(209,250,229,0.95) !important;
           border: 1px solid rgba(16,185,129,0.40) !important;
-          border-radius: 12px !important;
-          padding: 8px 12px !important;
+          border-radius: 16px !important;
+          padding: 8px 16px !important;
           font-size: 14px !important;
           box-shadow: 0 0 22px rgba(16,185,129,0.38) !important;
           backdrop-filter: blur(6px) !important;
@@ -265,8 +265,8 @@
           background: rgba(255,255,255,0.06) !important;
           color: rgba(255,255,255,0.85) !important;
           border: 1px solid rgba(255,255,255,0.12) !important;
-          border-radius: 12px !important;
-          padding: 8px 12px !important;
+          border-radius: 16px !important;
+          padding: 8px 16px !important;
           font-size: 14px !important;
           transition: background .15s, transform .05s !important;
           backdrop-filter: blur(4px) !important;
@@ -291,10 +291,10 @@
             <div class="px-5 py-4 flex items-center gap-3">
                 <div class="text-xl font-semibold tracking-tight">Telemetry</div>
                 <div class="ml-auto flex items-center gap-2 text-xs text-zinc-400">
-                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40">
+                    <button onclick="window.location.reload()" class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40 hover:bg-emerald-500/25 hover:ring-emerald-500/60 cursor-pointer transition-colors">
                         <span class="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
                         Online
-                    </span>
+                    </button>
                     <!-- Global API Key Chip (visible on all pages) -->
                     <div id="api-key-container" class="chip chip--dark" style="position:relative;">
                       <div id="api-key-display" class="api-key-mode">
@@ -319,8 +319,8 @@
         <div class="mt-4 flex gap-2 flex-wrap">
                     <button id="tab-dashboard" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#14151B] ring-indigo-500/40 text-zinc-100">Dashboard</button>
         <button id="tab-sources" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Sources</button>
-        <button id="tab-requests" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Requests</button>
-        <button id="tab-api" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">API</button>
+        <button id="tab-requests" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">System</button>
+        <button id="tab-api" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Toolbox</button>
         <button id="tab-logs" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Logs</button>
         </div>
 
@@ -353,25 +353,7 @@
             </div>
         </div>
 
-        <!-- System Information card -->
-        <div class="mt-6 rounded-2xl bg-white/[0.03] border border-white/5 p-6">
-            <div class="mb-4 flex items-center justify-between">
-                <div class="text-sm text-zinc-300">System Information</div>
-                <div class="flex items-center gap-3 text-xs text-zinc-400">
-                    <button onclick="window.location.reload()" class="rounded-lg px-2 py-1 ring-1 ring-white/10 hover:ring-indigo-400/40">Hard refresh</button>
-                </div>
-            </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <button onclick="window.open('/docs','_blank')" class="w-full text-left rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] focus:outline-none flex flex-col gap-2">
-                    <div class="text-xs uppercase tracking-wide text-zinc-400">Version</div>
-                    <div class="text-2xl font-semibold leading-none" id="version">0.8.5</div>
-                </button>
-                <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col gap-2">
-                    <div class="text-xs uppercase tracking-wide text-zinc-400">Uptime</div>
-                    <div class="text-2xl font-semibold leading-none" id="uptime">—</div>
-                </div>
-            </div>
-        </div>
+
         </div>
 
         
@@ -379,18 +361,22 @@
         <!-- Panel: Requests -->
         <div id="panel-requests" class="panel hidden mt-6">
         <!-- Top stats for requests -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
-            <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-6">
-                <div class="mx-auto flex flex-col items-center">
-                    <div id="success-ring" class="h-40 w-40 grid place-items-center"></div>
-                    <div class="mt-3 text-sm text-zinc-400">Success Rate</div>
-                </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col items-center justify-center gap-2">
+                <div id="success-ring" class="grid place-items-center"></div>
+                <div class="text-xs uppercase tracking-wide text-zinc-400">Success Rate</div>
             </div>
-            <div class="rounded-2xl bg-white/[0.03] border border-white/5 p-6 flex items-center justify-center">
-                <div class="text-center">
-                    <div class="mt-2 text-2xl md:text-3xl font-semibold tracking-tight text-white" id="avg-latency">0ms</div>
-                    <div class="mt-2 text-sm text-zinc-400 tracking-wide">Avg Latency</div>
-                </div>
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col items-center justify-center gap-2">
+                <div class="text-2xl font-semibold leading-none" id="avg-latency">0ms</div>
+                <div class="text-xs uppercase tracking-wide text-zinc-400">Avg Latency</div>
+            </div>
+            <button onclick="window.open('/docs','_blank')" class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] focus:outline-none flex flex-col items-center justify-center gap-2">
+                <div class="text-2xl font-semibold leading-none" id="version">0.8.5</div>
+                <div class="text-xs uppercase tracking-wide text-zinc-400">Version</div>
+            </button>
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col items-center justify-center gap-2">
+                <div class="text-2xl font-semibold leading-none" id="uptime">—</div>
+                <div class="text-xs uppercase tracking-wide text-zinc-400">Uptime</div>
             </div>
         </div>
         <div class="mt-2 mb-3 flex items-center justify-between">
@@ -527,13 +513,17 @@
         </div>
 
         <!-- Panel: API -->
-        <section id="panel-api" data-panel="api" class="card panel hidden mt-6">
-          <div class="card-header">
-            <div class="card-title">API Tools</div>
-            <div class="spacer"></div>
-          </div>
+        <div id="panel-api" class="panel hidden mt-6">
 
-          <div class="card-body">
+
+          <!-- API Tools card -->
+          <section class="card">
+            <div class="card-header">
+              <div class="card-title">API Tools</div>
+              <div class="spacer"></div>
+            </div>
+
+            <div class="card-body">
             <div id="api-error" class="alert hidden"></div>
 
             <div class="toolbar" style="margin-bottom:10px">
@@ -557,8 +547,9 @@
               <button id="btn-clear-output" class="btn-ghost-gray">Clear</button>
             </div>
             <pre id="api-output" class="codebox"></pre>
-          </div>
-        </section>
+            </div>
+          </section>
+        </div>
     </div>
 
     <!-- Slide over for details -->
@@ -854,6 +845,7 @@
   </div>
 
   <!-- Load script last, defer + cache bust -->
-  <script src="/ui/app.js?v=vefix29" defer></script>
+  <script src="/ui/app.js?v=vefix37" defer></script>
 </body>
 </html>
+

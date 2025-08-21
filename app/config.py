@@ -48,6 +48,8 @@ REDACT_FIELDS = os.getenv("REDACT_FIELDS", "password,token").split(",")
 # Admission control configuration
 ADMISSION_HTTP_ENABLED: bool = env_bool("ADMISSION_HTTP_ENABLED", False)
 ADMISSION_UDP_ENABLED: bool = env_bool("ADMISSION_UDP_ENABLED", False)
+HTTP_IP_ALLOWLIST_ENABLED: bool = env_bool("HTTP_IP_ALLOWLIST_ENABLED", False)
+HTTP_TRUST_XFF: bool = env_bool("HTTP_TRUST_XFF", True)
 ADMISSION_LOG_ONLY: bool = env_bool("ADMISSION_LOG_ONLY", False)  # block→log-only
 ADMISSION_FAIL_OPEN: bool = env_bool("ADMISSION_FAIL_OPEN", False)  # on internal errors, allow
 ADMISSION_COMPAT_ALLOW_EMPTY_IPS: bool = env_bool("ADMISSION_COMPAT_ALLOW_EMPTY_IPS", False)  # [] means allow-any (legacy)
@@ -98,6 +100,8 @@ class RuntimeConfig:
         self._flags = {
             "ADMISSION_HTTP_ENABLED": env_bool("ADMISSION_HTTP_ENABLED", False),
             "ADMISSION_UDP_ENABLED": env_bool("ADMISSION_UDP_ENABLED", False),
+            "HTTP_IP_ALLOWLIST_ENABLED": env_bool("HTTP_IP_ALLOWLIST_ENABLED", False),
+            "HTTP_TRUST_XFF": env_bool("HTTP_TRUST_XFF", True),
             "ADMISSION_LOG_ONLY": env_bool("ADMISSION_LOG_ONLY", False),
             "ADMISSION_FAIL_OPEN": env_bool("ADMISSION_FAIL_OPEN", False),
             "ADMISSION_COMPAT_ALLOW_EMPTY_IPS": env_bool("ADMISSION_COMPAT_ALLOW_EMPTY_IPS", False),
@@ -148,3 +152,11 @@ def get_admission_block_on_exceed_default() -> bool:
 
 def get_trust_proxy() -> bool:
     return runtime_config.get("TRUST_PROXY", False)
+
+def get_http_ip_allowlist_enabled() -> bool:
+    """Get HTTP IP allow-list enabled flag"""
+    return runtime_config.get("HTTP_IP_ALLOWLIST_ENABLED", False)
+
+def get_http_trust_xff() -> bool:
+    """Get HTTP trust X-Forwarded-For flag"""
+    return runtime_config.get("HTTP_TRUST_XFF", True)

@@ -23,9 +23,21 @@ async def authenticate(request: Request):
         key = db.query(ApiKey).filter(ApiKey.hash == token_hash, ApiKey.disabled == False).first()
         if not key:
             log.warning("auth: key not found for hash=%s", token_hash)
-            raise HTTPException(status_code=401, detail="Invalid API key")
+            raise HTTPException(
+                status_code=401, 
+                detail={"error": "unauthorized", "hint": "invalid API key or tenant"}
+            )
         
         tenant_id = key.tenant_id
+
+        # Check if tenant exists
+        tenant = db.get(Tenant, tenant_id)
+        if not tenant:
+            log.warning("auth: tenant not found for key=%s tenant_id=%s", key.key_id, tenant_id)
+            raise HTTPException(
+                status_code=401, 
+                detail={"error": "unauthorized", "hint": "invalid API key or tenant"}
+            )
 
         # Optional admin override
         override = request.headers.get("X-Tenant-ID")

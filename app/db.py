@@ -7,7 +7,8 @@ from sqlalchemy.orm import sessionmaker
 import os
 
 # Database URL from environment or default to SQLite
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./telemetry.db")
+sqlite_path = os.getenv("SQLITE_PATH", "./telemetry.db")
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{sqlite_path}")
 
 # Create engine
 engine = create_engine(

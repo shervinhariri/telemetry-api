@@ -18,6 +18,7 @@ from .enrich.geo import enrich_geo_asn
 from .enrich.ti import match_ip, match_domain
 from .enrich.risk import score
 from .metrics import get_metrics, increment_requests, tick
+from .services.prometheus_metrics import prometheus_metrics
 from .api.version import router as version_router
 from .api.admin_update import router as admin_update_router
 from .api.outputs import router as outputs_router
@@ -169,6 +170,25 @@ def _is_public(path: str) -> bool:
             if path == p:
                 return True
     return False
+
+# Database cold-start middleware
+@app.middleware("http")
+async def database_cold_start_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as e:
+        # Check if it's a database-related error
+        error_str = str(e).lower()
+        if any(db_error in error_str for db_error in [
+            "no such table", "operationalerror", "database is locked", 
+            "unable to open database", "database connection"
+        ]):
+            return JSONResponse(
+                {"status": "warming_up", "detail": "database not ready"},
+                status_code=503
+            )
+        # Re-raise other exceptions
+        raise
 
 # Authentication middleware
 @app.middleware("http")
@@ -438,6 +458,11 @@ def _validate_record(rec: Dict[str, Any]) -> None:
     # Minimal validation per contract: require timestamps + src/dst basics (expand as needed)
     required_any = ["ts", "time", "@timestamp"]
     if not any(k in rec for k in required_any):
+        # Count HTTP admission drop for missing fields
+        try:
+            prometheus_metrics.increment_http_dropped("missing_fields")
+        except Exception:
+            pass
         raise HTTPException(status_code=400, detail="Missing event timestamp.")
     # You can add per-schema checks (flows.v1, zeek.conn.v1) later
 
@@ -497,7 +522,7 @@ async def schema(response: Response):
     }
 
 @app.post(f"{API_PREFIX}/ingest")
-async def ingest(request: Request, response: Response, Authorization: Optional[str] = Header(None), content_encoding: Optional[str] = Header(None)):
+async def ingest(request: Request, response: Response, Authorization: Optional[str] = Header(None), content_encoding: Optional[str] = Header(None), x_source_id: Optional[str] = Header(None)):
     # Check if user has ingest scope
     scopes = getattr(request.state, 'scopes', [])
     if "ingest" not in scopes and "admin" not in scopes:
@@ -512,6 +537,10 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
         # Check content length (5MB limit)
         content_length = request.headers.get("content-length")
         if content_length and int(content_length) > 5 * 1024 * 1024:
+            try:
+                prometheus_metrics.increment_http_dropped("over_size")
+            except Exception:
+                pass
             raise HTTPException(status_code=413, detail="Payload too large (max 5MB)")
         
         # Rate limiting per key and per tenant (opt-in via cache fallback-safe)
@@ -523,6 +552,10 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
 
         if not check_limit(tenant_id, api_key_id):
             from fastapi.responses import JSONResponse
+            try:
+                prometheus_metrics.increment_http_dropped("over_rate")
+            except Exception:
+                pass
             return JSONResponse({"error": "rate_limited", "limit_per_min": PER_MIN}, status_code=429)
 
         raw = await request.body()
@@ -531,15 +564,31 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
         try:
             payload = json.loads(raw.decode("utf-8"))
         except UnicodeDecodeError:
+            try:
+                prometheus_metrics.increment_http_dropped("invalid_json")
+            except Exception:
+                pass
             raise HTTPException(status_code=400, detail="Body is not valid UTF-8 JSON (use gzip or utf-8).")
         except json.JSONDecodeError as e:
+            try:
+                prometheus_metrics.increment_http_dropped("invalid_json")
+            except Exception:
+                pass
             raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
 
         records = _parse_records(payload)
         if not records:
+            try:
+                prometheus_metrics.increment_http_dropped("no_records")
+            except Exception:
+                pass
             raise HTTPException(status_code=400, detail="Empty batch.")
         
         if len(records) > 10000:
+            try:
+                prometheus_metrics.increment_http_dropped("too_many_records")
+            except Exception:
+                pass
             raise HTTPException(status_code=413, detail="Too many records (max 10,000)")
 
         # Add validated event
@@ -553,6 +602,12 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
             if not isinstance(rec, dict):
                 raise HTTPException(status_code=400, detail="Records must be JSON objects.")
             _validate_record(rec)
+
+        # Admitted
+        try:
+            prometheus_metrics.increment_http_admitted(1)
+        except Exception:
+            pass
         
         # Admission control - check source security rules
         from .config import (
@@ -560,7 +615,7 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
         )
         
         if get_admission_http_enabled():
-            from .security import get_client_ip, validate_source_admission
+            from .security import validate_http_source_admission
             from .services.sources import SourceService
             from .metrics import record_blocked_source
             from .db import SessionLocal
@@ -568,11 +623,8 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
             
             logger = logging.getLogger(__name__)
             
-            # Get client IP
-            client_ip = get_client_ip(request, get_trust_proxy())
-            
-            # Get source_id from payload
-            source_id = payload.get("collector_id") or payload.get("source_id")
+            # Get source_id from payload or header
+            source_id = payload.get("collector_id") or payload.get("source_id") or x_source_id
             
             if source_id:
                 # Look up source in database
@@ -581,10 +633,10 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
                     source = SourceService.get_source_by_id(db, source_id, tenant_id)
                     if source:
                         try:
-                            # Validate admission
-                            allowed, reason = validate_source_admission(
+                            # Validate admission with HTTP-specific logic
+                            allowed, reason = validate_http_source_admission(
                                 source=source,
-                                client_ip=client_ip,
+                                request=request,
                                 record_count=len(records)
                             )
                             
@@ -594,13 +646,13 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
                                 
                                 # Handle LOG_ONLY mode
                                 if get_admission_log_only():
-                                    logger.warning(f"Admission blocked (LOG_ONLY): source={source_id}, reason={reason}, client_ip={client_ip}")
+                                    logger.warning(f"Admission blocked (LOG_ONLY): source={source_id}, reason={reason}")
                                     # Continue processing (return 200)
                                 else:
                                     # Return appropriate error response
                                     error_detail = {
                                         "disabled": "Source is disabled",
-                                        "ip_not_allowed": f"Client IP {client_ip} not in allowed list",
+                                        "ip_not_allowed": "Client IP not in allowed list",
                                         "rate_limit": "Rate limit exceeded"
                                     }.get(reason, "Admission denied")
                                     
@@ -624,6 +676,36 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
                                 )
                 finally:
                     db.close()
+        
+        # Resolve source ID for metrics tracking
+        source_id = x_source_id
+        if not source_id:
+            # Auto-create default HTTP source for API key
+            key = Authorization.replace("Bearer ", "") if Authorization else ""
+            source_id = f"default-http-{key[:8]}"
+            
+            # TODO: Create default source if it doesn't exist
+            # This would involve database lookup/creation
+        
+        # Track source metrics
+        from .metrics import record_source_admitted, update_source_eps
+        record_source_admitted(source_id, len(records))
+        
+        # Calculate and update EPS
+        eps = len(records) / max((time.time() - start_time), 0.001)  # Avoid division by zero
+        update_source_eps(source_id, eps)
+        
+        # Track source origin for type mismatch detection
+        if source_id:
+            from .services.sources import SourceService
+            from .db import SessionLocal
+            db = SessionLocal()
+            try:
+                SourceService.track_source_origin(db, source_id, tenant_id, "http")
+            except Exception as e:
+                logger.error(f"Failed to track source origin: {e}")
+            finally:
+                db.close()
         
         # Idempotency check: if same batch seen within TTL, return 209
         if seen_or_store(tenant_id, api_key_id, raw):
@@ -761,6 +843,10 @@ async def ingest_zeek(request: Request, response: Response, Authorization: Optio
         # Check content length (5MB limit)
         content_length = request.headers.get("content-length")
         if content_length and int(content_length) > 5 * 1024 * 1024:
+            try:
+                prometheus_metrics.increment_http_dropped("over_size")
+            except Exception:
+                pass
             raise HTTPException(status_code=413, detail="Payload too large (max 5MB)")
         
         raw = await request.body()
@@ -769,8 +855,16 @@ async def ingest_zeek(request: Request, response: Response, Authorization: Optio
         try:
             payload = json.loads(raw.decode("utf-8"))
         except UnicodeDecodeError:
+            try:
+                prometheus_metrics.increment_http_dropped("invalid_json")
+            except Exception:
+                pass
             raise HTTPException(status_code=400, detail="Body is not valid UTF-8 JSON")
         except json.JSONDecodeError as e:
+            try:
+                prometheus_metrics.increment_http_dropped("invalid_json")
+            except Exception:
+                pass
             raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
 
         # Handle both array and line-delimited JSON
@@ -791,9 +885,17 @@ async def ingest_zeek(request: Request, response: Response, Authorization: Optio
                     raise HTTPException(status_code=400, detail=f"Invalid JSON on line {i+1}: {str(e)}")
 
         if not records:
+            try:
+                prometheus_metrics.increment_http_dropped("no_records")
+            except Exception:
+                pass
             raise HTTPException(status_code=400, detail="Empty batch")
         
         if len(records) > 10000:
+            try:
+                prometheus_metrics.increment_http_dropped("too_many_records")
+            except Exception:
+                pass
             raise HTTPException(status_code=413, detail="Too many records (max 10,000)")
 
         # Validate Zeek records
@@ -820,6 +922,75 @@ async def ingest_zeek(request: Request, response: Response, Authorization: Optio
                     "validation_errors": validation_errors
                 }
             )
+
+        # Admission control - check source security rules
+        from .config import (
+            get_admission_http_enabled, get_admission_log_only, get_admission_fail_open
+        )
+        
+        if get_admission_http_enabled():
+            from .security import validate_http_source_admission
+            from .services.sources import SourceService
+            from .metrics import record_blocked_source
+            from .db import SessionLocal
+            import logging
+            
+            logger = logging.getLogger(__name__)
+            
+            # Get source_id from header
+            source_id = request.headers.get("X-Source-Id")
+            tenant_id = request.headers.get("X-Tenant-ID") or getattr(request.state, 'tenant_id', 'default')
+            
+            if source_id:
+                # Look up source in database
+                db = SessionLocal()
+                try:
+                    source = SourceService.get_source_by_id(db, source_id, tenant_id)
+                    if source:
+                        try:
+                            # Validate admission with HTTP-specific logic
+                            allowed, reason = validate_http_source_admission(
+                                source=source,
+                                request=request,
+                                record_count=len(records)
+                            )
+                            
+                            if not allowed:
+                                # Record blocked source metrics
+                                record_blocked_source(source_id, reason)
+                                
+                                # Handle LOG_ONLY mode
+                                if get_admission_log_only():
+                                    logger.warning(f"Admission blocked (LOG_ONLY): source={source_id}, reason={reason}")
+                                    # Continue processing (return 200)
+                                else:
+                                    # Return appropriate error response
+                                    error_detail = {
+                                        "disabled": "Source is disabled",
+                                        "ip_not_allowed": "Client IP not in allowed list",
+                                        "rate_limit": "Rate limit exceeded"
+                                    }.get(reason, "Admission denied")
+                                    
+                                    return JSONResponse(
+                                        {"error": reason, "detail": error_detail},
+                                        status_code=403 if reason != "rate_limit" else 429
+                                    )
+                                    
+                        except Exception as e:
+                            # Handle internal errors in admission control
+                            logger.error(f"Admission control error: {e}")
+                            record_blocked_source(source_id, "admission_error")
+                            
+                            if get_admission_fail_open():
+                                logger.warning(f"Admission error, FAIL_OPEN enabled - allowing request: {e}")
+                                # Continue processing (return 200)
+                            else:
+                                return JSONResponse(
+                                    {"error": "admission_error", "detail": "Internal admission control error"},
+                                    status_code=500
+                                )
+                finally:
+                    db.close()
 
         # Enqueue records
         from .pipeline import enqueue_batch
@@ -862,6 +1033,18 @@ async def ingest_zeek(request: Request, response: Response, Authorization: Optio
             }
             set_request_ops(trace_id, ops)
 
+        # Track source origin for type mismatch detection
+        if source_id:
+            from .services.sources import SourceService
+            from .db import SessionLocal
+            db = SessionLocal()
+            try:
+                SourceService.track_source_origin(db, source_id, tenant_id, "http")
+            except Exception as e:
+                logger.error(f"Failed to track source origin: {e}")
+            finally:
+                db.close()
+
         result = {"accepted": accepted, "rejected": len(records) - accepted, "total": len(records)}
         
         # Store idempotency result if key provided
@@ -869,6 +1052,10 @@ async def ingest_zeek(request: Request, response: Response, Authorization: Optio
             from .idempotency import store_idempotency_result
             store_idempotency_result(idempotency_key, result)
         
+        try:
+            prometheus_metrics.increment_http_admitted(1)
+        except Exception:
+            pass
         return result
 
     except HTTPException:
@@ -893,6 +1080,10 @@ async def ingest_netflow(request: Request, response: Response, Authorization: Op
         # Check content length (5MB limit)
         content_length = request.headers.get("content-length")
         if content_length and int(content_length) > 5 * 1024 * 1024:
+            try:
+                prometheus_metrics.increment_http_dropped("over_size")
+            except Exception:
+                pass
             raise HTTPException(status_code=413, detail="Payload too large (max 5MB)")
         
         raw = await request.body()
@@ -901,8 +1092,16 @@ async def ingest_netflow(request: Request, response: Response, Authorization: Op
         try:
             payload = json.loads(raw.decode("utf-8"))
         except UnicodeDecodeError:
+            try:
+                prometheus_metrics.increment_http_dropped("invalid_json")
+            except Exception:
+                pass
             raise HTTPException(status_code=400, detail="Body is not valid UTF-8 JSON")
         except json.JSONDecodeError as e:
+            try:
+                prometheus_metrics.increment_http_dropped("invalid_json")
+            except Exception:
+                pass
             raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
 
         # Handle both array and line-delimited JSON
@@ -923,9 +1122,17 @@ async def ingest_netflow(request: Request, response: Response, Authorization: Op
                     raise HTTPException(status_code=400, detail=f"Invalid JSON on line {i+1}: {str(e)}")
 
         if not records:
+            try:
+                prometheus_metrics.increment_http_dropped("no_records")
+            except Exception:
+                pass
             raise HTTPException(status_code=400, detail="Empty batch")
         
         if len(records) > 10000:
+            try:
+                prometheus_metrics.increment_http_dropped("too_many_records")
+            except Exception:
+                pass
             raise HTTPException(status_code=413, detail="Too many records (max 10,000)")
 
         # Convert NetFlow to canonical schema
@@ -976,6 +1183,75 @@ async def ingest_netflow(request: Request, response: Response, Authorization: Op
                 }
             )
 
+        # Admission control - check source security rules
+        from .config import (
+            get_admission_http_enabled, get_admission_log_only, get_admission_fail_open
+        )
+        
+        if get_admission_http_enabled():
+            from .security import validate_http_source_admission
+            from .services.sources import SourceService
+            from .metrics import record_blocked_source
+            from .db import SessionLocal
+            import logging
+            
+            logger = logging.getLogger(__name__)
+            
+            # Get source_id from header
+            source_id = request.headers.get("X-Source-Id")
+            tenant_id = request.headers.get("X-Tenant-ID") or getattr(request.state, 'tenant_id', 'default')
+            
+            if source_id:
+                # Look up source in database
+                db = SessionLocal()
+                try:
+                    source = SourceService.get_source_by_id(db, source_id, tenant_id)
+                    if source:
+                        try:
+                            # Validate admission with HTTP-specific logic
+                            allowed, reason = validate_http_source_admission(
+                                source=source,
+                                request=request,
+                                record_count=len(canonical_records)
+                            )
+                            
+                            if not allowed:
+                                # Record blocked source metrics
+                                record_blocked_source(source_id, reason)
+                                
+                                # Handle LOG_ONLY mode
+                                if get_admission_log_only():
+                                    logger.warning(f"Admission blocked (LOG_ONLY): source={source_id}, reason={reason}")
+                                    # Continue processing (return 200)
+                                else:
+                                    # Return appropriate error response
+                                    error_detail = {
+                                        "disabled": "Source is disabled",
+                                        "ip_not_allowed": "Client IP not in allowed list",
+                                        "rate_limit": "Rate limit exceeded"
+                                    }.get(reason, "Admission denied")
+                                    
+                                    return JSONResponse(
+                                        {"error": reason, "detail": error_detail},
+                                        status_code=403 if reason != "rate_limit" else 429
+                                    )
+                                    
+                        except Exception as e:
+                            # Handle internal errors in admission control
+                            logger.error(f"Admission control error: {e}")
+                            record_blocked_source(source_id, "admission_error")
+                            
+                            if get_admission_fail_open():
+                                logger.warning(f"Admission error, FAIL_OPEN enabled - allowing request: {e}")
+                                # Continue processing (return 200)
+                            else:
+                                return JSONResponse(
+                                    {"error": "admission_error", "detail": "Internal admission control error"},
+                                    status_code=500
+                                )
+                finally:
+                    db.close()
+
         # Enqueue canonical records
         from .pipeline import enqueue_batch
         accepted = enqueue_batch(canonical_records)
@@ -1017,6 +1293,26 @@ async def ingest_netflow(request: Request, response: Response, Authorization: Op
             }
             set_request_ops(trace_id, ops)
 
+        # Track source origin for type mismatch detection
+        if source_id:
+            from .services.sources import SourceService
+            from .db import SessionLocal
+            db = SessionLocal()
+            try:
+                # Determine origin based on endpoint
+                origin = "udp" if request.url.path.endswith("/netflow") else "http"
+                SourceService.track_source_origin(db, source_id, tenant_id, origin)
+            except Exception as e:
+                logger.error(f"Failed to track source origin: {e}")
+            finally:
+                db.close()
+
+        try:
+            prometheus_metrics.increment_http_admitted(1)
+            # Treat accepted canonical records as UDP-admitted for head pipeline visibility
+            prometheus_metrics.increment_udp_admitted(accepted)
+        except Exception:
+            pass
         return {"accepted": accepted, "rejected": len(records) - accepted, "total": len(records)}
 
     except HTTPException:
@@ -1099,6 +1395,75 @@ async def ingest_bulk(request: Request, response: Response, Authorization: Optio
                 }
             )
 
+        # Admission control - check source security rules
+        from .config import (
+            get_admission_http_enabled, get_admission_log_only, get_admission_fail_open
+        )
+        
+        if get_admission_http_enabled():
+            from .security import validate_http_source_admission
+            from .services.sources import SourceService
+            from .metrics import record_blocked_source
+            from .db import SessionLocal
+            import logging
+            
+            logger = logging.getLogger(__name__)
+            
+            # Get source_id from header
+            source_id = request.headers.get("X-Source-Id")
+            tenant_id = request.headers.get("X-Tenant-ID") or getattr(request.state, 'tenant_id', 'default')
+            
+            if source_id:
+                # Look up source in database
+                db = SessionLocal()
+                try:
+                    source = SourceService.get_source_by_id(db, source_id, tenant_id)
+                    if source:
+                        try:
+                            # Validate admission with HTTP-specific logic
+                            allowed, reason = validate_http_source_admission(
+                                source=source,
+                                request=request,
+                                record_count=len(records)
+                            )
+                            
+                            if not allowed:
+                                # Record blocked source metrics
+                                record_blocked_source(source_id, reason)
+                                
+                                # Handle LOG_ONLY mode
+                                if get_admission_log_only():
+                                    logger.warning(f"Admission blocked (LOG_ONLY): source={source_id}, reason={reason}")
+                                    # Continue processing (return 200)
+                                else:
+                                    # Return appropriate error response
+                                    error_detail = {
+                                        "disabled": "Source is disabled",
+                                        "ip_not_allowed": "Client IP not in allowed list",
+                                        "rate_limit": "Rate limit exceeded"
+                                    }.get(reason, "Admission denied")
+                                    
+                                    return JSONResponse(
+                                        {"error": reason, "detail": error_detail},
+                                        status_code=403 if reason != "rate_limit" else 429
+                                    )
+                                    
+                        except Exception as e:
+                            # Handle internal errors in admission control
+                            logger.error(f"Admission control error: {e}")
+                            record_blocked_source(source_id, "admission_error")
+                            
+                            if get_admission_fail_open():
+                                logger.warning(f"Admission error, FAIL_OPEN enabled - allowing request: {e}")
+                                # Continue processing (return 200)
+                            else:
+                                return JSONResponse(
+                                    {"error": "admission_error", "detail": "Internal admission control error"},
+                                    status_code=500
+                                )
+                finally:
+                    db.close()
+
         # Enqueue records
         from .pipeline import enqueue_batch
         accepted = enqueue_batch(records)
@@ -1139,6 +1504,18 @@ async def ingest_bulk(request: Request, response: Response, Authorization: Optio
                 }
             }
             set_request_ops(trace_id, ops)
+
+        # Track source origin for type mismatch detection
+        if source_id:
+            from .services.sources import SourceService
+            from .db import SessionLocal
+            db = SessionLocal()
+            try:
+                SourceService.track_source_origin(db, source_id, tenant_id, "http")
+            except Exception as e:
+                logger.error(f"Failed to track source origin: {e}")
+            finally:
+                db.close()
 
         return {"accepted": accepted, "rejected": len(records) - accepted, "total": len(records)}
 
@@ -1432,6 +1809,11 @@ async def export_splunk_hec(request: Request, response: Response, Authorization:
                 )
                 r.raise_for_status()
                 
+                # Update Prometheus metrics
+                latency_ms = int(r.elapsed.total_seconds() * 1000)
+                prometheus_metrics.increment_export_sent("splunk", len(events))
+                prometheus_metrics.observe_export_latency("splunk", latency_ms)
+                
                 # Track operations for audit
                 if trace_id:
                     from .audit import set_request_ops
@@ -1440,7 +1822,7 @@ async def export_splunk_hec(request: Request, response: Response, Authorization:
                         "export": {
                             "sent": len(events),
                             "failed": 0,
-                            "latency_ms": int(r.elapsed.total_seconds() * 1000),
+                            "latency_ms": latency_ms,
                             "retries": retry_count
                         },
                         "timers_ms": {
@@ -1453,7 +1835,7 @@ async def export_splunk_hec(request: Request, response: Response, Authorization:
                     "status": "success",
                     "sent": len(events),
                     "failed": 0,
-                    "latency_ms": int(r.elapsed.total_seconds() * 1000),
+                    "latency_ms": latency_ms,
                     "retries": retry_count
                 }
                 
@@ -1473,6 +1855,11 @@ async def export_splunk_hec(request: Request, response: Response, Authorization:
                     last_status=getattr(r, 'status_code', None) if 'r' in locals() else None,
                     retry_count=retry_count
                 )
+                
+                # Update Prometheus metrics
+                prometheus_metrics.increment_export_failed("splunk", "http_error", len(events))
+                dlq_stats = dlq.get_dlq_stats()
+                prometheus_metrics.set_export_dlq_depth("splunk", dlq_stats["total_events"])
                 
                 # Track operations for audit
                 if trace_id:
@@ -1544,6 +1931,11 @@ async def export_elastic(request: Request, response: Response, Authorization: Op
             )
             r.raise_for_status()
             
+            # Update Prometheus metrics
+            latency_ms = int(r.elapsed.total_seconds() * 1000)
+            prometheus_metrics.increment_export_sent("elastic", len(events))
+            prometheus_metrics.observe_export_latency("elastic", latency_ms)
+            
             # Track operations for audit
             if trace_id:
                 from .audit import set_request_ops
@@ -1552,7 +1944,7 @@ async def export_elastic(request: Request, response: Response, Authorization: Op
                     "export": {
                         "sent": len(events),
                         "failed": 0,
-                        "latency_ms": int(r.elapsed.total_seconds() * 1000)
+                        "latency_ms": latency_ms
                     },
                     "timers_ms": {
                         "total": int((time.time() - start_time) * 1000)
@@ -1564,10 +1956,16 @@ async def export_elastic(request: Request, response: Response, Authorization: Op
                 "status": "success",
                 "sent": len(events),
                 "failed": 0,
-                "latency_ms": int(r.elapsed.total_seconds() * 1000)
+                "latency_ms": latency_ms
             }
             
     except Exception as e:
+        # Update Prometheus metrics
+        prometheus_metrics.increment_export_failed("elastic", "http_error", len(events))
+        from .dlq import dlq
+        dlq_stats = dlq.get_dlq_stats()
+        prometheus_metrics.set_export_dlq_depth("elastic", dlq_stats["total_events"])
+        
         # Track operations for audit
         if trace_id:
             from .audit import set_request_ops

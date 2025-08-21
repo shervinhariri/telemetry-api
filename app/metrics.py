@@ -56,6 +56,23 @@ class MetricsAggregator:
         # Background tick task
         self.last_tick = time.time()
         
+        # Admission counters (HTTP and UDP)
+        self.http_admitted_total = 0
+        self.http_dropped_total = {}
+        self.udp_admitted_total = 0
+        self.udp_dropped_total = {}
+        
+        # Export counters
+        self.export_sent_total = {"splunk": 0, "elastic": 0}
+        self.export_failed_total = {"splunk": {}, "elastic": {}}
+        self.export_test_total = {"splunk": 0, "elastic": 0}
+        
+        # Per-source counters and ring buffers
+        self.source_admitted_total = {}  # source_id -> count
+        self.source_dropped_total = {}   # source_id -> {reason -> count}
+        self.source_eps_buffers = {}     # source_id -> ring buffer of 60 buckets
+        self.source_error_buffers = {}   # source_id -> ring buffer of 60 buckets
+
     def increment_requests(self, failed: bool = False):
         """Increment request counters"""
         with self.lock:
@@ -107,6 +124,99 @@ class MetricsAggregator:
             
         # Update Prometheus metrics
         prometheus_metrics.set_queue_lag(lag_ms)
+
+    # ----- Admission accounting -----
+    def record_http_admitted(self, count: int = 1):
+        with self.lock:
+            self.http_admitted_total += count
+        # Prometheus
+        prometheus_metrics.increment_http_admitted(count)
+
+    def record_http_dropped(self, reason: str, count: int = 1):
+        with self.lock:
+            self.http_dropped_total[reason] = self.http_dropped_total.get(reason, 0) + count
+        # Prometheus
+        prometheus_metrics.increment_http_dropped(reason, count)
+
+    def record_udp_admitted(self, count: int = 1):
+        with self.lock:
+            self.udp_admitted_total += count
+        # Prometheus
+        prometheus_metrics.increment_udp_admitted(count)
+
+    def record_udp_dropped(self, reason: str, count: int = 1):
+        with self.lock:
+            self.udp_dropped_total[reason] = self.udp_dropped_total.get(reason, 0) + count
+        # Prometheus
+        prometheus_metrics.increment_udp_dropped(reason, count)
+
+    # ----- Export accounting -----
+    def record_export_sent(self, dest: str, count: int = 1):
+        with self.lock:
+            self.export_sent_total[dest] = self.export_sent_total.get(dest, 0) + count
+        # Prometheus
+        prometheus_metrics.increment_export_sent(dest, count)
+
+    def record_export_failed(self, dest: str, reason: str, count: int = 1):
+        with self.lock:
+            if dest not in self.export_failed_total:
+                self.export_failed_total[dest] = {}
+            self.export_failed_total[dest][reason] = self.export_failed_total[dest].get(reason, 0) + count
+        # Prometheus
+        prometheus_metrics.increment_export_failed(dest, reason, count)
+
+    def record_export_test(self, dest: str, count: int = 1):
+        with self.lock:
+            self.export_test_total[dest] = self.export_test_total.get(dest, 0) + count
+            
+    # ----- Per-source accounting -----
+    def record_source_admitted(self, source_id: str, count: int = 1):
+        with self.lock:
+            self.source_admitted_total[source_id] = self.source_admitted_total.get(source_id, 0) + count
+        # Prometheus
+        prometheus_metrics.increment_http_admitted()  # Reuse existing counter for now
+
+    def record_source_dropped(self, source_id: str, reason: str, count: int = 1):
+        with self.lock:
+            if source_id not in self.source_dropped_total:
+                self.source_dropped_total[source_id] = {}
+            self.source_dropped_total[source_id][reason] = self.source_dropped_total[source_id].get(reason, 0) + count
+        # Prometheus
+        prometheus_metrics.increment_http_dropped(reason)
+
+    def update_source_eps(self, source_id: str, eps: float):
+        """Update source EPS ring buffer"""
+        with self.lock:
+            if source_id not in self.source_eps_buffers:
+                self.source_eps_buffers[source_id] = []
+            self.source_eps_buffers[source_id].append(eps)
+            # Keep only last 60 buckets
+            if len(self.source_eps_buffers[source_id]) > 60:
+                self.source_eps_buffers[source_id] = self.source_eps_buffers[source_id][-60:]
+
+    def update_source_error_pct(self, source_id: str, error_pct: float):
+        """Update source error percentage ring buffer"""
+        with self.lock:
+            if source_id not in self.source_error_buffers:
+                self.source_error_buffers[source_id] = []
+            self.source_error_buffers[source_id].append(error_pct)
+            # Keep only last 60 buckets
+            if len(self.source_error_buffers[source_id]) > 60:
+                self.source_error_buffers[source_id] = self.source_error_buffers[source_id][-60:]
+
+    def get_source_eps_1m(self, source_id: str) -> float:
+        """Get 1-minute average EPS for source"""
+        with self.lock:
+            if source_id not in self.source_eps_buffers or not self.source_eps_buffers[source_id]:
+                return 0.0
+            return sum(self.source_eps_buffers[source_id]) / len(self.source_eps_buffers[source_id])
+
+    def get_source_error_pct_1m(self, source_id: str) -> float:
+        """Get 1-minute average error percentage for source"""
+        with self.lock:
+            if source_id not in self.source_error_buffers or not self.source_error_buffers[source_id]:
+                return 0.0
+            return sum(self.source_error_buffers[source_id]) / len(self.source_error_buffers[source_id])
             
     def tick(self):
         """Background tick to roll windows and update time series"""
@@ -174,6 +284,11 @@ class MetricsAggregator:
                 "requests_total": self.requests_total,
                 "requests_failed": self.requests_failed,
                 "records_processed": self.totals["events"],
+                # Step-2 admission metrics (for convenience include top-level keys)
+                "http_admitted_total": self.http_admitted_total,
+                "http_dropped_total": self.http_dropped_total.copy(),
+                "udp_admitted_total": self.udp_admitted_total,
+                "udp_dropped_total": self.udp_dropped_total.copy(),
                 "queue_depth": 0,  # TODO: get from queue
                 "records_queued": 0,  # TODO: get from queue
                 "eps": eps_1m,
@@ -204,7 +319,14 @@ class MetricsAggregator:
                 
                 "timeseries": {
                     "last_5m": self.timeseries.copy()
-                }
+                },
+                "export": {
+                    "sent_total": self.export_sent_total.copy(),
+                    "failed_total": self.export_failed_total.copy(),
+                    "test_total": self.export_test_total.copy()
+                },
+                "source_admitted_total": self.source_admitted_total.copy(),
+                "source_dropped_total": self.source_dropped_total.copy()
             }
             
     def record_event(self, risk_score: int, threat_matches: int):
@@ -260,6 +382,42 @@ def record_udp_packets_received(count: int = 1):
 def record_records_parsed(count: int = 1):
     """Record successfully parsed records"""
     prometheus_metrics.increment_records_parsed(count)
+
+def record_export_sent(dest: str, count: int = 1):
+    """Record successfully exported events"""
+    metrics.record_export_sent(dest, count)
+
+def record_export_failed(dest: str, reason: str, count: int = 1):
+    """Record failed export events"""
+    metrics.record_export_failed(dest, reason, count)
+
+def record_export_test(dest: str, count: int = 1):
+    """Record export test attempts"""
+    metrics.record_export_test(dest, count)
+
+def record_source_admitted(source_id: str, count: int = 1):
+    """Record admitted events for source"""
+    metrics.record_source_admitted(source_id, count)
+
+def record_source_dropped(source_id: str, reason: str, count: int = 1):
+    """Record dropped events for source"""
+    metrics.record_source_dropped(source_id, reason, count)
+
+def update_source_eps(source_id: str, eps: float):
+    """Update source EPS ring buffer"""
+    metrics.update_source_eps(source_id, eps)
+
+def update_source_error_pct(source_id: str, error_pct: float):
+    """Update source error percentage ring buffer"""
+    metrics.update_source_error_pct(source_id, error_pct)
+
+def get_source_eps_1m(source_id: str) -> float:
+    """Get 1-minute average EPS for source"""
+    return metrics.get_source_eps_1m(source_id)
+
+def get_source_error_pct_1m(source_id: str) -> float:
+    """Get 1-minute average error percentage for source"""
+    return metrics.get_source_error_pct_1m(source_id)
 
 def tick():
     """Background tick to roll windows"""

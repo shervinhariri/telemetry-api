@@ -6,7 +6,7 @@ from datetime import datetime
 class SourceCreate(BaseModel):
     id: str = Field(..., description="Unique source identifier")
     tenant_id: str = Field(..., description="Tenant ID")
-    type: str = Field(..., description="Source type (cisco_asa, cisco_ftd, palo_alto, aws_vpc, etc.)")
+    type: str = Field(..., description="Source type (udp, http) - declared intent")
     display_name: str = Field(..., description="Human-readable display name")
     collector: str = Field(..., description="Collector ID (e.g. gw-local)")
     site: Optional[str] = Field(None, description="Site location (Krakow, HQ, etc.)")
@@ -17,6 +17,9 @@ class SourceCreate(BaseModel):
     allowed_ips: Optional[str] = Field("[]", description="JSON array of allowed CIDR strings")
     max_eps: Optional[int] = Field(0, description="Maximum events per second (0 = unlimited)")
     block_on_exceed: Optional[bool] = Field(True, description="Block traffic when EPS limit exceeded")
+    # New fields
+    enabled: Optional[bool] = Field(True, description="Source enabled status")
+    eps_cap: Optional[int] = Field(0, description="EPS cap (0 = unlimited)")
 
 
 class SourceUpdate(BaseModel):
@@ -29,12 +32,16 @@ class SourceUpdate(BaseModel):
     allowed_ips: Optional[str] = Field(None, description="JSON array of allowed CIDR strings")
     max_eps: Optional[int] = Field(None, description="Maximum events per second (0 = unlimited)")
     block_on_exceed: Optional[bool] = Field(None, description="Block traffic when EPS limit exceeded")
+    # New fields
+    enabled: Optional[bool] = Field(None, description="Source enabled status")
+    eps_cap: Optional[int] = Field(None, description="EPS cap (0 = unlimited)")
 
 
 class SourceResponse(BaseModel):
     id: str
     tenant_id: str
     type: str
+    origin: Optional[str] = Field(None, description="Actual traffic origin (udp, http, unknown)")
     display_name: str
     collector: str
     site: Optional[str]
@@ -47,6 +54,14 @@ class SourceResponse(BaseModel):
     allowed_ips: str
     max_eps: int
     block_on_exceed: bool
+    # New fields
+    enabled: bool
+    eps_cap: int
+    last_seen_ts: Optional[int]
+    eps_1m: Optional[float]
+    error_pct_1m: Optional[float]
+    created_at: int
+    updated_at: int
 
 
 class SourceMetrics(BaseModel):
@@ -57,9 +72,19 @@ class SourceMetrics(BaseModel):
     last_seen: Optional[str] = Field(None, description="Last seen timestamp")
 
 
+class SourceStatus(BaseModel):
+    last_seen_ts: Optional[int] = Field(None, description="Last seen timestamp")
+    eps_1m: Optional[float] = Field(0.0, description="Events per second (1 minute average)")
+    error_pct_1m: Optional[float] = Field(0.0, description="Error percentage (1 minute average)")
+
+
 class SourceListResponse(BaseModel):
+    # Existing fields
     sources: List[SourceResponse]
     total: int
     page: int
     size: int
     pages: int
+    # New alias fields for UI/contract compatibility
+    items: List[SourceResponse] | None = None
+    page_size: int | None = None

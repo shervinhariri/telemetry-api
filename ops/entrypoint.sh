@@ -23,6 +23,14 @@ API="$MAPPER_API" KEY="$MAPPER_KEY" COLLECTOR_ID="$MAPPER_COLLECTOR_ID" \
   python /app/mapper/nf2ingest.py < "$FIFO" &
 PID_MAPPER=$!
 
+echo "[BOOT] running database bootstrap..."
+python scripts/bootstrap.py
+
+echo "[BOOT] running migrate_sqlite.py"
+python /app/scripts/migrate_sqlite.py || {
+  echo "[BOOT] migrate_sqlite failed"; exit 1;
+}
+
 echo "[BOOT] starting API on ${API_HOST}:${API_PORT}"
 # Replace with your real API server command if different:
 python -m uvicorn app.main:app --host "$API_HOST" --port "$API_PORT" &
