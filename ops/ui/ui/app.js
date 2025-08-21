@@ -212,6 +212,19 @@ function showError(panel, message) {
   }
 }
 
+function showWarmingUp(detail = "database not ready") {
+  const dashboardEl = document.getElementById('dashboard-panel');
+  if (dashboardEl) {
+    const warmingEl = document.getElementById('warming-up-banner');
+    if (warmingEl) {
+      warmingEl.innerHTML = `<div class="bg-blue-500/20 border border-blue-500/30 text-blue-300 px-4 py-2 rounded-lg text-sm">
+        <span class="animate-pulse">🔄</span> Warming up... ${escapeHtml(detail)}
+      </div>`;
+      warmingEl.classList.remove('hidden');
+    }
+  }
+}
+
 // --- Lookup action (/v1/lookup?q=...) ---
 async function doLookup() {
   clearError('api');
@@ -665,7 +678,7 @@ function renderSourceSummary(src, mode){
   } else {
     // Edit mode - show form fields
     return `
-      <form id="edit-src-form" class="space-y-4" onsubmit="return window.submitEditSource(event)">
+      <form id="edit-src-form" class="p-6 space-y-4 pb-28" onsubmit="return window.submitEditSource(event)">
         <div>
           <label class="text-sm text-white/70">Source ID</label>
           <input id="edit-src-id" value="${src.id}" readonly
@@ -726,13 +739,11 @@ function renderSourceSummary(src, mode){
         </div>
 
         <!-- Footer -->
-        <div class="pt-2 flex justify-end gap-3">
-          <button type="button" onclick="window.hideSourceDrawer()"
-                  class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
+        <div class="flex items-center justify-end gap-3 sticky bottom-0 bg-[#0f1115]/90 backdrop-blur border-t border-white/10 px-6 py-4">
+          <button type="button" onclick="window.hideSourceDrawer()" class="btn-secondary">
             Cancel
           </button>
-          <button type="submit"
-                  class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium">
+          <button type="submit" class="btn-primary-glow">
             Save Changes
           </button>
         </div>
@@ -788,6 +799,20 @@ window.openCreateSourceDrawer = function () {
   });
   // autofocus first field
   setTimeout(() => document.getElementById('create-src-id')?.focus(), 50);
+
+  // initialize type toggles
+  const help = document.getElementById('create-src-type-help');
+  const ipsBlock = document.getElementById('create-src-ips-block');
+  const toApi = () => { help.classList.remove('hidden'); ipsBlock.classList.add('hidden'); };
+  const toUdp = () => { help.classList.add('hidden'); ipsBlock.classList.remove('hidden'); };
+  const apiRadio = document.getElementById('create-src-type-api');
+  const udpRadio = document.getElementById('create-src-type-udp');
+  if (apiRadio && udpRadio) {
+    // default to API
+    apiRadio.checked = true; toApi();
+    apiRadio.onchange = toApi;
+    udpRadio.onchange = toUdp;
+  }
 };
 
 window.closeCreateSourceDrawer = function () {
@@ -813,7 +838,8 @@ window.submitCreateSource = async function (evt) {
     const id        = document.getElementById('create-src-id').value.trim();
     const display   = document.getElementById('create-src-display').value.trim();
     const tenant    = document.getElementById('create-src-tenant').value.trim() || 'default';
-    const type      = document.getElementById('create-src-type').value.trim() || 'test';
+    const typeRadio = document.querySelector('input[name="create-src-type"]:checked');
+    const type      = (typeRadio?.value || 'http').trim();
     const collector = document.getElementById('create-src-collector').value.trim() || 'gw-local';
     const status    = document.getElementById('create-src-status').value;
     const max_eps   = parseInt(document.getElementById('create-src-maxeps').value || '0', 10);
@@ -860,8 +886,6 @@ window.submitCreateSource = async function (evt) {
       location.reload();
     }
     
-    // Open the new source in edit mode
-    window.openSourceDetails?.(id, 'edit');
     return false;
   } catch (e) {
     console.error(e);
@@ -1143,6 +1167,19 @@ class TelemetryDashboard {
             console.log('Response headers:', response.headers);
             
             if (!response.ok) {
+                if (response.status === 503) {
+                    // Handle warming up state
+                    const text = await response.text();
+                    let detail = "database not ready";
+                    try {
+                        const json = JSON.parse(text);
+                        detail = json.detail || detail;
+                    } catch (e) {
+                        // Use default detail if JSON parsing fails
+                    }
+                    this.showWarmingUp?.(detail);
+                    throw new Error(`HTTP 503: ${detail}`);
+                }
                 if (response.status === 401 || response.status === 403) {
                     this.showError?.('dashboard', `HTTP ${response.status}: Unauthorized`);
                     promptForKey(`HTTP ${response.status}`);
@@ -1180,26 +1217,42 @@ class TelemetryDashboard {
             const k = getApiKey();
             if (!k) { this.showError('dashboard','API key required.'); promptForKey('no key found'); return; }
             
-            // Load system info first (with backoff)
+            // Load system info first (with backoff for 503)
             let system;
             try {
-                system = await withBackoff(() => this.apiCall('/system'), {retries:2, base:400});
+                system = await withBackoff(() => this.apiCall('/system'), {retries:5, base:1000});
                 console.log('System info loaded:', system);
             } catch (error) {
                 console.error('Failed to load system info:', error);
+                if (error.message.includes('HTTP 503')) {
+                    // Don't show error for 503, just keep retrying
+                    return;
+                }
                 system = { version: '0.8.5' }; // Set default version
             }
             
             this.updateSystemInfo(system);
 
-            // Load metrics
-            const metrics = await withBackoff(() => this.apiCall('/metrics'), {retries:2, base:400});
-            console.log('Metrics loaded:', metrics);
-            this.updateDashboardMetrics(metrics);
+            // Load metrics (with backoff for 503)
+            try {
+                const metrics = await withBackoff(() => this.apiCall('/metrics'), {retries:5, base:1000});
+                console.log('Metrics loaded:', metrics);
+                this.updateDashboardMetrics(metrics);
+            } catch (error) {
+                console.error('Failed to load metrics:', error);
+                if (error.message.includes('HTTP 503')) {
+                    // Don't show error for 503, just keep retrying
+                    return;
+                }
+                this.showError('dashboard', error.message);
+            }
             
         } catch (error) {
             console.error('Failed to load initial data:', error);
-            this.showError('dashboard', error.message);
+            // Only show error if it's not a 503
+            if (!error.message.includes('HTTP 503')) {
+                this.showError('dashboard', error.message);
+            }
         }
     }
 
@@ -1288,7 +1341,7 @@ class TelemetryDashboard {
             let requestsData = null;
             
             try {
-                requestsData = await this.apiCall('/api/requests');
+                requestsData = await this.apiCall('/api/requests?limit=20');
                 console.log('API requests loaded:', requestsData);
             } catch (error) {
                 console.error('API requests failed:', error);
@@ -1921,7 +1974,7 @@ function addSourcesFunctionality() {
         type: '',
         status: '',
         page: 1,
-        size: 50
+        page_size: 20
     };
     dashboard.sourcesPollingInterval = null;
 
@@ -1935,13 +1988,14 @@ function addSourcesFunctionality() {
             if (this.sourcesFilters.type) params.append('type', this.sourcesFilters.type);
             if (this.sourcesFilters.status) params.append('status', this.sourcesFilters.status);
             params.append('page', this.sourcesFilters.page.toString());
-            params.append('size', this.sourcesFilters.size.toString());
-            
-            const response = await this.apiCall(`/sources?${params}`);
+            params.append('page_size', this.sourcesFilters.page_size.toString());
+
+            const response = await this.apiCall(`/sources?${params.toString()}`);
             console.log('Sources response:', response);
             
-            if (response.sources) {
-                this.sourcesData = response.sources;
+            const items = response.items || response.sources || [];
+            if (Array.isArray(items)) {
+                this.sourcesData = items;
                 this.renderSourcesTable();
                 this.updateSourcesPagination(response);
                 this.startSourcesPolling();
@@ -1972,6 +2026,16 @@ function addSourcesFunctionality() {
                 allowedIps = [];
             }
             
+            const typeBadge = (t) => {
+                const type = String(t || '').toLowerCase();
+                const base = 'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1';
+                // UDP: orange/amber tone
+                if (type === 'udp') return `<span class="${base} bg-amber-500/15 text-amber-300 ring-amber-500/40">UDP</span>`;
+                // API: pink/fuchsia tone
+                if (type === 'http' || type === 'api') return `<span class="${base} bg-fuchsia-500/15 text-fuchsia-300 ring-fuchsia-500/40">API</span>`;
+                return `<span class="${base} bg-zinc-500/15 text-zinc-300 ring-zinc-500/40">${type || '—'}</span>`;
+            };
+
             return `
                 <tr class="hover:bg-white/5 transition-colors">
                     <td class="px-6 py-4 whitespace-nowrap">
@@ -1980,7 +2044,7 @@ function addSourcesFunctionality() {
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-white font-medium cursor-pointer" onclick="window.telemetryDashboard.openSourceDetails('${source.id}')">${source.display_name}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.type}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${typeBadge(source.type)}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.tenant_id}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${allowedIps.length} IPs</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.max_eps || 0}</td>
@@ -1988,10 +2052,10 @@ function addSourcesFunctionality() {
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">${source.last_seen ? new Date(source.last_seen).toLocaleString() : '—'}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">—</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">
-                        <div class="flex items-center bg-white/10 border border-white/20 rounded-full px-3 py-2 shadow-lg">
-                            <button class="px-3 py-1 text-green-400 hover:text-green-300 hover:bg-green-500/30 rounded-md transition-all duration-200 text-xs font-medium hover:shadow-md" data-action="edit" data-id="${source.id}">Edit</button>
-                            <div class="w-px h-4 bg-white/30 mx-1"></div>
-                            <button class="px-3 py-1 text-red-400 hover:text-red-300 hover:bg-red-500/30 rounded-md transition-all duration-200 text-xs font-medium hover:shadow-md" data-action="delete" data-id="${source.id}">Delete</button>
+                        <div class="flex items-center space-x-3 text-sm">
+                            <button class="text-white/80 hover:text-white" data-action="edit" data-id="${source.id}">Edit</button>
+                            <span class="text-white/20">|</span>
+                            <button class="text-rose-400 hover:text-rose-300" data-action="delete" data-id="${source.id}">Delete</button>
                         </div>
                     </td>
                 </tr>
@@ -2001,17 +2065,28 @@ function addSourcesFunctionality() {
 
     dashboard.updateSourcesPagination = function(response) {
         const pagination = document.getElementById('sources-pagination');
-        const count = document.getElementById('sources-count');
+        const rangeStart = document.getElementById('sources-range-start');
+        const rangeEnd = document.getElementById('sources-range-end');
+        const totalEl = document.getElementById('sources-total');
         const page = document.getElementById('sources-page');
         const prevBtn = document.getElementById('sources-prev');
         const nextBtn = document.getElementById('sources-next');
 
-        if (pagination && response.total > 0) {
+        const total = response.total ?? 0;
+        const pageNum = response.page ?? this.sourcesFilters.page;
+        const pageSize = response.page_size ?? this.sourcesFilters.page_size;
+        const itemsCount = (response.items || response.sources || []).length;
+
+        if (pagination && total > 0) {
             pagination.classList.remove('hidden');
-            if (count) count.textContent = response.sources.length;
-            if (page) page.textContent = response.page;
-            if (prevBtn) prevBtn.disabled = response.page <= 1;
-            if (nextBtn) nextBtn.disabled = response.sources.length < response.size;
+            const start = (pageNum - 1) * pageSize + 1;
+            const end = Math.min(pageNum * pageSize, total);
+            if (rangeStart) rangeStart.textContent = start;
+            if (rangeEnd) rangeEnd.textContent = end;
+            if (totalEl) totalEl.textContent = total;
+            if (page) page.textContent = pageNum;
+            if (prevBtn) prevBtn.disabled = pageNum <= 1;
+            if (nextBtn) nextBtn.disabled = (pageNum * pageSize) >= total || itemsCount < pageSize;
         } else if (pagination) {
             pagination.classList.add('hidden');
         }
@@ -2070,7 +2145,34 @@ function addSourcesFunctionality() {
             // Populate modal with source data
             document.getElementById('source-id').value = source.id;
             document.getElementById('source-display-name').value = source.display_name || '';
-            document.getElementById('source-type').value = source.type;
+            const typeWrap = document.getElementById('source-type-badge');
+            const originWrap = document.getElementById('source-origin-badge');
+            if (typeWrap) {
+                const t = (source.type || '').toLowerCase();
+                const o = (source.origin || '').toLowerCase();
+                const base = 'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1';
+                
+                // Type badge (declared intent)
+                const typeHtml = t === 'udp'
+                    ? `<span class="${base} bg-amber-500/15 text-amber-300 ring-amber-500/40">UDP</span>`
+                    : `<span class="${base} bg-fuchsia-500/15 text-fuchsia-300 ring-fuchsia-500/40">API</span>`;
+                typeWrap.innerHTML = typeHtml;
+                
+                // Origin badge (actual traffic)
+                if (originWrap && o) {
+                    const originHtml = o === 'udp'
+                        ? `<span class="${base} bg-amber-500/15 text-amber-300 ring-amber-500/40">UDP</span>`
+                        : o === 'http'
+                        ? `<span class="${base} bg-fuchsia-500/15 text-fuchsia-300 ring-fuchsia-500/40">HTTP</span>`
+                        : `<span class="${base} bg-gray-500/15 text-gray-300 ring-gray-500/40">Unknown</span>`;
+                    originWrap.innerHTML = originHtml;
+                    
+                    // Add mismatch indicator if type != origin
+                    if (t !== o) {
+                        typeWrap.innerHTML += `<span class="ml-2 text-xs text-red-400">⚠️ Mismatch</span>`;
+                    }
+                }
+            }
             document.getElementById('source-tenant').value = source.tenant_id;
             document.getElementById('source-status').value = source.status || 'enabled';
             document.getElementById('source-max-eps').value = source.max_eps || 0;
@@ -2325,7 +2427,7 @@ function addSourcesFunctionality() {
 
     if (sizeFilter) {
         sizeFilter.addEventListener('change', (e) => {
-            dashboard.sourcesFilters.size = parseInt(e.target.value);
+            dashboard.sourcesFilters.page_size = parseInt(e.target.value);
             dashboard.sourcesFilters.page = 1;
             dashboard.loadSourcesData();
         });
@@ -2411,12 +2513,16 @@ function addSourcesFunctionality() {
 }
 
 function getStatusBadgeClass(status) {
+    // Map Enabled/Disabled to green/gray; keep legacy health fallbacks
+    const s = (status || '').toLowerCase();
+    if (s === 'enabled') return 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/40';
+    if (s === 'disabled') return 'bg-zinc-500/15 text-zinc-300 ring-zinc-500/40';
     const classes = {
         healthy: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/40',
-        degraded: 'bg-yellow-500/15 text-yellow-300 ring-yellow-500/40',
+        degraded: 'bg-amber-500/15 text-amber-300 ring-amber-500/40',
         stale: 'bg-zinc-500/15 text-zinc-300 ring-zinc-500/40'
     };
-    return classes[status] || classes.stale;
+    return classes[s] || classes.stale;
 }
 
 // Initialize Sources functionality when dashboard is ready

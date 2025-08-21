@@ -29,6 +29,23 @@
         }
     </script>
     <style>
+        /* Utility classes to unify primary buttons (Create / Save) */
+        .btn-primary-glow{
+          @apply inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-medium
+                 text-white bg-blue-600 hover:bg-blue-500 focus:outline-none
+                 shadow-[0_0_25px_rgba(37,99,235,0.4)] transition-all duration-200;
+        }
+        .btn-secondary{
+          @apply inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-medium
+                 bg-white/10 hover:bg-white/20 text-white/90 border border-white/20 transition-all duration-200;
+        }
+        .drawer-surface{
+          @apply bg-[#0f1115] border border-white/10 shadow-2xl;
+        }
+        .drawer-footer{
+          @apply sticky bottom-0 bg-[#0f1115] border-t border-white/10;
+        }
+        
         html { 
             -webkit-font-smoothing: antialiased; 
             -moz-osx-font-smoothing: grayscale; 
@@ -128,6 +145,144 @@
         .toast .title { font-weight:700; margin-right:.25rem; }
         .toast .msg { white-space: pre-wrap; word-break: break-word; }
         .toast .close { margin-left:auto; background:transparent; border:0; cursor:pointer; font-size: 18px; line-height: 1; }
+        
+        /* Edit drawer green focus styles */
+        .edit-drawer input:focus, .edit-drawer select:focus, .edit-drawer textarea:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px rgba(16,185,129,0.6); /* emerald-500/60 - darker */
+          border-color: rgba(16,185,129,0.6);
+        }
+        
+        /* Reusable glow buttons (no Tailwind build required) */
+        .btn-glow-blue {
+          background: rgba(37, 99, 235, 0.15);        /* blue-600 @ ~15% */
+          color: rgba(191, 219, 254, 0.95);           /* text-blue-200ish */
+          border: 1px solid rgba(59,130,246,0.35);    /* ring-blue-500/35 */
+          border-radius: 16px;                        /* rounded-2xl like tabs */
+          padding: 8px 16px;                          /* px-4 py-2 like tabs */
+          font-size: 14px;                            /* text-sm like tabs */
+          box-shadow: 0 0 22px rgba(37,99,235,0.36);
+          backdrop-filter: blur(6px);
+          transition: box-shadow .2s, background .2s, transform .05s;
+        }
+        .btn-glow-blue:hover {
+          background: rgba(37, 99, 235, 0.22);
+          box-shadow: 0 0 28px rgba(37,99,235,0.55);
+        }
+        .btn-glow-blue:active { transform: translateY(1px); }
+
+        .btn-glow-green {
+          background: rgba(16,185,129,0.16);          /* emerald-500 @ ~16% */
+          color: rgba(209,250,229,0.95);              /* text-emerald-100ish */
+          border: 1px solid rgba(16,185,129,0.40);
+          border-radius: 12px;                        /* rounded-xl like dropdowns */
+          padding: 8px 12px;                          /* px-3 py-2 like dropdowns */
+          font-size: 14px;                            /* text-sm like dropdowns */
+          box-shadow: 0 0 22px rgba(16,185,129,0.38);
+          backdrop-filter: blur(6px);
+          transition: box-shadow .2s, background .2s, transform .05s;
+        }
+        
+        .btn-glow-red {
+          background: rgba(239,68,68,0.16);           /* red-500 @ ~16% */
+          color: rgba(254,226,226,0.95);              /* text-red-100ish */
+          border: 1px solid rgba(239,68,68,0.40);
+          border-radius: 12px;                        /* rounded-xl like dropdowns */
+          padding: 8px 12px;                          /* px-3 py-2 like dropdowns */
+          font-size: 14px;                            /* text-sm like dropdowns */
+          box-shadow: 0 0 22px rgba(239,68,68,0.38);
+          backdrop-filter: blur(6px);
+          transition: box-shadow .2s, background .2s, transform .05s;
+        }
+        .btn-glow-red:hover {
+          background: rgba(239,68,68,0.22);
+          box-shadow: 0 0 28px rgba(239,68,68,0.55);
+        }
+        .btn-glow-red:active { transform: translateY(1px); }
+        .btn-glow-green:hover {
+          background: rgba(16,185,129,0.22);
+          box-shadow: 0 0 28px rgba(16,185,129,0.55);
+        }
+        .btn-glow-green:active { transform: translateY(1px); }
+
+        .btn-ghost-gray {
+          background: rgba(255,255,255,0.06);
+          color: rgba(255,255,255,0.85);
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 12px;                        /* rounded-xl like dropdowns */
+          padding: 8px 12px;                          /* px-3 py-2 like dropdowns */
+          font-size: 14px;                            /* text-sm like dropdowns */
+          transition: background .15s, transform .05s;
+          backdrop-filter: blur(4px);
+        }
+        .btn-ghost-gray:hover { background: rgba(255,255,255,0.12); }
+        .btn-ghost-gray:active { transform: translateY(1px); }
+
+        /* Green focus ring ONLY inside Edit drawer */
+        .edit-drawer input:focus,
+        .edit-drawer select:focus,
+        .edit-drawer textarea:focus {
+          outline: none !important;
+          box-shadow: 0 0 0 2px rgba(16,185,129,0.8) !important; /* darker emerald */
+          border-color: rgba(16,185,129,0.6) !important;
+        }
+        
+        /* Force green glow button styling in edit drawer */
+        .edit-drawer .btn-glow-green {
+          background: rgba(16,185,129,0.16) !important;
+          color: rgba(209,250,229,0.95) !important;
+          border: 1px solid rgba(16,185,129,0.40) !important;
+          border-radius: 12px !important;
+          padding: 8px 12px !important;
+          font-size: 14px !important;
+          box-shadow: 0 0 22px rgba(16,185,129,0.38) !important;
+          backdrop-filter: blur(6px) !important;
+          transition: box-shadow .2s, background .2s, transform .05s !important;
+        }
+        .edit-drawer .btn-glow-green:hover {
+          background: rgba(16,185,129,0.22) !important;
+          box-shadow: 0 0 28px rgba(16,185,129,0.55) !important;
+        }
+        
+        /* Target the source drawer for edit mode */
+        #source-drawer .btn-primary-glow {
+          background: rgba(16,185,129,0.16) !important;
+          color: rgba(209,250,229,0.95) !important;
+          border: 1px solid rgba(16,185,129,0.40) !important;
+          border-radius: 12px !important;
+          padding: 8px 12px !important;
+          font-size: 14px !important;
+          box-shadow: 0 0 22px rgba(16,185,129,0.38) !important;
+          backdrop-filter: blur(6px) !important;
+          transition: box-shadow .2s, background .2s, transform .05s !important;
+        }
+        #source-drawer .btn-primary-glow:hover {
+          background: rgba(16,185,129,0.22) !important;
+          box-shadow: 0 0 28px rgba(16,185,129,0.55) !important;
+        }
+        
+        #source-drawer .btn-secondary {
+          background: rgba(255,255,255,0.06) !important;
+          color: rgba(255,255,255,0.85) !important;
+          border: 1px solid rgba(255,255,255,0.12) !important;
+          border-radius: 12px !important;
+          padding: 8px 12px !important;
+          font-size: 14px !important;
+          transition: background .15s, transform .05s !important;
+          backdrop-filter: blur(4px) !important;
+        }
+        #source-drawer .btn-secondary:hover {
+          background: rgba(255,255,255,0.12) !important;
+        }
+        
+        /* Green focus rings for source drawer inputs */
+        #source-drawer input:focus,
+        #source-drawer select:focus,
+        #source-drawer textarea:focus {
+          outline: none !important;
+          box-shadow: 0 0 0 2px rgba(16,185,129,0.8) !important;
+          border-color: rgba(16,185,129,0.6) !important;
+        }
     </style>
 </head>
 <body class="min-h-screen w-full bg-[#0B0C10] text-zinc-100 antialiased">
@@ -163,15 +318,16 @@
         <!-- Tabs -->
         <div class="mt-4 flex gap-2 flex-wrap">
                     <button id="tab-dashboard" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#14151B] ring-indigo-500/40 text-zinc-100">Dashboard</button>
-        <button id="tab-requests" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Requests</button>
-        <button id="tab-logs" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Logs</button>
         <button id="tab-sources" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Sources</button>
+        <button id="tab-requests" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Requests</button>
         <button id="tab-api" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">API</button>
+        <button id="tab-logs" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Logs</button>
         </div>
 
-        <!-- Panel: Dashboard -->
-        <div id="panel-dashboard" class="panel mt-6">
-        <div id="dashboard-error" class="hidden text-xs text-red-400"></div>
+            <!-- Panel: Dashboard -->
+    <div id="panel-dashboard" class="panel mt-6">
+      <div id="warming-up-banner" class="hidden mb-4"></div>
+      <div id="dashboard-error" class="hidden text-xs text-red-400"></div>
 
         <!-- Top metric tiles -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
@@ -240,7 +396,7 @@
         <div class="mt-2 mb-3 flex items-center justify-between">
             <h2 class="text-xl font-semibold text-white">Recent Requests</h2>
             <div class="flex items-center gap-3">
-                <button id="refresh-requests" class="rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 px-4 py-2 border border-emerald-400/20">Refresh</button>
+                <button id="refresh-requests" class="btn-glow-green">Refresh</button>
             </div>
         </div>
 
@@ -271,9 +427,9 @@
         <div id="panel-logs" class="panel hidden mt-6 space-y-4">
             <div id="logs-error" class="hidden text-xs text-red-400"></div>
             <div class="flex items-center gap-3">
-                <button id="start-logs" class="rounded-xl px-3 py-2 text-sm ring-1 bg-emerald-500/15 ring-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20">Start Live</button>
-                <button id="stop-logs" class="rounded-xl px-3 py-2 text-sm bg-rose-500/15 text-rose-200 ring-1 ring-rose-500/30 hover:bg-rose-500/20">Stop Live</button>
-                <button id="download-logs" class="rounded-xl px-3 py-2 text-sm bg-white/5 text-zinc-200 ring-1 ring-white/10 hover:bg-white/10">Download</button>
+                <button id="start-logs" class="btn-glow-green">Start Live</button>
+                <button id="stop-logs" class="btn-glow-red">Stop Live</button>
+                <button id="download-logs" class="btn-ghost-gray">Download</button>
             </div>
             <pre id="logs-content" class="h-80 overflow-auto bg-black/40 rounded-xl p-4 text-xs text-zinc-300"></pre>
         </div>
@@ -296,11 +452,8 @@
                     <label class="block text-sm font-medium text-zinc-400 mb-1">Type</label>
                     <select id="sources-type-filter" class="w-full rounded-xl bg-[#14151B] px-3 py-2 text-sm text-zinc-200 outline-none ring-1 ring-white/5 focus:ring-indigo-400/40">
                         <option value="">All Types</option>
-                        <option value="cisco_asa">Cisco ASA</option>
-                        <option value="cisco_ftd">Cisco FTD</option>
-                        <option value="palo_alto">Palo Alto</option>
-                        <option value="aws_vpc">AWS VPC</option>
-                        <option value="test_device">Test Device</option>
+                        <option value="udp">UDP</option>
+                        <option value="http">API</option>
                     </select>
                 </div>
                 
@@ -317,8 +470,8 @@
                 <div>
                     <label class="block text-sm font-medium text-zinc-400 mb-1">Page Size</label>
                     <select id="sources-size-filter" class="w-full rounded-xl bg-[#14151B] px-3 py-2 text-sm text-zinc-200 outline-none ring-1 ring-white/5 focus:ring-indigo-400/40">
-                        <option value="25">25</option>
-                        <option value="50" selected>50</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
                         <option value="100">100</option>
                     </select>
                 </div>
@@ -328,7 +481,7 @@
             <div class="flex justify-end">
                 <button id="btn-add-source"
                         data-action="add-source"
-                        class="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/20">
+                        class="btn-glow-blue">
                   Add Source
                 </button>
             </div>
@@ -363,7 +516,7 @@
             <!-- Pagination -->
             <div id="sources-pagination" class="flex items-center justify-between hidden">
                 <div class="text-sm text-zinc-400">
-                    Showing <span id="sources-count">0</span> sources
+                    Showing <span id="sources-range-start">0</span>–<span id="sources-range-end">0</span> of <span id="sources-total">0</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <button id="sources-prev" class="px-3 py-1 rounded text-sm bg-[#14151B] text-zinc-300 hover:bg-[#0F1116] disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
@@ -384,14 +537,14 @@
             <div id="api-error" class="alert hidden"></div>
 
             <div class="toolbar" style="margin-bottom:10px">
-              <button id="btn-system"  class="btn">/v1/system</button>
-              <button id="btn-metrics" class="btn">/v1/metrics</button>
+              <button id="btn-system"  class="btn-glow-blue">/v1/system</button>
+              <button id="btn-metrics" class="btn-glow-blue">/v1/metrics</button>
               <input id="lookup-value" class="input" placeholder="value for /v1/lookup" />
-              <button id="btn-lookup" class="btn btn--ghost">Lookup</button>
+              <button id="btn-lookup" class="btn-ghost-gray">Lookup</button>
               <div class="spacer"></div>
-              <button id="btn-sample-flows" class="btn btn--ghost">Insert sample flows.v1</button>
-              <button id="btn-sample-zeek"  class="btn btn--ghost">Insert sample zeek.conn</button>
-              <button id="btn-send-ingest"  class="btn btn--primary">Send ingest</button>
+              <button id="btn-sample-flows" class="btn-ghost-gray">Insert sample flows.v1</button>
+              <button id="btn-sample-zeek"  class="btn-ghost-gray">Insert sample zeek.conn</button>
+              <button id="btn-send-ingest"  class="btn-glow-green">Send ingest</button>
             </div>
 
             <label for="ingest-payload" style="display:block; margin:6px 0 6px; color:var(--muted); font:600 12px var(--sans);">Ingest payload (JSON)</label>
@@ -400,8 +553,8 @@
             <div class="output-bar">
               <span>Response</span>
               <div class="spacer"></div>
-              <button id="btn-copy-output"  class="btn btn--ghost">Copy</button>
-              <button id="btn-clear-output" class="btn btn--ghost">Clear</button>
+              <button id="btn-copy-output"  class="btn-ghost-gray">Copy</button>
+              <button id="btn-clear-output" class="btn-ghost-gray">Clear</button>
             </div>
             <pre id="api-output" class="codebox"></pre>
           </div>
@@ -435,23 +588,25 @@
     </div>
 </div>
 
-<!-- Source Details Modal -->
+    <!-- Source Details Modal -->
 <div id="source-modal" class="fixed inset-0 z-50 hidden">
-    <div id="source-modal-backdrop" class="absolute inset-0 bg-black/50"></div>
+    <div id="source-modal-backdrop" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4">
-        <div class="bg-[#14151B] rounded-xl border border-white/5 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-white/5 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-white">Source Details</h3>
-                <button id="source-modal-close" class="btn btn--ghost">✕</button>
+        <div class="bg-[#0f1115]/95 backdrop-blur rounded-xl border border-white/10 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl edit-drawer" style="width: 540px; max-width: 90vw;">
+            <div class="flex items-center justify-between px-6 py-5 border-b border-white/10">
+                <h2 class="text-lg font-semibold">Source Details</h2>
+                <button id="source-modal-close" class="text-white/60 hover:text-white">✕</button>
             </div>
             
-            <div class="p-6 space-y-6">
+            <div class="p-6 space-y-4">
                 <!-- Basic Info -->
                 <div>
                     <h4 class="text-sm font-medium text-zinc-400 mb-3">Basic Information</h4>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-zinc-400 mb-1">Source ID</label>
+                            <label class="block text-sm font-medium text-zinc-400 mb-1">Source ID
+                              <span class="ml-1 text-xs text-zinc-500" title="Stable identifier for this data source. UDP collectors must set this value in the collector (SOURCE_ID) and it will be sent as X-Source-Id. HTTP senders may pass X-Source-Id or one will be auto-generated per API key.">ⓘ</span>
+                            </label>
                             <input id="source-id" type="text" class="input" readonly />
                         </div>
                         <div>
@@ -460,7 +615,11 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-zinc-400 mb-1">Type</label>
-                            <input id="source-type" type="text" class="input" readonly />
+                            <div id="source-type-badge"></div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-zinc-400 mb-1">Origin</label>
+                            <div id="source-origin-badge"></div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-zinc-400 mb-1">Tenant</label>
@@ -485,6 +644,7 @@
                         <!-- Allowed IPs -->
                         <div>
                             <label class="block text-sm font-medium text-zinc-400 mb-1">Allowed IPs (CIDR)</label>
+                            <p class="mb-2 text-xs text-zinc-500">For UDP sources: enforced at the UDP collector (L4 allow‑list).<br>For API sources: (optional) enforced at HTTP if enabled; for cloud behind proxies, set HTTP_TRUST_XFF=true.</p>
                             <div class="space-y-2">
                                 <div id="allowed-ips-container" class="space-y-2">
                                     <!-- IP chips will be added here -->
@@ -528,10 +688,10 @@
                     <div id="sync-result" class="mt-2 text-sm hidden"></div>
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="flex gap-2 pt-4 border-t border-white/5">
-                    <button id="source-save-btn" class="flex-1 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/20">Save Changes</button>
-                    <button id="source-cancel-btn" class="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-400 border border-white/10 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg hover:shadow-white/10">Cancel</button>
+                                <!-- Action Buttons -->
+                <div class="flex items-center justify-end gap-3 sticky bottom-0 bg-[#0f1115]/90 backdrop-blur border-t border-white/10 px-6 py-4">
+                    <button id="source-cancel-btn" class="btn-ghost-gray">Cancel</button>
+                    <button id="source-save-btn" class="btn-glow-green">Save Changes</button>
                 </div>
             </div>
         </div>
@@ -545,14 +705,13 @@
     <!-- Drawer markup -->
   <div id="drawer-backdrop" class="fixed inset-0 bg-black/40 hidden"></div>
   <aside id="source-drawer"
-         class="fixed top-0 right-0 h-full w-[480px] max-w-[95vw] bg-[#0b1020]
-                border-l border-white/10 shadow-2xl translate-x-full
-                transition-transform duration-200 z-50">
-    <div class="p-4 flex items-center justify-between border-b border-white/10">
-      <h2 id="drawer-title" class="text-white text-sm font-semibold">Source</h2>
-      <button id="drawer-close" class="text-white/70 hover:text-white" aria-label="Close">✕</button>
+         class="fixed top-0 right-0 h-full w-[540px] max-w-[90vw] bg-[#0f1115]/95 backdrop-blur border border-white/10 shadow-2xl
+                translate-x-full transition-transform duration-200 z-50 edit-drawer overflow-y-auto">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-white/10">
+      <h2 id="drawer-title" class="text-lg font-semibold">Source</h2>
+      <button id="drawer-close" class="text-white/60 hover:text-white" aria-label="Close">✕</button>
     </div>
-    <div id="drawer-content" class="p-4 text-white/90 text-sm space-y-3">
+    <div id="drawer-content" class="text-white/90 text-sm">
       <!-- content injected by app.js -->
     </div>
   </aside>
@@ -566,7 +725,7 @@
   <aside id="create-src-drawer"
          class="fixed right-0 top-0 h-full w-[540px] max-w-[90vw] z-[99]
                 translate-x-full transition-transform duration-200 ease-out
-                bg-[#0f1115] border-l border-white/10 shadow-2xl hidden">
+                bg-[#0f1115]/95 backdrop-blur border border-white/10 shadow-2xl hidden overflow-y-auto">
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-5 border-b border-white/10">
       <h2 class="text-lg font-semibold">Create New Source</h2>
@@ -576,7 +735,7 @@
     </div>
 
     <!-- Body -->
-    <form id="create-src-form" class="p-6 space-y-4" onsubmit="return window.submitCreateSource(event)">
+    <form id="create-src-form" class="p-6 space-y-4 pb-28" onsubmit="return window.submitCreateSource(event)">
       <div>
         <label class="text-sm text-white/70">Source ID *</label>
         <input id="create-src-id" required pattern="[a-z0-9_\-]+"
@@ -599,8 +758,19 @@
         </div>
         <div>
           <label class="text-sm text-white/70">Type</label>
-          <input id="create-src-type" placeholder="e.g., cisco_asa / test"
-                 class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"/>
+          <div class="mt-2 flex items-center gap-3">
+            <label class="inline-flex items-center gap-2 text-sm text-white/80">
+              <input type="radio" name="create-src-type" id="create-src-type-api" value="http" class="accent-blue-500" checked>
+              <span>API</span>
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm text-white/80">
+              <input type="radio" name="create-src-type" id="create-src-type-udp" value="udp" class="accent-blue-500">
+              <span>UDP</span>
+            </label>
+          </div>
+          <p id="create-src-type-help" class="mt-2 text-xs text-white/50">
+            For HTTP senders; optional IP allow‑list can be enforced if enabled on the server.
+          </p>
         </div>
       </div>
 
@@ -631,21 +801,19 @@
         <label class="text-sm text-white/80">Block on exceed</label>
       </div>
 
-      <div>
+      <div id="create-src-ips-block">
         <label class="text-sm text-white/70">Allowed IPs (CIDRs, one per line)</label>
         <textarea id="create-src-ips" rows="4" placeholder="127.0.0.1/32&#10;203.0.113.0/24"
                   class="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 outline-none focus:border-blue-500"></textarea>
-        <p class="mt-1 text-xs text-white/50">Leave empty to block all (whitelist-only).</p>
+        <p class="mt-1 text-xs text-white/50">For UDP sources: enforced at the UDP collector (L4 allow‑list).<br>For API sources: (optional) enforced at HTTP if enabled; for cloud behind proxies, set HTTP_TRUST_XFF=true.</p>
       </div>
 
       <!-- Footer -->
-      <div class="pt-2 flex justify-end gap-3">
-        <button type="button" onclick="window.closeCreateSourceDrawer()"
-                class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
+      <div class="flex items-center justify-end gap-3 sticky bottom-0 bg-[#0f1115]/90 backdrop-blur border-t border-white/10 px-6 py-4">
+        <button type="button" onclick="window.closeCreateSourceDrawer()" class="btn-ghost-gray">
           Cancel
         </button>
-        <button type="submit"
-                class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium">
+        <button type="submit" class="btn-glow-blue">
           Create Source
         </button>
       </div>
@@ -674,12 +842,10 @@
         </p>
         
         <div class="flex gap-3 justify-end">
-          <button id="delete-modal-cancel" 
-                  class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 transition-colors">
+          <button id="delete-modal-cancel" class="btn-ghost-gray">
             Cancel
           </button>
-          <button id="delete-modal-confirm" 
-                  class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium transition-colors">
+          <button id="delete-modal-confirm" class="btn-glow-red">
             Delete Source
           </button>
         </div>
@@ -688,6 +854,6 @@
   </div>
 
   <!-- Load script last, defer + cache bust -->
-  <script src="/ui/app.js?v=vefix13" defer></script>
+  <script src="/ui/app.js?v=vefix29" defer></script>
 </body>
 </html>
