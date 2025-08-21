@@ -2,18 +2,35 @@ from fastapi import APIRouter, Header, HTTPException
 import os
 import httpx
 from packaging import version as semver
+from pathlib import Path
 
 router = APIRouter()
 
 APP_NAME = os.getenv("APP_NAME", "telemetry-api")
-# Import version from config module
-from ..config import API_VERSION
-APP_VERSION = os.getenv("APP_VERSION", API_VERSION)
+
+def get_version_from_file():
+    """Read version from VERSION file, fallback to env APP_VERSION, then config"""
+    try:
+        # Try to read from VERSION file at repo root
+        version_file = Path(__file__).parent.parent.parent / "VERSION"
+        if version_file.exists():
+            with open(version_file, 'r') as f:
+                version = f.read().strip()
+                if version:
+                    return version
+    except Exception:
+        pass
+    
+    # Fallback to environment variable
+    from ..config import API_VERSION
+    return os.getenv("APP_VERSION", API_VERSION)
+
+APP_VERSION = get_version_from_file()
 GIT_SHA = os.getenv("GIT_SHA", "unknown")
 IMAGE = os.getenv("IMAGE", "shvin/telemetry-api")
 UPDATE_CHECK_ENABLED = os.getenv("UPDATE_CHECK_ENABLED", "true").lower() == "true"
 DOCKERHUB_REPO = os.getenv("DOCKERHUB_REPO", IMAGE)  # e.g. shvin/telemetry-api
-DOCKERHUB_TAG = os.getenv("DOCKERHUB_TAG", API_VERSION)
+DOCKERHUB_TAG = os.getenv("DOCKERHUB_TAG", APP_VERSION)
 
 @router.get("/version")
 def get_version():

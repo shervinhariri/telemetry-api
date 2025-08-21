@@ -1,0 +1,34 @@
+# Gitleaks configuration for Telemetry API
+# This file defines what secrets to scan for and what to ignore
+
+[allowlist]
+# Allow test keys and example values
+description = "Allow test keys and example values"
+paths = [
+    '''\.env\.example$''',
+    '''README\.md$''',
+    '''docs/.*\.md$''',
+    '''samples/.*''',
+    '''tests/.*''',
+    '''scripts/test_.*\.sh$''',
+    '''postman/.*\.json$''',
+]
+
+regexes = [
+    '''TEST_KEY''',
+    '''your-.*-here''',
+    '''example-.*''',
+    '''test-.*''',
+    '''DEV_ADMIN_KEY_.*''',
+]
+
+[detectors]
+# Enable all detectors
+use-default = true
+
+# Custom rules for this project
+[[rules]]
+id = "telemetry-api-key"
+description = "Telemetry API Key"
+regex = '''(?i)(api[_-]?key|bearer[_-]?token)\s*[:=]\s*['"]?[a-zA-Z0-9._-]{10,}['"]?'''
+tags = ["key", "api"]

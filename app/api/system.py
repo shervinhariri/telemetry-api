@@ -49,7 +49,7 @@ async def get_system_info() -> Dict[str, Any]:
         return {
             "version": APP_VERSION,
             "git_sha": GIT_SHA,
-            "image": f"{IMAGE}:{DOCKERHUB_TAG}",
+            "image": f"{IMAGE}:{DOCKERHUB_TAG}" if DOCKERHUB_TAG and DOCKERHUB_TAG != "unknown" else f"{IMAGE}:(unknown)",
             "uptime_s": uptime_seconds,
             "workers": 1,  # Single worker for now
             "mem_mb": 0,  # TODO: Implement without psutil

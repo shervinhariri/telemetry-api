@@ -36,13 +36,14 @@ function isNumberLike(v) {
 
 // Minimal validators for MVP formats
 function validateFlowsV1Record(r, idx) {
-  const missing = requireKeys(r, ['ts','src_ip','dst_ip','src_port','dst_port','proto','bytes'], `records[${idx}]`);
+  const missing = requireKeys(r, ['ts','src_ip','dst_ip','src_port','dst_port','proto','bytes','packets'], `records[${idx}]`);
   const typeErr = [];
   if (missing.length) return { ok:false, msg:`Missing fields: ${missing.join(', ')}` };
   if (!isNumberLike(r.ts)) typeErr.push(`records[${idx}].ts must be number (epoch seconds)`);
   if (!isNumberLike(r.src_port)) typeErr.push(`records[${idx}].src_port must be number`);
   if (!isNumberLike(r.dst_port)) typeErr.push(`records[${idx}].dst_port must be number`);
   if (!isNumberLike(r.bytes))    typeErr.push(`records[${idx}].bytes must be number`);
+  if (!isNumberLike(r.packets))  typeErr.push(`records[${idx}].packets must be number`);
   if (!['tcp','udp','icmp','other'].includes(String(r.proto).toLowerCase())) {
     typeErr.push(`records[${idx}].proto must be one of tcp|udp|icmp|other`);
   }
@@ -94,7 +95,8 @@ function sampleFlowsV1() {
       src_port: 51514,
       dst_port: 53,
       proto: "udp",
-      bytes: 1200
+      bytes: 1200,
+      packets: 3
     },{
       ts: now + 1.234,
       src_ip: "10.0.0.5",
@@ -102,7 +104,8 @@ function sampleFlowsV1() {
       src_port: 51514,
       dst_port: 443,
       proto: "tcp",
-      bytes: 4820
+      bytes: 4820,
+      packets: 5
     }]
   };
 }
@@ -1235,7 +1238,7 @@ class TelemetryDashboard {
                     // Don't show error for 503, just keep retrying
                     return;
                 }
-                system = { version: '0.8.6' }; // Set default version
+                system = { version: '0.8.6' }; // Set default version if API fails
             }
             
             this.updateSystemInfo(system);
@@ -1266,7 +1269,8 @@ class TelemetryDashboard {
     updateSystemInfo(system) {
         console.log('Updating system info:', system);
         
-        const version = '0.8.6';
+        // Get version from system response, fallback to hardcoded version
+        const version = system?.version || '0.8.6';
         console.log('Version to display:', version);
         
         // Update version in dashboard and system panels
@@ -1716,33 +1720,75 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
             // Load initial logs first
             this.loadInitialLogs();
             
-            // Since SSE is not available, we'll poll the logs endpoint
-            this.logsInterval = setInterval(async () => {
+            // Try SSE first, fallback to polling
+            if (window.EventSource) {
                 try {
-                    const response = await fetch(`${this.apiBase}/v1/logs/tail?max_bytes=50000&format=text`, {
-                        headers: { 'Authorization': `Bearer ${this.apiKey}` }
-                    });
-                    
-                    if (response.ok) {
-                        const text = await response.text();
-                        if (logsContent && text.trim()) {
-                            // Split into lines and show the last 100 lines
-                            const lines = text.split('\n').filter(line => line.trim());
-                            const recentLines = lines.slice(-100);
-                            logsContent.innerHTML = recentLines.join('\n');
+                    this.logsEventSource = new EventSource(`${this.apiBase}/v1/logs/stream`);
+                    this.logsEventSource.onmessage = (event) => {
+                        try {
+                            const logEntry = JSON.parse(event.data);
+                            if (logsContent) {
+                                const timestamp = logEntry.timestamp || '';
+                                const level = logEntry.level || 'INFO';
+                                const msg = logEntry.msg || '';
+                                const traceId = logEntry.trace_id || '';
+                                
+                                const line = `${timestamp} [${level}] ${msg}${traceId ? ` (trace_id: ${traceId})` : ''}`;
+                                logsContent.innerHTML += line + '<br>';
+                                
+                                // Keep only last 100 lines
+                                const lines = logsContent.innerHTML.split('<br>');
+                                if (lines.length > 100) {
+                                    logsContent.innerHTML = lines.slice(-100).join('<br>');
+                                }
+                            }
+                        } catch (parseError) {
+                            console.error('Failed to parse SSE log entry:', parseError);
                         }
-                    } else {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                } catch (error) {
-                    console.error('Logs polling error:', error);
-                    this.showError('logs', `Failed to fetch logs: ${error.message}`);
+                    };
+                    this.logsEventSource.onerror = (error) => {
+                        console.error('SSE error, falling back to polling:', error);
+                        this.logsEventSource.close();
+                        this.startLogsPolling();
+                    };
+                    return;
+                } catch (sseError) {
+                    console.error('SSE not available, using polling:', sseError);
                 }
-            }, 2000); // Poll every 2 seconds
+            }
+            
+            // Fallback to polling
+            this.startLogsPolling();
             
         } catch (error) {
             this.showError('logs', error.message);
         }
+    }
+
+    startLogsPolling() {
+        this.logsInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`${this.apiBase}/v1/logs/tail?max_bytes=50000&format=text`, {
+                    headers: { 'Authorization': `Bearer ${this.apiKey}` }
+                });
+                
+                if (response.ok) {
+                    const text = await response.text();
+                    const logsContent = document.getElementById('logs-content');
+                    if (logsContent && text.trim()) {
+                        // Split into lines and show the last 100 lines
+                        const lines = text.split('\n').filter(line => line.trim());
+                        const recentLines = lines.slice(-100);
+                        logsContent.innerHTML = recentLines.join('<br>');
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('Logs polling error:', error);
+                this.showError('logs', `Failed to fetch logs: ${error.message}`);
+            }
+        }, 2000); // Poll every 2 seconds
     }
 
     async loadInitialLogs() {
@@ -1750,18 +1796,40 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
             const logsContent = document.getElementById('logs-content');
             if (!logsContent) return;
             
-            const response = await fetch(`${this.apiBase}/v1/logs/tail?max_bytes=50000&format=text`, {
+            // Try the new JSON endpoint first
+            const response = await fetch(`${this.apiBase}/v1/logs?limit=50`, {
                 headers: { 'Authorization': `Bearer ${this.apiKey}` }
             });
             
             if (response.ok) {
-                const text = await response.text();
-                if (text.trim()) {
-                    const lines = text.split('\n').filter(line => line.trim());
-                    const recentLines = lines.slice(-50); // Show last 50 lines initially
-                    logsContent.innerHTML = recentLines.join('\n');
+                const data = await response.json();
+                if (data.logs && data.logs.length > 0) {
+                    const lines = data.logs.map(log => {
+                        const timestamp = log.timestamp || '';
+                        const level = log.level || 'INFO';
+                        const msg = log.msg || '';
+                        const traceId = log.trace_id || '';
+                        return `${timestamp} [${level}] ${msg}${traceId ? ` (trace_id: ${traceId})` : ''}`;
+                    });
+                    logsContent.innerHTML = lines.join('<br>');
                 } else {
-                    logsContent.innerHTML = 'No logs available yet.';
+                    // Fallback to tail endpoint
+                    const tailResponse = await fetch(`${this.apiBase}/v1/logs/tail?max_bytes=50000&format=text`, {
+                        headers: { 'Authorization': `Bearer ${this.apiKey}` }
+                    });
+                    
+                    if (tailResponse.ok) {
+                        const text = await tailResponse.text();
+                        if (text.trim()) {
+                            const lines = text.split('\n').filter(line => line.trim());
+                            const recentLines = lines.slice(-50);
+                            logsContent.innerHTML = recentLines.join('<br>');
+                        } else {
+                            logsContent.innerHTML = 'No logs available yet.';
+                        }
+                    } else {
+                        logsContent.innerHTML = `Failed to load logs: HTTP ${tailResponse.status}`;
+                    }
                 }
             } else {
                 logsContent.innerHTML = `Failed to load logs: HTTP ${response.status}`;
@@ -1873,19 +1941,30 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
             
             setLoading(btn, true);
             
-            // Make API call
-            const result = await this.apiCall('/ingest', {
-                method: 'POST',
-                body: JSON.stringify(bodyObj)
-            });
-            
-            setOutput(result);
-            showToast('success', 'Ingest accepted.', '/v1/ingest');
-            
-            // Optionally refresh metrics after successful ingest
-            try { 
-                await this.fetchMetrics(); 
-            } catch (_) {}
+            // Make API call with better error handling
+            try {
+                const result = await this.apiCall('/ingest', {
+                    method: 'POST',
+                    body: JSON.stringify(bodyObj)
+                });
+                
+                setOutput(result);
+                showToast('success', 'Ingest accepted.', '/v1/ingest');
+                
+                // Optionally refresh metrics after successful ingest
+                try { 
+                    await this.fetchMetrics(); 
+                } catch (_) {}
+                
+            } catch (apiError) {
+                // Handle API errors with better detail
+                let errorMessage = apiError.message;
+                if (apiError.status) {
+                    errorMessage = `HTTP ${apiError.status}: ${apiError.message}`;
+                }
+                this.showError('api', errorMessage);
+                showToast('error', errorMessage, '/v1/ingest failed');
+            }
             
         } catch (error) {
             this.showError('api', error.message);

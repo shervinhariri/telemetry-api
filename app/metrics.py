@@ -23,6 +23,8 @@ class MetricsAggregator:
         # Request counters
         self.requests_total = 0
         self.requests_failed = 0
+        self.requests_success = 0
+        self.latency_samples = deque(maxlen=1000)  # For latency statistics
         
         # Blocked source counters by reason
         self.blocked_sources = {
@@ -73,12 +75,18 @@ class MetricsAggregator:
         self.source_eps_buffers = {}     # source_id -> ring buffer of 60 buckets
         self.source_error_buffers = {}   # source_id -> ring buffer of 60 buckets
 
-    def increment_requests(self, failed: bool = False):
+    def increment_requests(self, failed: bool = False, latency_ms: float = None):
         """Increment request counters"""
         with self.lock:
             self.requests_total += 1
             if failed:
                 self.requests_failed += 1
+            else:
+                self.requests_success += 1
+            
+            # Record latency if provided
+            if latency_ms is not None:
+                self.latency_samples.append(latency_ms)
             
             # Update Prometheus metrics
             status_code = 500 if failed else 200
@@ -283,6 +291,9 @@ class MetricsAggregator:
             return {
                 "requests_total": self.requests_total,
                 "requests_failed": self.requests_failed,
+                "requests_success": self.requests_success,
+                "requests_last_15m_success_rate": self._calculate_success_rate(),
+                "latency_ms_avg": self._calculate_avg_latency(),
                 "records_processed": self.totals["events"],
                 # Step-2 admission metrics (for convenience include top-level keys)
                 "http_admitted_total": self.http_admitted_total,
@@ -343,6 +354,18 @@ class MetricsAggregator:
             if threat_matches > 0:
                 self.threats_window.append(threat_matches)
             self.risk_window.append(risk_score)
+    
+    def _calculate_success_rate(self) -> float:
+        """Calculate success rate for last 15 minutes"""
+        if self.requests_total == 0:
+            return 0.0
+        return round((self.requests_success / self.requests_total) * 100, 2)
+    
+    def _calculate_avg_latency(self) -> float:
+        """Calculate average latency from samples"""
+        if not self.latency_samples:
+            return 0.0
+        return round(statistics.mean(self.latency_samples), 2)
 
 # Global metrics instance
 metrics = MetricsAggregator()
@@ -351,9 +374,9 @@ def get_metrics() -> Dict[str, Any]:
     """Get current metrics"""
     return metrics.get_metrics()
 
-def increment_requests(failed: bool = False):
+def increment_requests(failed: bool = False, latency_ms: float = None):
     """Increment request counters"""
-    metrics.increment_requests(failed)
+    metrics.increment_requests(failed, latency_ms)
 
 def record_batch(record_count: int, threat_matches: int, risk_scores: List[int], sources: List[str]):
     """Record a processed batch"""

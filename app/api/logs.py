@@ -1,151 +1,177 @@
-from fastapi import APIRouter, Query, UploadFile, File, HTTPException
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from typing import Optional, List
-from pathlib import Path
-from datetime import datetime
 import json
+import asyncio
+from datetime import datetime, timedelta
+from ..auth.deps import authenticate
+from ..logging_config import memory_handler, get_trace_id
 
 router = APIRouter()
 
-def _format_audit_lines(limit: int = 500) -> List[str]:
-    """Build human-readable log lines from in-memory audit records."""
-    try:
-        from ..observability.audit import list_audits
-    except Exception:
-        return []
-
-    items = list_audits(limit=limit, exclude_monitoring=False)
-    lines: List[str] = []
-    for it in items:
-        ts = it.get("ts") or ""
-        method = it.get("method") or ""
-        path = it.get("path") or ""
-        status = it.get("status")
-        latency = it.get("latency_ms")
-        client_ip = it.get("client_ip") or ""
-        trace_id = it.get("id") or it.get("trace_id") or ""
-        parts = [
-            f"{ts}",
-            method,
-            path,
-            f"status={status}" if status is not None else "status=?",
-            f"latency_ms={latency}" if latency is not None else "latency_ms=?",
-            f"ip={client_ip}" if client_ip else "",
-            f"trace={trace_id}" if trace_id else "",
-        ]
-        line = " ".join(p for p in parts if p)
-        lines.append(line)
-    return lines
-
 @router.get("/logs")
-def get_logs(limit: int = Query(100, ge=1, le=1000), 
-             max_bytes: int = Query(2000000, ge=1024, le=5000000),
-             format: str = Query("text", regex="^(text|json)$")):
-    """Get recent logs derived from in-memory request audits."""
-    return tail_logs(max_bytes=max_bytes, format=format, limit=limit)
+async def get_logs(
+    since: Optional[str] = Query(None, description="RFC3339 timestamp to filter logs from"),
+    limit: int = Query(1000, ge=1, le=10000, description="Maximum number of logs to return"),
+    level: Optional[str] = Query(None, description="Filter by log level (INFO, WARNING, ERROR, etc.)"),
+    trace_id: Optional[str] = Query(None, description="Filter by trace ID"),
+    endpoint: Optional[str] = Query(None, description="Filter by endpoint path"),
+    current_user: dict = Depends(authenticate)
+):
+    """Get logs from memory buffer with optional filtering"""
+    
+    # Get logs from memory handler
+    logs = memory_handler.get_logs(since=since, limit=limit)
+    
+    # Apply filters
+    if level:
+        logs = [log for log in logs if log.get("level") == level.upper()]
+    
+    if trace_id:
+        logs = [log for log in logs if log.get("trace_id") == trace_id]
+    
+    if endpoint:
+        logs = [log for log in logs if log.get("path") and endpoint in log.get("path")]
+    
+    return {
+        "logs": logs,
+        "count": len(logs),
+        "since": since,
+        "limit": limit,
+        "filters": {
+            "level": level,
+            "trace_id": trace_id,
+            "endpoint": endpoint
+        }
+    }
+
+@router.get("/logs/stream")
+async def stream_logs(
+    current_user: dict = Depends(authenticate)
+):
+    """Stream logs as Server-Sent Events (SSE)"""
+    
+    async def log_stream():
+        """Stream logs as SSE"""
+        last_count = 0
+        
+        while True:
+            try:
+                # Get current logs
+                logs = memory_handler.get_logs()
+                current_count = len(logs)
+                
+                # Send new logs since last check
+                if current_count > last_count:
+                    new_logs = logs[last_count:]
+                    for log in new_logs:
+                        yield f"data: {json.dumps(log)}\n\n"
+                    
+                    last_count = current_count
+                
+                # Keep connection alive
+                await asyncio.sleep(1)
+                
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                error_log = {
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "level": "ERROR",
+                    "logger": "logs.stream",
+                    "msg": f"Log stream error: {str(e)}",
+                    "trace_id": get_trace_id(),
+                    "component": "api"
+                }
+                yield f"data: {json.dumps(error_log)}\n\n"
+                break
+    
+    return StreamingResponse(
+        log_stream(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @router.get("/logs/tail")
-def tail_logs(max_bytes: int = Query(2000000, ge=1024, le=5000000), 
-              format: str = Query("text", regex="^(text|json)$"),
-              limit: int = Query(500, ge=1, le=5000)):
-    """Get the tail of recent logs from in-memory audits (no filesystem)."""
-    try:
-        lines = _format_audit_lines(limit=limit)
-        content_bytes = ("\n".join(lines)).encode("utf-8", errors="replace")
-        if len(content_bytes) > max_bytes:
-            content_bytes = content_bytes[-max_bytes:]
-        content = content_bytes.decode("utf-8", errors="replace")
-
-        if format == "json":
-            return {"lines": content.split("\n") if content else [], "total_bytes": len(content_bytes)}
-        else:
-            return Response(content=content, media_type="text/plain")
-    except Exception as e:
-        if format == "json":
-            return {"lines": [], "error": str(e)}
-        return f"Error building logs: {str(e)}"
+async def logs_tail(
+    max_bytes: int = Query(50000, ge=1000, le=1000000, description="Maximum bytes to return"),
+    format: str = Query("text", description="Output format: text or json"),
+    current_user: dict = Depends(authenticate)
+):
+    """Compatibility endpoint for legacy UI - returns recent logs in text or JSON format"""
+    
+    # Get logs from memory handler
+    logs = memory_handler.get_logs(limit=1000)  # Get recent logs
+    
+    if format.lower() == "json":
+        # Return JSON format with lines array
+        lines = []
+        for log in logs:
+            # Format as text line for compatibility
+            timestamp = log.get("timestamp", "")
+            level = log.get("level", "INFO")
+            msg = log.get("msg", "")
+            trace_id = log.get("trace_id", "")
+            
+            line = f"{timestamp} [{level}] {msg}"
+            if trace_id:
+                line += f" (trace_id: {trace_id})"
+            lines.append(line)
+        
+        return {"lines": lines}
+    else:
+        # Return text format
+        lines = []
+        for log in logs:
+            timestamp = log.get("timestamp", "")
+            level = log.get("level", "INFO")
+            msg = log.get("msg", "")
+            trace_id = log.get("trace_id", "")
+            
+            line = f"{timestamp} [{level}] {msg}"
+            if trace_id:
+                line += f" (trace_id: {trace_id})"
+            lines.append(line)
+        
+        # Join lines and truncate to max_bytes
+        content = "\n".join(lines)
+        if len(content.encode('utf-8')) > max_bytes:
+            # Truncate to approximately max_bytes
+            truncated = content.encode('utf-8')[:max_bytes].decode('utf-8', errors='ignore')
+            # Try to end at a newline
+            last_newline = truncated.rfind('\n')
+            if last_newline > max_bytes // 2:  # Only if we can find a reasonable break point
+                truncated = truncated[:last_newline]
+            content = truncated
+        
+        return content
 
 @router.get("/logs/download")
-def download_logs(max_bytes: int = Query(2000000, ge=1024, le=5000000)):
-    """Download recent logs derived from in-memory audits as a text file."""
-    try:
-        lines = _format_audit_lines(limit=5000)
-        content_bytes = ("\n".join(lines)).encode("utf-8", errors="replace")
-        if len(content_bytes) > max_bytes:
-            content_bytes = content_bytes[-max_bytes:]
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"audit_logs_{timestamp}.log"
-        return Response(
-            content=content_bytes,
-            media_type="text/plain",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error preparing logs: {str(e)}")
-
-@router.post("/logs/upload")
-async def upload_log_file(file: UploadFile = File(...)):
-    """Upload a log file for support review"""
-    # Validate file
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename provided")
+async def download_logs(
+    since: Optional[str] = Query(None, description="RFC3339 timestamp to filter logs from"),
+    limit: int = Query(1000, ge=1, le=10000, description="Maximum number of logs to return"),
+    current_user: dict = Depends(authenticate)
+):
+    """Download logs as JSON lines file"""
     
-    # Create uploads directory (fallback to local data/ if /data not writable)
-    base = Path("/data")
-    if not os.access(base.parent, os.W_OK):
-        base = Path("data")
-    uploads_dir = base / "uploads"
-    uploads_dir.mkdir(exist_ok=True)
+    logs = memory_handler.get_logs(since=since, limit=limit)
     
-    # Create filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_filename = "".join(c for c in file.filename if c.isalnum() or c in "._-")
-    filename = f"{timestamp}_{safe_filename}"
-    file_path = uploads_dir / filename
+    # Convert to JSON lines format
+    json_lines = "\n".join(json.dumps(log) for log in logs)
     
-    try:
-        # Save the file
-        content = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(content)
-        
-        return {
-            "status": "uploaded",
-            "filename": filename,
-            "original_name": file.filename,
-            "size": len(content),
-            "uploaded_at": datetime.now().isoformat()
+    # Generate filename
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"telemetry-logs-{timestamp}.jsonl"
+    
+    return StreamingResponse(
+        iter([json_lines]),
+        media_type="application/jsonl",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(json_lines))
         }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-
-@router.get("/logs/uploads")
-def list_uploaded_files():
-    """List uploaded files"""
-    base = Path("/data")
-    if not os.access(base.parent, os.W_OK):
-        base = Path("data")
-    uploads_dir = base / "uploads"
-    
-    if not uploads_dir.exists():
-        return {"files": []}
-    
-    try:
-        files = []
-        for file_path in uploads_dir.iterdir():
-            if file_path.is_file():
-                stat = file_path.stat()
-                files.append({
-                    "name": file_path.name,
-                    "size": stat.st_size,
-                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
-                })
-        
-        # Sort by modification time (newest first)
-        files.sort(key=lambda x: x["modified"], reverse=True)
-        
-        return {"files": files}
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing files: {str(e)}")
+    )

@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 from ..audit import mask_api_key, get_active_clients_count
+from ..middleware import get_requests_store
+from ..auth.deps import authenticate
 
 router = APIRouter()
 
@@ -290,4 +292,40 @@ async def get_requests_api(
         "succeeded": succeeded,
         "failed": failed,
         "avg_latency_ms": round(avg_latency, 2)
+    }
+
+@router.get("/v1/api/requests")
+async def get_recent_requests_v1(
+    limit: int = Query(30, ge=1, le=1000, description="Maximum number of requests to return"),
+    current_user: dict = Depends(authenticate)
+) -> Dict[str, Any]:
+    """Get recent API requests with statistics from audit system"""
+    
+    # Get requests from audit system instead of middleware store
+    from ..observability.audit import list_audits
+    
+    # Get recent audits
+    all_requests = list_audits(limit=1000, exclude_monitoring=True)
+    
+    # Sort by timestamp (most recent first)
+    all_requests.sort(key=lambda x: x.get("ts", 0), reverse=True)
+    
+    # Apply limit
+    recent_requests = all_requests[:limit]
+    
+    # Calculate statistics
+    total = len(all_requests)
+    succeeded = len([r for r in all_requests if r.get("status", 0) < 400])
+    failed = len([r for r in all_requests if r.get("status", 0) >= 400])
+    
+    # Calculate average latency
+    latencies = [r.get("latency_ms", 0) for r in all_requests if r.get("latency_ms") is not None]
+    avg_latency_ms = round(sum(latencies) / len(latencies), 2) if latencies else 0
+    
+    return {
+        "items": recent_requests,
+        "total": total,
+        "succeeded": succeeded,
+        "failed": failed,
+        "avg_latency_ms": avg_latency_ms
     }

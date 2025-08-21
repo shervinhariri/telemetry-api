@@ -2,6 +2,7 @@ from fastapi import FastAPI, Header, HTTPException, Request, Response, Query, De
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from .middleware import TracingMiddleware
 from contextlib import asynccontextmanager
 from typing import Optional, List, Dict, Any
 import os
@@ -33,6 +34,7 @@ from .api.sources import router as sources_router
 from .api.admin_security import router as admin_security_router
 from .api.admin_flags import router as admin_flags_router
 from .api.utils import router as utils_router
+from .api.ingest import router as ingest_router
 from .pipeline import ingest_queue, record_batch_accepted, enqueue
 from .logging_config import setup_logging
 from .config import API_VERSION
@@ -48,14 +50,17 @@ from .config import (
     LOG_LEVEL, LOG_FILE, RETENTION_DAYS
 )
 
-# Configure logging with rotating file handler
+# Configure logging at import time
 setup_logging()
+
+# Test logging configuration
+logger = logging.getLogger("app")
+logger.info("startup: logging configured", extra={"component":"api"})
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     from .pipeline import worker_loop
-    from .logging_config import log_system_event
     from .db import SessionLocal
     try:
         from .models.apikey import ApiKey as _ApiKey
@@ -64,8 +69,10 @@ async def lifespan(app: FastAPI):
         _ApiKey = None
         _Tenant = None
     
-    log_system_event("startup", "Telemetry API starting up", {
-        "details": "Initializing pipeline workers and metrics"
+    logger = logging.getLogger("app")
+    logger.info("Telemetry API starting up", extra={
+        "details": "Initializing pipeline workers and metrics",
+        "component": "api"
     })
     
     # Start two worker processes
@@ -98,21 +105,19 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
 
-    log_system_event("success", "Telemetry API ready", {
+    logger.info("Telemetry API ready", extra={
         "details": "All services started successfully",
         "workers": 2,
-        "metrics_ticker": True
+        "metrics_ticker": True,
+        "component": "api"
     })
     
     yield
     # Shutdown
-    log_system_event("shutdown", "Telemetry API shutting down", {
-        "details": "Stopping pipeline workers"
+    logger.info("Telemetry API shutting down", extra={
+        "details": "Stopping pipeline workers",
+        "component": "api"
     })
-    
-    # Cleanup logging
-    from .logging_config import cleanup_logging
-    cleanup_logging()
 
 app = FastAPI(title="Live Network Threat Telemetry API (MVP)", lifespan=lifespan)
 
@@ -134,6 +139,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add tracing middleware
+app.add_middleware(TracingMiddleware)
 
 # ------------------------------------------------------------
 # Public endpoint allowlist and middleware helpers
@@ -228,6 +236,7 @@ app.include_router(sources_router, prefix=API_PREFIX)
 app.include_router(admin_security_router, prefix=API_PREFIX)
 app.include_router(admin_flags_router, prefix=API_PREFIX)
 app.include_router(utils_router, prefix=API_PREFIX)
+app.include_router(ingest_router, prefix=API_PREFIX)
 
 # UDP Metrics endpoint for mapper reporting
 @app.post(f"{API_PREFIX}/admin/metrics/udp")
@@ -297,140 +306,7 @@ async def docs():
     """Serve Swagger UI"""
     return FileResponse("docs/swagger.html", media_type="text/html")
 
-# Middleware to track requests and audit logging
-@app.middleware("http")
-async def track_requests(request: Request, call_next):
-    import time
-    start_time = time.perf_counter()
-    
-    # Skip audit for static files and health checks
-    if request.url.path.startswith("/ui/") or request.url.path == "/v1/health":
-        response = await call_next(request)
-        increment_requests(response.status_code >= 400)
-        
-        # Update Prometheus metrics
-        from .services.prometheus_metrics import prometheus_metrics
-        prometheus_metrics.increment_requests(response.status_code, request.url.path)
-        
-        return response
-    
-    # Extract API key for audit
-    api_key = None
-    tenant_id = getattr(request.state, 'tenant_id', 'unknown')
-    
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        api_key = auth_header[7:]  # Remove "Bearer " prefix
-    
-    # Generate trace ID
-    trace_id = request.headers.get("x-trace-id") or str(uuid.uuid4())
-    client_ip = request.client.host if request.client else None
-    
-    # Normalize path to avoid duplicates and 307 artifacts
-    path = request.url.path
-    if path != "/" and path.endswith("/"):
-        path = path.rstrip("/")
-    
-    # Start request audit using new observability system
-    from .observability.audit import new_audit, push_event, finalize_audit
-    audit = new_audit(trace_id, request.method, path, client_ip, tenant_id)
-    push_event(audit, "received", {"tenant": tenant_id, "auth": "ingest" if "ingest" in path else "read"})
-    
-    # Store trace_id and audit in request state for handlers to access
-    request.state.trace_id = trace_id
-    request.state.audit = audit
-    
-    try:
-        # Process request
-        response = await call_next(request)
-        
-        # Calculate duration
-        latency_ms = (time.perf_counter() - start_time) * 1000.0
-        
-        # Finalize audit
-        finalize_audit(audit, status=response.status_code, latency_ms=latency_ms)
-        
-        # Add security headers
-        from .security import get_security_headers
-        for key, value in get_security_headers().items():
-            response.headers[key] = value
-        
-        # Add trace ID to response headers
-        response.headers["X-Trace-Id"] = trace_id
-        response.headers["X-Request-ID"] = trace_id
-        
-        # Log HTTP request using structured logging (sampled)
-        from .logging_config import log_http_request
-        log_http_request(
-            method=request.method,
-            path=path,
-            status=response.status_code,
-            duration_ms=int(latency_ms),
-            client_ip=client_ip or "unknown",
-            trace_id=trace_id,
-            tenant_id=tenant_id
-        )
-        
-        increment_requests(response.status_code >= 400)
-        
-        # Update Prometheus metrics with path and fitness
-        from .services.prometheus_metrics import prometheus_metrics
-        prometheus_metrics.increment_requests(response.status_code, path)
-        if audit.get('fitness') is not None:
-            prometheus_metrics.observe_request_fitness(audit['fitness'])
-        
-        return response
-        
-    except HTTPException as e:
-        # Calculate duration
-        latency_ms = (time.perf_counter() - start_time) * 1000.0
-        
-        # Finalize audit with correct client error status
-        finalize_audit(audit, status=e.status_code, latency_ms=latency_ms, summary={"error": str(e.detail)})
-        
-        # Log error with structured logging
-        from .logging_config import log_http_request
-        log_http_request(
-            method=request.method,
-            path=path,
-            status=e.status_code,
-            duration_ms=int(latency_ms),
-            client_ip=client_ip or "unknown",
-            trace_id=trace_id,
-            tenant_id=tenant_id
-        )
-        
-        increment_requests(True)
-        
-        # Update Prometheus metrics
-        from .services.prometheus_metrics import prometheus_metrics
-        prometheus_metrics.increment_requests(e.status_code, path)
-        
-        # Return the original HTTPException as a response (avoid converting to 500)
-        from fastapi.responses import JSONResponse
-        return JSONResponse({"detail": e.detail}, status_code=e.status_code)
-        
-    except Exception as e:
-        # Calculate duration
-        latency_ms = (time.perf_counter() - start_time) * 1000.0
-        
-        # Finalize audit with error
-        finalize_audit(audit, status=500, latency_ms=latency_ms, summary={"error": str(e)})
-        
-        # Log error with structured logging (always log errors)
-        from .logging_config import log_http_request
-        log_http_request(
-            method=request.method,
-            path=path,
-            status=500,
-            duration_ms=int(latency_ms),
-            client_ip=client_ip or "unknown",
-            trace_id=trace_id,
-            tenant_id=tenant_id
-        )
-        
-        increment_requests(True)
-        raise
+
 
 # Serve index.html at root
 @app.get("/", include_in_schema=False)
@@ -452,7 +328,7 @@ def _parse_records(obj: Any) -> List[Dict[str, Any]]:
         return obj
     if isinstance(obj, dict) and "records" in obj and isinstance(obj["records"], list):
         return obj["records"]
-    raise HTTPException(status_code=400, detail="Expected JSON array or object with 'records' array.")
+    raise HTTPException(status_code=400, detail="Expected JSON array or object with 'records' array. Got: " + str(type(obj)))
 
 def _validate_record(rec: Dict[str, Any]) -> None:
     # Minimal validation per contract: require timestamps + src/dst basics (expand as needed)
@@ -463,7 +339,20 @@ def _validate_record(rec: Dict[str, Any]) -> None:
             prometheus_metrics.increment_http_dropped("missing_fields")
         except Exception:
             pass
-        raise HTTPException(status_code=400, detail="Missing event timestamp.")
+        raise HTTPException(status_code=400, detail="Missing event timestamp. Required one of: " + ", ".join(required_any))
+    
+    # Validate required fields for flows.v1 format
+    if "src_ip" in rec or "dst_ip" in rec:
+        # This looks like a flow record, validate required fields
+        required_flow_fields = ["src_ip", "dst_ip", "src_port", "dst_port", "proto"]
+        missing_fields = [field for field in required_flow_fields if field not in rec]
+        if missing_fields:
+            try:
+                prometheus_metrics.increment_http_dropped("missing_fields")
+            except Exception:
+                pass
+            raise HTTPException(status_code=400, detail=f"Missing required flow fields: {', '.join(missing_fields)}")
+    
     # You can add per-schema checks (flows.v1, zeek.conn.v1) later
 
 # Enrichers are loaded once on startup via the new modules
@@ -504,8 +393,10 @@ async def health(response: Response):
 @app.get(f"{API_PREFIX}/version")
 async def version(response: Response):
     add_version_header(response)
+    # Use the same version reading logic as the version router
+    from .api.version import get_version_from_file
     return {
-        "version": API_VERSION,
+        "version": get_version_from_file(),
         "git_tag": os.getenv("GIT_TAG", "unknown"),
         "image_digest": os.getenv("IMAGE_DIGEST", "unknown")
     }
@@ -563,17 +454,27 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
         
         try:
             payload = json.loads(raw.decode("utf-8"))
-        except UnicodeDecodeError:
+        except UnicodeDecodeError as e:
             try:
                 prometheus_metrics.increment_http_dropped("invalid_json")
             except Exception:
                 pass
+            logger = logging.getLogger("app")
+            logger.warning(f"Invalid UTF-8 in ingest payload: {str(e)}", extra={
+                "trace_id": trace_id,
+                "component": "ingest"
+            })
             raise HTTPException(status_code=400, detail="Body is not valid UTF-8 JSON (use gzip or utf-8).")
         except json.JSONDecodeError as e:
             try:
                 prometheus_metrics.increment_http_dropped("invalid_json")
             except Exception:
                 pass
+            logger = logging.getLogger("app")
+            logger.warning(f"Invalid JSON in ingest payload: {str(e)}", extra={
+                "trace_id": trace_id,
+                "component": "ingest"
+            })
             raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
 
         records = _parse_records(payload)

@@ -5,6 +5,7 @@ import gzip
 import socket
 import asyncio
 import aiohttp
+import uuid
 from collections import defaultdict
 
 API_URL = os.getenv("API_URL", "http://api-core:80/v1/ingest/netflow")
@@ -40,6 +41,10 @@ def admit(ip: str) -> bool:
 async def post_batch(batch):
     if not batch:
         return
+    
+    # Generate trace ID for this batch
+    trace_id = str(uuid.uuid4())
+    
     body = {"format": "flows.v1", "records": batch}
     data = gzip.compress(json.dumps(body).encode())
     headers = {
@@ -47,14 +52,22 @@ async def post_batch(batch):
         "Content-Type": "application/json",
         "Content-Encoding": "gzip",
         "X-Source-Id": SOURCE_ID,
+        "X-Request-ID": trace_id,
     }
+    
+    print(f"Mapper sending batch with trace_id: {trace_id}")
+    
     try:
         async with aiohttp.ClientSession() as s:
             async with s.post(API_URL, data=data, headers=headers, timeout=15) as r:
                 if r.status >= 300:
                     metrics["udp_dropped_total"][f"http_{r.status}"] += 1
-    except Exception:
+                    print(f"Mapper HTTP error {r.status} for trace_id: {trace_id}")
+                else:
+                    print(f"Mapper success for trace_id: {trace_id}")
+    except Exception as e:
         metrics["udp_dropped_total"]["http_error"] += 1
+        print(f"Mapper exception for trace_id {trace_id}: {e}")
 
 # NOTE: placeholder decoder; wire in your NetFlow/IPFIX decoder here
 def decode_to_flows(records_bytes: bytes, src_ip: str):

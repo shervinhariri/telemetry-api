@@ -1,201 +1,256 @@
-# Telemetry API Logging Configuration
-
-This document describes the structured logging system and request audit capabilities of the Telemetry API.
+# Logging & Observability
 
 ## Overview
 
-The Telemetry API uses a professional, scalable logging approach that:
-- **Reduces noise** through sampling and filtering
-- **Maintains signal** by always logging errors and important events
-- **Provides structured data** in JSON format for easy parsing
-- **Includes request timelines** for debugging and monitoring
+The Telemetry API uses structured JSON logging with request tracing, correlation IDs, and comprehensive observability features.
 
-## Environment Variables
+## Configuration
 
-### Core Logging
-- `LOG_LEVEL`: Log level (INFO, WARNING, ERROR) - default: INFO
-- `LOG_FORMAT`: Output format (json, text) - default: json
-- `ENVIRONMENT`: Environment (development, production) - default: production
+### Environment Variables
 
-### HTTP Request Logging
-- `HTTP_LOG_ENABLED`: Enable/disable HTTP request logging (true/false) - default: true
-- `HTTP_LOG_SAMPLE_RATE`: Sample rate for 2xx responses (0.0-1.0) - default: 0.01 (1%)
-- `HTTP_LOG_EXCLUDE_PATHS`: Comma-separated paths to exclude from logging - default: `/v1/metrics,/v1/system,/v1/logs/tail,/v1/admin/requests`
-- `REDACT_HEADERS`: Comma-separated headers to redact - default: `authorization,x-api-key`
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_FORMAT` | `json` | Log format: `json` or `text` |
+| `LOG_LEVEL` | `INFO` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `LOG_SAMPLE_RATE` | `1.0` | Request sampling rate (0.0-1.0) |
+| `LOG_EXCLUDE_PATHS` | `/v1/health,/v1/metrics/prometheus` | Paths to exclude from request logging |
 
-## Request Audit System
+### Configuration File
 
-The API maintains a ring buffer of request audits with timeline events for each request.
+The system loads logging configuration from `LOGGING.yaml` at startup:
 
-### Timeline Events
-
-Each request generates up to 5 timeline events:
-
-1. **received** - Request received
-   ```json
-   {
-     "ts": "2025-08-17T21:10:30.076457+00:00",
-     "event": "received",
-     "meta": {
-       "tenant": "tenant_489",
-       "auth": "ingest"
-     }
-   }
-   ```
-
-2. **validated** - Schema validation (for ingest requests)
-   ```json
-   {
-     "ts": "2025-08-17T21:10:30.077557+00:00",
-     "event": "validated",
-     "meta": {
-       "schema": "flows.v1",
-       "ok": true,
-       "records": 1
-     }
-   }
-   ```
-
-3. **enriched** - Data enrichment (for ingest requests)
-   ```json
-   {
-     "ts": "2025-08-17T21:10:30.077624+00:00",
-     "event": "enriched",
-     "meta": {
-       "geo": 1,
-       "asn": 1,
-       "ti": 0,
-       "risk_avg": 18.7
-     }
-   }
-   ```
-
-4. **exported** - Data export (for ingest requests)
-   ```json
-   {
-     "ts": "2025-08-17T21:10:30.077633+00:00",
-     "event": "exported",
-     "meta": {
-       "splunk": "ok",
-       "elastic": "ok",
-       "count": 1
-     }
-   }
-   ```
-
-5. **completed** - Request completed
-   ```json
-   {
-     "ts": "2025-08-17T21:10:30.079173+00:00",
-     "event": "completed",
-     "meta": {
-       "status": 200,
-       "latency_ms": 2.8
-     }
-   }
-   ```
-
-### Audit API Endpoints
-
-- `GET /v1/admin/requests` - Get recent request audits with timeline
-- `GET /v1/admin/requests/summary` - Get audit summary statistics
-- `GET /v1/api/requests` - Legacy endpoint for UI compatibility
-
-### Audit Data Structure
-
-```json
-{
-  "id": "trace-id-uuid",
-  "ts": "2025-08-17T21:10:30.076434+00:00",
-  "method": "POST",
-  "path": "/v1/ingest",
-  "client_ip": "192.168.65.1",
-  "tenant_id": "tenant_489",
-  "status": 200,
-  "latency_ms": 2.8123855590820312,
-  "summary": {},
-  "timeline": [
-    // Timeline events as shown above
-  ]
-}
-```
-
-## Log Formats
-
-### JSON Format (Production)
-```json
-{
-  "ts": "2025-08-17T21:10:30.076434+00:00",
-  "level": "INFO",
-  "msg": "http_request",
-  "trace_id": "trace-id-uuid",
-  "method": "POST",
-  "path": "/v1/ingest",
-  "status": 200,
-  "latency_ms": 2.8,
-  "client_ip": "192.168.65.1",
-  "tenant_id": "tenant_489"
-}
-```
-
-### Text Format (Development)
-```
-2025-08-17T21:10:30.076434 | INFO | 🌐 HTTP REQUEST
-2025-08-17T21:10:30.076434 | INFO | ✅ POST /v1/ingest → 200
-2025-08-17T21:10:30.076434 | INFO | 🟢 Duration: 3ms
-2025-08-17T21:10:30.076434 | INFO | 📍 Client: 192.168.65.1
-2025-08-17T21:10:30.076434 | INFO | 🔍 Trace ID: trace-id-uuid
-```
-
-## Sampling Strategy
-
-- **Always log**: 4xx and 5xx responses (errors)
-- **Sample**: 2xx responses based on `HTTP_LOG_SAMPLE_RATE`
-- **Exclude**: Noisy endpoints like metrics, health checks, and admin endpoints
-- **Queue-based**: Non-blocking logging using QueueHandler/QueueListener
-
-## Configuration Examples
-
-### Development
-```bash
-export LOG_LEVEL=INFO
-export LOG_FORMAT=text
-export ENVIRONMENT=development
-export HTTP_LOG_SAMPLE_RATE=0.1  # 10% sampling
-```
-
-### Production
-```bash
-export LOG_LEVEL=WARNING
-export LOG_FORMAT=json
-export ENVIRONMENT=production
-export HTTP_LOG_SAMPLE_RATE=0.01  # 1% sampling
-export HTTP_LOG_EXCLUDE_PATHS=/v1/metrics,/v1/system,/v1/logs/tail,/v1/admin/requests
-```
-
-## Docker Compose Configuration
-
-### Production Override
 ```yaml
-# docker-compose.prod.yml
-services:
-  api:
-    environment:
-      - ENVIRONMENT=production
-      - LOG_LEVEL=WARNING
-      - LOG_FORMAT=json
-      - HTTP_LOG_ENABLED=true
-      - HTTP_LOG_SAMPLE_RATE=0.01
-      - HTTP_LOG_EXCLUDE_PATHS=/v1/metrics,/v1/system,/v1/logs/tail,/v1/admin/requests
-      - REDACT_HEADERS=authorization,x-api-key
-      - DEMO_MODE=false
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  json:
+    class: app.logging_config.JsonFormatter
+  text:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: json
+    stream: ext://sys.stdout
+  
+  memory:
+    class: app.logging_config.MemoryLogHandler
+    level: INFO
+    formatter: json
+    max_size: 10000
 ```
 
-## Benefits
+## JSON Log Schema
 
-1. **Reduced Noise**: Only 1% of successful requests are logged
-2. **Structured Data**: JSON format for easy parsing and analysis
-3. **Request Tracing**: Full timeline for debugging and monitoring
-4. **Performance**: Non-blocking queue-based logging
-5. **Flexibility**: Environment-based configuration
-6. **Security**: Automatic header redaction
+All logs follow a consistent JSON structure:
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:45.123Z",
+  "level": "INFO",
+  "logger": "app",
+  "msg": "HTTP Request",
+  "trace_id": "550e8400-e29b-41d4-a716-446655440000",
+  "method": "POST",
+  "path": "/v1/ingest",
+  "status": 200,
+  "latency_ms": 45.2,
+  "client_ip": "192.168.1.100",
+  "tenant_id": "default",
+  "component": "api"
+}
+```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timestamp` | string | ISO 8601 timestamp in UTC |
+| `level` | string | Log level (DEBUG, INFO, WARNING, ERROR) |
+| `logger` | string | Logger name |
+| `msg` | string | Log message |
+| `trace_id` | string | Request correlation ID |
+| `method` | string | HTTP method (for requests) |
+| `path` | string | Request path (for requests) |
+| `status` | integer | HTTP status code (for requests) |
+| `latency_ms` | float | Request latency in milliseconds |
+| `client_ip` | string | Client IP address |
+| `tenant_id` | string | Tenant identifier |
+| `component` | string | Component name (api, mapper, etc.) |
+
+## Request Tracing
+
+### Trace ID Generation
+
+- **Inbound requests**: Reuse `X-Request-ID` header if present
+- **Generated requests**: Create new UUID4 trace ID
+- **Mapper requests**: Generate trace ID and propagate to API
+
+### Correlation
+
+The mapper service generates trace IDs and includes them in requests to the API:
+
+```python
+# Mapper generates trace ID
+trace_id = str(uuid.uuid4())
+headers = {
+    "X-Request-ID": trace_id,
+    "Authorization": f"Bearer {API_KEY}"
+}
+```
+
+Both mapper and API logs will show the same `trace_id` for correlated operations.
+
+## Live Logs API
+
+### Get Logs
+
+```bash
+# Get recent logs
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  "http://localhost/v1/logs?limit=100"
+
+# Filter by level
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  "http://localhost/v1/logs?level=ERROR"
+
+# Filter by trace ID
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  "http://localhost/v1/logs?trace_id=550e8400-e29b-41d4-a716-446655440000"
+
+# Filter by endpoint
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  "http://localhost/v1/logs?endpoint=/v1/ingest"
+```
+
+### Stream Logs (SSE)
+
+```bash
+# Stream live logs
+curl -N -H "Authorization: Bearer YOUR_API_KEY" \
+  "http://localhost/v1/logs/stream"
+```
+
+### Download Logs
+
+```bash
+# Download as JSON lines
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  "http://localhost/v1/logs/download?limit=1000" \
+  -o telemetry-logs.jsonl
+```
+
+## Metrics Integration
+
+### Success Rate
+
+The system tracks request success rates:
+
+```json
+{
+  "requests_total": 1500,
+  "requests_success": 1485,
+  "requests_failed": 15,
+  "requests_last_15m_success_rate": 99.0
+}
+```
+
+### Latency Tracking
+
+Average latency is calculated from recent requests:
+
+```json
+{
+  "latency_ms_avg": 45.2
+}
+```
+
+## Examples
+
+### HTTP Request Log
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:45.123Z",
+  "level": "INFO",
+  "logger": "app",
+  "msg": "HTTP Request",
+  "trace_id": "550e8400-e29b-41d4-a716-446655440000",
+  "method": "POST",
+  "path": "/v1/ingest",
+  "status": 200,
+  "latency_ms": 45.2,
+  "client_ip": "192.168.1.100",
+  "tenant_id": "default",
+  "component": "api"
+}
+```
+
+### Error Log
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:45.123Z",
+  "level": "ERROR",
+  "logger": "app",
+  "msg": "Request failed: Invalid API key",
+  "trace_id": "550e8400-e29b-41d4-a716-446655440000",
+  "method": "POST",
+  "path": "/v1/ingest",
+  "status": 401,
+  "latency_ms": 12.5,
+  "client_ip": "192.168.1.100",
+  "tenant_id": "unknown",
+  "component": "api",
+  "exception": "Invalid API key"
+}
+```
+
+### Mapper Log
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:45.123Z",
+  "level": "INFO",
+  "logger": "mapper",
+  "msg": "Mapper sending batch with trace_id: 550e8400-e29b-41d4-a716-446655440000",
+  "trace_id": "550e8400-e29b-41d4-a716-446655440000",
+  "component": "mapper"
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **No logs appearing**: Check `LOG_LEVEL` and `LOG_SAMPLE_RATE`
+2. **Missing trace IDs**: Ensure `X-Request-ID` headers are being set
+3. **High latency**: Monitor `latency_ms` field in logs
+4. **Memory usage**: Adjust `max_size` in MemoryLogHandler
+
+### Debug Mode
+
+Enable debug logging:
+
+```bash
+export LOG_LEVEL=DEBUG
+export LOG_SAMPLE_RATE=1.0
+```
+
+### Log Analysis
+
+Use `jq` to analyze logs:
+
+```bash
+# Count by level
+docker logs telemetry-api-api-1 | jq -r '.level' | sort | uniq -c
+
+# Find slow requests
+docker logs telemetry-api-api-1 | jq -r 'select(.latency_ms > 100) | {path, latency_ms, trace_id}'
+
+# Track specific trace ID
+docker logs telemetry-api-api-1 | jq -r 'select(.trace_id == "550e8400-e29b-41d4-a716-446655440000")'
+```

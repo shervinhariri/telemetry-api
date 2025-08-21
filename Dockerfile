@@ -7,7 +7,7 @@ RUN git clone --depth 1 --branch ${GOFLOW_VERSION} https://github.com/netsampler
 RUN CGO_ENABLED=0 go build -o /out/goflow2 ./cmd/goflow2
 
 # ---- Stage 2: app image (API + mapper + goflow2) ----
-FROM python:3.11-slim as app
+FROM python:3.11-slim@sha256:1d6131b5d479888b43200645e03a78443c7157efbdb730e6b48129740727c312 as app
 
 ARG APP_VERSION=0.8.4
 ARG GIT_SHA=dev
@@ -30,6 +30,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir requests orjson
 
 COPY app /app/app
+
+# Copy VERSION file for version reading
+COPY VERSION /app/VERSION
+
+# Copy logging configuration
+COPY LOGGING.yaml /app/LOGGING.yaml
 
 # Copy UI files
 COPY ops/ui/ui /app/ui
@@ -71,5 +77,13 @@ ENV APP_PORT=80
 ENV GEOIP_DB_CITY=/data/GeoLite2-City.mmdb
 ENV GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb
 ENV THREATLIST_CSV=/data/threats.csv
+
+# OCI Labels for image metadata
+LABEL org.opencontainers.image.title="telemetry-api" \
+      org.opencontainers.image.version="${APP_VERSION:-0.8.6}" \
+      org.opencontainers.image.revision="${GIT_SHA:-dev}" \
+      org.opencontainers.image.source="https://github.com/shervinhariri/telemetry-api" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.description="Live Network Threat Telemetry API (MVP)"
 
 ENTRYPOINT ["/app/entrypoint.sh"]
