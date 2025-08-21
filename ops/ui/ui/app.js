@@ -1214,6 +1214,13 @@ class TelemetryDashboard {
     async loadInitialData() {
         try {
             console.log('Loading initial data...');
+            
+            // Initialize error ring with default value
+            const errorRing = document.getElementById('error-ring');
+            if (errorRing) {
+                errorRing.innerHTML = this.createErrorRing(0);
+            }
+            
             const k = getApiKey();
             if (!k) { this.showError('dashboard','API key required.'); promptForKey('no key found'); return; }
             
@@ -1228,7 +1235,7 @@ class TelemetryDashboard {
                     // Don't show error for 503, just keep retrying
                     return;
                 }
-                system = { version: '0.8.5' }; // Set default version
+                system = { version: '0.8.6' }; // Set default version
             }
             
             this.updateSystemInfo(system);
@@ -1259,7 +1266,7 @@ class TelemetryDashboard {
     updateSystemInfo(system) {
         console.log('Updating system info:', system);
         
-        const version = '0.8.5';
+        const version = '0.8.6';
         console.log('Version to display:', version);
         
         // Update version in dashboard and system panels
@@ -1319,9 +1326,9 @@ class TelemetryDashboard {
         const totalRequests = metrics?.requests_total ?? 0;
         const failedRequests = metrics?.requests_failed ?? 0;
         const errorRate = totalRequests > 0 ? Math.round((failedRequests / totalRequests) * 100 * 10) / 10 : 0;
-        const errorRateElement = document.getElementById('error-rate');
-        if (errorRateElement) {
-            errorRateElement.textContent = `${errorRate}%`;
+        const errorRing = document.getElementById('error-ring');
+        if (errorRing) {
+            errorRing.innerHTML = this.createErrorRing(errorRate);
         }
         
         console.log('Metrics updated:', {
@@ -1341,7 +1348,7 @@ class TelemetryDashboard {
             let requestsData = null;
             
             try {
-                requestsData = await this.apiCall('/api/requests?limit=20');
+                requestsData = await this.apiCall('/api/requests?limit=30');
                 console.log('API requests loaded:', requestsData);
             } catch (error) {
                 console.error('API requests failed:', error);
@@ -1440,6 +1447,42 @@ class TelemetryDashboard {
             <circle cx="${size/2}" cy="${size/2}" r="${radius}" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
                     stroke-dasharray="${dash} ${circumference - dash}" transform="rotate(-90 ${size/2} ${size/2})"
                     filter="url(#glow-${Math.round(percentage)})" style="box-shadow: 0 0 12px ${glowColor}"/>
+            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff"
+                  style="font-size:${size*0.2}px;font-weight:700;letter-spacing:-0.02em">${Math.round(percentage)}%</text>
+          </svg>`;
+    }
+
+    createErrorRing(percentage) {
+        const size = 80; // same size as success ring
+        const stroke = 4; // same thin stroke
+        const radius = (size - stroke) / 2;
+        const circumference = 2 * Math.PI * radius;
+        const dash = Math.max(0, Math.min(100, percentage)) / 100 * circumference;
+        let color = '#22c55e'; // green (good - low error rate)
+        let glowColor = 'rgba(34,197,94,0.7)'; // green glow
+        if (percentage > 80) {
+            color = '#ef4444'; // red (bad - high error rate)
+            glowColor = 'rgba(239,68,68,0.7)'; // red glow
+        } else if (percentage > 50) {
+            color = '#f59e0b'; // orange (warning - medium error rate)
+            glowColor = 'rgba(245,158,11,0.7)'; // orange glow
+        }
+        
+        return `
+          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;filter:drop-shadow(0 0 8px ${glowColor})">
+            <defs>
+              <filter id="error-glow-${Math.round(percentage)}">
+                <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                <feMerge> 
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            <circle cx="${size/2}" cy="${size/2}" r="${radius}" stroke="rgba(255,255,255,0.08)" stroke-width="${stroke}" fill="none"/>
+            <circle cx="${size/2}" cy="${size/2}" r="${radius}" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
+                    stroke-dasharray="${dash} ${circumference - dash}" transform="rotate(-90 ${size/2} ${size/2})"
+                    filter="url(#error-glow-${Math.round(percentage)})" style="box-shadow: 0 0 12px ${glowColor}"/>
             <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff"
                   style="font-size:${size*0.2}px;font-weight:700;letter-spacing:-0.02em">${Math.round(percentage)}%</text>
           </svg>`;
@@ -1990,7 +2033,7 @@ function addSourcesFunctionality() {
         type: '',
         status: '',
         page: 1,
-        page_size: 20
+        page_size: 30
     };
     dashboard.sourcesPollingInterval = null;
 

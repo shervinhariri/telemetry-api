@@ -331,25 +331,30 @@
 
         <!-- Top metric tiles -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
-            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col gap-2">
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col items-center justify-center gap-2">
+                <div class="flex items-baseline gap-2">
+                    <div class="text-2xl font-semibold leading-none" id="queue-lag">0</div>
+                    <div class="text-xs text-zinc-500">ms (p50)</div>
+                </div>
                 <div class="text-xs uppercase tracking-wide text-zinc-400">Queue Lag</div>
-                <div class="text-4xl font-semibold leading-none" id="queue-lag">0</div>
-                <div class="text-xs text-zinc-500">ms (p50)</div>
             </div>
-            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col gap-2">
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col items-center justify-center gap-2">
+                <div class="flex items-baseline gap-2">
+                    <div class="text-2xl font-semibold leading-none" id="avg-risk">0</div>
+                    <div class="text-xs text-zinc-500">0–100 scale</div>
+                </div>
                 <div class="text-xs uppercase tracking-wide text-zinc-400">Average Risk</div>
-                <div class="text-4xl font-semibold leading-none" id="avg-risk">0</div>
-                <div class="text-xs text-zinc-500">0–100 scale</div>
             </div>
-            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-amber-500/40 hover:shadow-[0_0_0_2px_rgba(245,158,11,.25)] flex flex-col gap-2">
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-amber-500/40 hover:shadow-[0_0_0_2px_rgba(245,158,11,.25)] flex flex-col items-center justify-center gap-2">
+                <div class="flex items-baseline gap-2">
+                    <div class="text-2xl font-semibold leading-none" id="threat-matches">0</div>
+                    <div class="text-xs text-zinc-500">last 15m</div>
+                </div>
                 <div class="text-xs uppercase tracking-wide text-zinc-400">Threat Matches</div>
-                <div class="text-4xl font-semibold leading-none" id="threat-matches">0</div>
-                <div class="text-xs text-zinc-500">last 15m</div>
             </div>
-            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-rose-500/40 hover:shadow-[0_0_0_2px_rgba(244,63,94,.25)] flex flex-col gap-2">
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-rose-500/40 hover:shadow-[0_0_0_2px_rgba(244,63,94,.25)] flex flex-col items-center justify-center gap-2">
+                <div id="error-ring" class="grid place-items-center"></div>
                 <div class="text-xs uppercase tracking-wide text-zinc-400">Error Rate</div>
-                <div class="text-4xl font-semibold leading-none" id="error-rate">0%</div>
-                <div class="text-xs text-zinc-500">overall</div>
             </div>
         </div>
 
@@ -371,7 +376,7 @@
                 <div class="text-xs uppercase tracking-wide text-zinc-400">Avg Latency</div>
             </div>
             <button onclick="window.open('/docs','_blank')" class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] focus:outline-none flex flex-col items-center justify-center gap-2">
-                <div class="text-2xl font-semibold leading-none" id="version">0.8.5</div>
+                <div class="text-2xl font-semibold leading-none" id="version">0.8.6</div>
                 <div class="text-xs uppercase tracking-wide text-zinc-400">Version</div>
             </button>
             <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col items-center justify-center gap-2">
@@ -845,7 +850,7 @@
   </div>
 
   <!-- Load script last, defer + cache bust -->
-  <script src="/ui/app.js?v=vefix37" defer></script>
+  <script src="/ui/app.js?v=vefix42" defer></script>
 </body>
 </html>
 
