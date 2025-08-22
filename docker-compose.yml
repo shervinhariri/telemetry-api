@@ -64,5 +64,20 @@ services:
     deploy:
       replicas: 0
 
+  udp-head:
+    build:
+      context: ./heads
+      dockerfile: Dockerfile.udp
+    image: ghcr.io/netreex/telemetry-api-udp:0.0.1
+    container_name: telemetry-udp-head
+    profiles: ["udp"]          # <— only runs when profile enabled
+    ports:
+      - "2055:2055/udp"
+      - "8081:8081"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   dbdata:
