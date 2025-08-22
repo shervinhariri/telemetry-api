@@ -1322,6 +1322,10 @@ class TelemetryDashboard {
         // Feature flags (default false if missing)
         const allowSources = features.sources === true;
         
+        if (!allowSources) {
+            this.hideTab('sources'); // don't show the tab if disabled
+        }
+        
         // Disable Create Source form/button if not enabled
         const form = document.getElementById('form-create-source');
         const btn = document.getElementById('btn-create-source');
@@ -1347,8 +1351,25 @@ class TelemetryDashboard {
             }
         }
         
+        // Belt & suspenders: guard the loader too
+        const oldLoadSources = this.loadSourcesData?.bind(this);
+        this.loadSourcesData = async () => {
+            if (!(window.FEATURES && window.FEATURES.sources === true)) {
+                this.showPanelError('sources', 'Sources are disabled in this build.');
+                return;
+            }
+            return oldLoadSources ? oldLoadSources() : null;
+        };
+        
         // Store features globally for other functions to access
         window.FEATURES = features;
+    }
+
+    hideTab(tabId) {
+        const btn = document.getElementById(`tab-${tabId}`);
+        const panel = document.getElementById(`panel-${tabId}`);
+        if (btn) btn.style.display = 'none';
+        if (panel) panel.style.display = 'none';
     }
 
     async loadUdpHeadStatus() {
