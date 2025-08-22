@@ -1,12 +1,14 @@
 version: "3.9"
 services:
-  api-core:
+  api:
     build: .
-    image: shvin/telemetry-api:golden
-    container_name: api-core
+    image: ghcr.io/netreex/telemetry-api:0.8.6
+    container_name: telemetry-api
     environment:
       - APP_PORT=80
-      - APP_VERSION=0.8.5
+      - APP_VERSION=0.8.6
+      - TELEMETRY_FEATURE_SOURCES=false
+      - TELEMETRY_FEATURE_UDP=false
       - SQLITE_PATH=/data/telemetry.db
       - GEOIP_CITY_DB=/data/geo/GeoLite2-City.mmdb
       - GEOIP_ASN_DB=/data/geo/GeoLite2-ASN.mmdb
@@ -36,28 +38,30 @@ services:
       - ./ti:/data/ti:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import time,urllib.request; import sys; import urllib.error; url='http://localhost:80/v1/health'; urllib.request.urlopen(url, timeout=2); sys.exit(0)"]
-      interval: 5s
-      timeout: 4s
-      retries: 20
-      start_period: 10s
+      test: ["CMD", "curl", "-fsS", "http://localhost/v1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
-  udp-head:
-    build: ./services/udp-head
-    container_name: udp-head
+  # keep disabled until UDP ingest exists in backend
+  udp-ingestor:
+    image: ghcr.io/netreex/telemetry-api-udp:0.8.6
+    container_name: telemetry-udp-ingestor
     environment:
       - UDP_BIND=0.0.0.0
       - UDP_PORT=2055
       - ALLOWLIST_CIDRS=
       - RATE_PER_MIN=60000
-      - API_URL=http://api-core:80/v1/ingest/netflow
+      - API_URL=http://api:80/v1/ingest/netflow
       - API_KEY=${API_KEY}
       - SOURCE_ID=udp-head-01
     ports:
       - "2055:2055/udp"
     depends_on:
-      - api-core
+      - api
     restart: unless-stopped
+    deploy:
+      replicas: 0
 
 volumes:
   dbdata:
