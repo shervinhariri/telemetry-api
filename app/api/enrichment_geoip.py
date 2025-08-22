@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from app.services.geoip import set_mmdb_path, lookup_ip
 
-router = APIRouter(prefix="/v1/config", tags=["config"])
+router = APIRouter(tags=["config"])
 
 class GeoIPCfg(BaseModel):
     enabled: bool = True
@@ -10,7 +10,7 @@ class GeoIPCfg(BaseModel):
 
 GEOIP_ENABLED = False
 
-@router.put("/geoip")
+@router.put("/config/geoip")
 def set_geoip(cfg: GeoIPCfg):
     global GEOIP_ENABLED
     if not cfg.path:
@@ -19,7 +19,7 @@ def set_geoip(cfg: GeoIPCfg):
     GEOIP_ENABLED = cfg.enabled
     return {"ok": True, "enabled": GEOIP_ENABLED, "path": cfg.path}
 
-@router.post("/geoip/test")
+@router.post("/config/geoip/test")
 def test_geoip(ip: str = Query(...)):
     hit = lookup_ip(ip)
     return {"enabled": GEOIP_ENABLED, "ip": ip, "geo": hit}

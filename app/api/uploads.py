@@ -1,10 +1,10 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import os, uuid, hashlib, shutil
 
-router = APIRouter(prefix="/v1/upload", tags=["upload"])
+router = APIRouter(tags=["upload"])
 DATA_DIR = os.getenv("ENRICH_DATA_DIR", "/data/enrichment")
 
-@router.post("/geoip")
+@router.post("/upload/geoip")
 async def upload_geoip(f: UploadFile = File(...)):
     os.makedirs(DATA_DIR, exist_ok=True)
     if not f.filename.endswith(".mmdb"):
