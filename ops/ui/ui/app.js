@@ -581,6 +581,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create dashboard instance and make it globally accessible
     window.telemetryDashboard = new TelemetryDashboard();
     
+    // Set Dashboard as the default active tab
+    window.telemetryDashboard.switchTab('dashboard');
+    
     // === VEFIX: event delegation so re-renders don't break clicks ===
     document.addEventListener('click', function (e) {
       console.log('[vefix] Click event detected on:', e.target);
@@ -1012,11 +1015,12 @@ class TelemetryDashboard {
     switchTab(tabName) {
         console.log('Switching to tab:', tabName);
         
-        // Update tab buttons
+        // Update tab buttons - reset all to inactive state
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.className = 'tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200';
         });
         
+        // Set the active tab styling
         const activeTab = document.getElementById(`tab-${tabName.toLowerCase()}`);
         if (activeTab) {
             activeTab.className = 'tab-btn active px-4 py-2 rounded-2xl text-sm ring-1 bg-[#14151B] ring-indigo-500/40 text-zinc-100';
