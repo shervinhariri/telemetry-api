@@ -1207,6 +1207,9 @@ class TelemetryDashboard {
             this.loadSourcesData();
         } else if (tabName.toLowerCase() === 'toolbox') {
             // Toolbox doesn't need special data loading
+        } else if (tabName.toLowerCase() === 'api') {
+            // API tab removed, redirect to toolbox
+            this.switchTab('toolbox');
         }
     }
 
