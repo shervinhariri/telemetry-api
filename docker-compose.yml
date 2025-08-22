@@ -45,6 +45,7 @@ services:
 
   # keep disabled until UDP ingest exists in backend
   udp-ingestor:
+    build: ./services/udp-head
     image: ghcr.io/netreex/telemetry-api-udp:0.8.6
     container_name: telemetry-udp-ingestor
     environment:
