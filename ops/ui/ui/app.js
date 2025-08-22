@@ -93,19 +93,32 @@ async function geoipUpload() {
   toast('Uploaded ' + file.name);
 }
 
+function setGeoipStatus(txt) {
+  const el = document.getElementById('geoip-status');
+  if (!el) return;
+  if (txt && txt.length) {
+    el.textContent = txt;
+    el.classList.remove('hidden');
+  } else {
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
+}
+
 async function geoipSave() {
   const enabled = document.getElementById('geoip-enabled').checked;
   const path = document.getElementById('geoip-path').value.trim();
   const r = await apiPUT('/v1/config/geoip', { enabled, path });
   if (!r.ok) return toast('Save failed');
-  toast('GeoIP saved');
+  setGeoipStatus('Saved.');
+  setTimeout(() => setGeoipStatus(''), 2000);
 }
 
 async function geoipTest() {
-  const ip = document.getElementById('geoip-test-ip').value.trim() || '1.1.1.1';
-  const r = await apiPOST('/v1/config/geoip/test?ip='+encodeURIComponent(ip));
+  const ip = (document.getElementById('geoip-test-ip')?.value || '1.1.1.1').trim();
+  const r = await apiPOST('/v1/config/geoip/test?ip=' + encodeURIComponent(ip));
   const j = await r.json();
-  document.getElementById('geoip-status').textContent = j.geo ? JSON.stringify(j.geo) : 'No hit';
+  setGeoipStatus(j?.geo ? JSON.stringify(j.geo) : 'No hit');
 }
 
 // ---------- SAMPLE PAYLOADS ----------
