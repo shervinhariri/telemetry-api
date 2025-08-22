@@ -81,6 +81,33 @@ function validateIngestBody(body) {
   return { ok:true };
 }
 
+// ---------- GEOIP FUNCTIONS ----------
+async function geoipUpload() {
+  const file = document.getElementById('geoip-file').files[0];
+  if (!file) return toast('Choose a .mmdb file');
+  const fd = new FormData(); fd.append('f', file);
+  const r = await fetch('/v1/upload/geoip', { method: 'POST', headers: AUTH_HEADERS_NOJSON(), body: fd });
+  const j = await r.json();
+  if (!r.ok) return toast('Upload failed: ' + (j.error || r.status));
+  document.getElementById('geoip-path').value = j.path;
+  toast('Uploaded ' + file.name);
+}
+
+async function geoipSave() {
+  const enabled = document.getElementById('geoip-enabled').checked;
+  const path = document.getElementById('geoip-path').value.trim();
+  const r = await apiPUT('/v1/config/geoip', { enabled, path });
+  if (!r.ok) return toast('Save failed');
+  toast('GeoIP saved');
+}
+
+async function geoipTest() {
+  const ip = document.getElementById('geoip-test-ip').value.trim() || '1.1.1.1';
+  const r = await apiPOST('/v1/config/geoip/test?ip='+encodeURIComponent(ip));
+  const j = await r.json();
+  document.getElementById('geoip-status').textContent = j.geo ? JSON.stringify(j.geo) : 'No hit';
+}
+
 // ---------- SAMPLE PAYLOADS ----------
 function sampleFlowsV1() {
   const now = Math.floor(Date.now()/1000);
@@ -1108,6 +1135,12 @@ class TelemetryDashboard {
                 insertSampleZeek();
             });
         }
+
+        // GeoIP event listeners
+        document.getElementById('geoip-upload')?.addEventListener('click', () => document.getElementById('geoip-file').click());
+        document.getElementById('geoip-file')?.addEventListener('change', geoipUpload);
+        document.getElementById('geoip-save')?.addEventListener('click', geoipSave);
+        document.getElementById('geoip-test')?.addEventListener('click', geoipTest);
 
         // Slide-over
         const closeSlideOverBtn = document.getElementById('close-slide-over');
