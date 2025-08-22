@@ -321,7 +321,8 @@
                     <button id="tab-dashboard" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#14151B] ring-indigo-500/40 text-zinc-100">Dashboard</button>
         <button id="tab-sources" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Sources</button>
         <button id="tab-requests" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">System</button>
-        <button id="tab-api" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Toolbox</button>
+                    <button id="tab-api" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">API</button>
+            <button id="tab-toolbox" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Toolbox</button>
         <button id="tab-logs" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Logs</button>
         </div>
 
@@ -562,34 +563,31 @@
             </div>
           </section>
 
-          <!-- Enrichment Tools card -->
-          <section class="card">
-            <div class="card-header">
-              <div class="card-title">Enrichment</div>
-              <div class="spacer"></div>
-            </div>
+        </div>
 
-            <div class="card-body">
-              <!-- GeoIP card -->
-              <div id="card-geoip" class="card">
-                <div class="card-title">GeoIP (MaxMind)</div>
-                <label class="flex items-center gap-2 text-sm">
-                  <input type="checkbox" id="geoip-enabled"> Enabled
-                </label>
-                <div class="mt-2 flex gap-2">
-                  <input id="geoip-path" placeholder="/data/enrichment/<blob>_GeoLite2-City.mmdb" class="input w-full">
-                  <button id="geoip-upload" class="btn">Upload .mmdb</button>
-                  <input id="geoip-file" type="file" accept=".mmdb" class="hidden">
-                </div>
-                <div class="mt-2 flex gap-2">
-                  <button id="geoip-save" class="btn">Save</button>
-                  <input id="geoip-test-ip" placeholder="1.1.1.1" class="input">
-                  <button id="geoip-test" class="btn">Test</button>
-                </div>
-                <div id="geoip-status" class="muted text-xs mt-2">—</div>
+        <!-- Panel: Toolbox -->
+        <div id="panel-toolbox" class="panel hidden mt-6">
+          <h2 class="text-lg mb-3">Enrichment</h2>
+          <div class="space-y-6 mt-4">
+            <!-- GeoIP card -->
+            <div id="card-geoip" class="card">
+              <div class="card-title">GeoIP (MaxMind)</div>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" id="geoip-enabled"> Enabled
+              </label>
+              <div class="mt-2 flex gap-2">
+                <input id="geoip-path" placeholder="/data/enrichment/<blob>_GeoLite2-City.mmdb" class="input w-full">
+                <button id="geoip-upload" class="btn">Upload .mmdb</button>
+                <input id="geoip-file" type="file" accept=".mmdb" class="hidden">
               </div>
+              <div class="mt-2 flex gap-2">
+                <button id="geoip-save" class="btn">Save</button>
+                <input id="geoip-test-ip" placeholder="1.1.1.1" class="input">
+                <button id="geoip-test" class="btn">Test</button>
+              </div>
+              <div id="geoip-status" class="muted text-xs mt-2 hidden"></div>
             </div>
-          </section>
+          </div>
         </div>
     </div>
 

@@ -1192,6 +1192,8 @@ class TelemetryDashboard {
             this.loadInitialLogs();
         } else if (tabName.toLowerCase() === 'sources') {
             this.loadSourcesData();
+        } else if (tabName.toLowerCase() === 'toolbox') {
+            // Toolbox doesn't need special data loading
         }
     }
 
