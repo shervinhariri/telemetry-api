@@ -236,7 +236,7 @@ async def create_source():
 
 @app.get(f"{API_PREFIX}/sources")
 async def list_sources():
-    return JSONResponse({"error": "sources endpoint not enabled in this build"}, status_code=501)
+    return JSONResponse({"enabled": False, "items": [], "note": "Sources feature disabled in this build"}, status_code=200)
 
 @app.get(f"{API_PREFIX}/sources/{{source_id}}")
 async def get_source(source_id: str):
