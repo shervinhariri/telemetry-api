@@ -33,6 +33,7 @@ from .api.sources import router as sources_router
 from .api.admin_security import router as admin_security_router
 from .api.admin_flags import router as admin_flags_router
 from .api.utils import router as utils_router
+from .api.uploads import router as uploads_router
 from .pipeline import ingest_queue, record_batch_accepted, enqueue
 from .logging_config import setup_logging
 from .config import API_VERSION
@@ -228,6 +229,7 @@ app.include_router(prometheus_router, prefix=API_PREFIX)
 app.include_router(admin_security_router, prefix=API_PREFIX)
 app.include_router(admin_flags_router, prefix=API_PREFIX)
 app.include_router(utils_router, prefix=API_PREFIX)
+app.include_router(uploads_router, prefix=API_PREFIX)
 
 # Hard-stop unfinished admin endpoints cleanly (no 500)
 @app.post(f"{API_PREFIX}/sources")
