@@ -1191,11 +1191,18 @@ class TelemetryDashboard {
             activeTab.className = 'tab-btn active px-4 py-2 rounded-2xl text-sm ring-1 bg-[#14151B] ring-indigo-500/40 text-zinc-100';
         }
 
-        // Update panels
+        // Hide ALL panels first (including both .panel and #panel-toolbox)
         document.querySelectorAll('.panel').forEach(panel => {
             panel.classList.add('hidden');
         });
         
+        // Also hide toolbox specifically since it doesn't have .panel class
+        const toolboxPanel = document.getElementById('panel-toolbox');
+        if (toolboxPanel) {
+            toolboxPanel.classList.add('hidden');
+        }
+        
+        // Show the target panel
         const targetPanel = document.getElementById(`panel-${tabName.toLowerCase()}`);
         if (targetPanel) {
             targetPanel.classList.remove('hidden');
