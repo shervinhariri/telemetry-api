@@ -224,10 +224,31 @@ app.include_router(system_router, prefix=API_PREFIX)
 app.include_router(keys_router, prefix=API_PREFIX)
 app.include_router(demo_router, prefix=API_PREFIX)
 app.include_router(prometheus_router, prefix=API_PREFIX)
-app.include_router(sources_router, prefix=API_PREFIX)
+# app.include_router(sources_router, prefix=API_PREFIX)  # Disabled until implemented
 app.include_router(admin_security_router, prefix=API_PREFIX)
 app.include_router(admin_flags_router, prefix=API_PREFIX)
 app.include_router(utils_router, prefix=API_PREFIX)
+
+# Hard-stop unfinished admin endpoints cleanly (no 500)
+@app.post(f"{API_PREFIX}/sources")
+async def create_source():
+    return JSONResponse({"error": "sources endpoint not enabled in this build"}, status_code=501)
+
+@app.get(f"{API_PREFIX}/sources")
+async def list_sources():
+    return JSONResponse({"error": "sources endpoint not enabled in this build"}, status_code=501)
+
+@app.get(f"{API_PREFIX}/sources/{{source_id}}")
+async def get_source(source_id: str):
+    return JSONResponse({"error": "sources endpoint not enabled in this build"}, status_code=501)
+
+@app.patch(f"{API_PREFIX}/sources/{{source_id}}")
+async def update_source(source_id: str):
+    return JSONResponse({"error": "sources endpoint not enabled in this build"}, status_code=501)
+
+@app.delete(f"{API_PREFIX}/sources/{{source_id}}")
+async def delete_source(source_id: str):
+    return JSONResponse({"error": "sources endpoint not enabled in this build"}, status_code=501)
 
 # UDP Metrics endpoint for mapper reporting
 @app.post(f"{API_PREFIX}/admin/metrics/udp")
