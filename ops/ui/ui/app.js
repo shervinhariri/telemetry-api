@@ -140,7 +140,99 @@ function insertSampleZeek() {
   if (ta) ta.value = JSON.stringify(sampleZeekConn(), null, 2);
 }
 
+// --- New helpers for the output box ---
+function setOutput(textOrObj) {
+  const out = document.querySelector('#api-output');
+  if (!out) return;
+  if (typeof textOrObj === 'string') {
+    out.textContent = textOrObj;
+  } else {
+    out.textContent = JSON.stringify(textOrObj, null, 2);
+  }
+}
+function appendOutputLine(line) {
+  const out = document.querySelector('#api-output');
+  if (!out) return;
+  out.textContent += (out.textContent ? '\n' : '') + line;
+}
+function clearOutput() { setOutput(''); }
+function copyOutput() {
+  const out = document.querySelector('#api-output');
+  if (!out) return;
+  navigator.clipboard.writeText(out.textContent || '').catch(()=>{});
+}
 
+// --- Lookup action (/v1/lookup?q=...) ---
+async function doLookup() {
+  clearError('api');
+  const qInput = document.querySelector('#lookup-value');
+  const btn = document.querySelector('#btn-lookup');
+  const qv = (qInput?.value || '').trim();
+  if (!qv) { 
+    showError('api','Enter a value to look up (IP, domain, hash, etc.)'); 
+    showToast('info','Enter a value to look up'); 
+    return; 
+  }
+
+  setLoading(btn, true);
+  try {
+    // If your API expects ?q=, keep as-is. If it expects JSON body, switch to POST.
+    const { resp, data, text } = await apiCall(`/v1/lookup?q=${encodeURIComponent(qv)}`, {}, 'api');
+
+    if (!resp.ok) {
+      const snippet = (text || JSON.stringify(data || {})).slice(0, 500);
+      throw new Error(`Lookup failed (HTTP ${resp.status}): ${snippet}`);
+    }
+
+    setOutput(data ?? { raw: text || 'No body' });
+    showToast('success', `Lookup OK: ${qv}`, '/v1/lookup');
+  } catch (e) {
+    showError('api', e.message);
+    showToast('error', e.message, '/v1/lookup failed');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+// ---------- GEOIP FUNCTIONS ----------
+async function geoipUpload() {
+  const file = document.getElementById('geoip-file').files[0];
+  if (!file) return toast('Choose a .mmdb file');
+  const fd = new FormData(); fd.append('f', file);
+  const r = await fetch('/v1/upload/geoip', { method: 'POST', headers: AUTH_HEADERS_NOJSON(), body: fd });
+  const j = await r.json();
+  if (!r.ok) return toast('Upload failed: ' + (j.error || r.status));
+  document.getElementById('geoip-path').value = j.path;
+  toast('Uploaded ' + file.name);
+}
+
+function setGeoipStatus(txt) {
+  const el = document.getElementById('geoip-status');
+  if (!el) return;
+  if (txt && txt.length) {
+    el.textContent = txt;
+    el.classList.remove('hidden');
+  } else {
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
+}
+
+async function geoipSave() {
+  const enabled = document.getElementById('geoip-enabled').checked;
+  const path = document.getElementById('geoip-path').value.trim();
+  const r = await apiPUT('/v1/config/geoip', { enabled, path });
+  if (!r.ok) return toast('Save failed');
+  setGeoipStatus('Saved.');
+  setTimeout(() => setGeoipStatus(''), 2000);
+}
+
+async function geoipTest() {
+  const ip = (document.getElementById('geoip-test-ip')?.value || '1.1.1.1').trim();
+  const r = await apiPOST('/v1/config/geoip/test?ip=' + encodeURIComponent(ip));
+  const j = await r.json();
+  setGeoipStatus(j?.geo ? JSON.stringify(j.geo) : 'No hit');
+}
 
 // ---------- TOASTS ----------
 function showToast(type, message, title = null, timeoutMs = 4200) {
@@ -993,9 +1085,82 @@ class TelemetryDashboard {
         if (stopLogsBtn) stopLogsBtn.addEventListener('click', () => this.stopLogs());
         if (downloadLogsBtn) downloadLogsBtn.addEventListener('click', () => this.downloadLogs());
 
+        // API actions
+        const btnSystem = document.getElementById('btn-system');
+        const btnMetrics = document.getElementById('btn-metrics');
+        const btnSendIngest = document.getElementById('btn-send-ingest');
+        const btnLookup = document.getElementById('btn-lookup');
+        const btnCopyOutput = document.getElementById('btn-copy-output');
+        const btnClearOutput = document.getElementById('btn-clear-output');
+        
+        console.log('API buttons found:', {
+            btnSystem: !!btnSystem,
+            btnMetrics: !!btnMetrics,
+            btnSendIngest: !!btnSendIngest,
+            btnLookup: !!btnLookup,
+            btnCopyOutput: !!btnCopyOutput,
+            btnClearOutput: !!btnClearOutput
+        });
+        
+        if (btnSystem) {
+            btnSystem.addEventListener('click', () => {
+                console.log('System button clicked');
+                this.fetchSystem();
+            });
+        }
+        if (btnMetrics) {
+            btnMetrics.addEventListener('click', () => {
+                console.log('Metrics button clicked');
+                this.fetchMetrics();
+            });
+        }
+        if (btnSendIngest) {
+            btnSendIngest.addEventListener('click', () => {
+                console.log('Send ingest button clicked');
+                this.sendIngest();
+            });
+        }
+        if (btnLookup) {
+            btnLookup.addEventListener('click', () => {
+                console.log('Lookup button clicked');
+                doLookup();
+            });
+        }
+        if (btnCopyOutput) {
+            btnCopyOutput.addEventListener('click', () => {
+                console.log('Copy output button clicked');
+                copyOutput();
+            });
+        }
+        if (btnClearOutput) {
+            btnClearOutput.addEventListener('click', () => {
+                console.log('Clear output button clicked');
+                clearOutput();
+            });
+        }
 
+        // Sample buttons
+        const sampleFlowsBtn = document.getElementById('btn-sample-flows');
+        const sampleZeekBtn = document.getElementById('btn-sample-zeek');
+        
+        if (sampleFlowsBtn) {
+            sampleFlowsBtn.addEventListener('click', () => {
+                console.log('Sample flows button clicked');
+                insertSampleFlows();
+            });
+        }
+        if (sampleZeekBtn) {
+            sampleZeekBtn.addEventListener('click', () => {
+                console.log('Sample zeek button clicked');
+                insertSampleZeek();
+            });
+        }
 
-
+        // GeoIP event listeners
+        document.getElementById('geoip-upload')?.addEventListener('click', () => document.getElementById('geoip-file').click());
+        document.getElementById('geoip-file')?.addEventListener('change', geoipUpload);
+        document.getElementById('geoip-save')?.addEventListener('click', geoipSave);
+        document.getElementById('geoip-test')?.addEventListener('click', geoipTest);
 
         // Slide-over
         const closeSlideOverBtn = document.getElementById('close-slide-over');
