@@ -377,7 +377,7 @@
                 <div class="text-xs uppercase tracking-wide text-zinc-400">Avg Latency</div>
             </div>
             <button onclick="window.open('/docs','_blank')" class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] focus:outline-none flex flex-col items-center justify-center gap-2">
-                <div class="text-2xl font-semibold leading-none" id="version">0.8.6</div>
+                <div class="text-2xl font-semibold leading-none" id="version" data-field="version">0.8.6</div>
                 <div class="text-xs uppercase tracking-wide text-zinc-400">Version</div>
             </button>
             <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col items-center justify-center gap-2">
@@ -732,7 +732,7 @@
     </div>
 
     <!-- Body -->
-    <form id="create-src-form" class="p-6 space-y-4 pb-28" onsubmit="return window.submitCreateSource(event)">
+    <form id="form-create-source" class="p-6 space-y-4 pb-28" onsubmit="return window.submitCreateSource(event)">
       <div>
         <label class="text-sm text-white/70">Source ID *</label>
         <input id="create-src-id" required pattern="[a-z0-9_\-]+"
@@ -810,7 +810,7 @@
         <button type="button" onclick="window.closeCreateSourceDrawer()" class="btn-ghost-gray">
           Cancel
         </button>
-        <button type="submit" class="btn-glow-blue">
+        <button type="submit" id="btn-create-source" class="btn-glow-blue">
           Create Source
         </button>
       </div>

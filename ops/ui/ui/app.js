@@ -834,6 +834,13 @@ document.addEventListener('keydown', (e) => {
 // Submit handler
 window.submitCreateSource = async function (evt) {
   evt.preventDefault();
+  
+  // Check feature flag first
+  if (!(window.FEATURES && window.FEATURES.sources === true)) {
+    showToast('error', 'Source management is not available in this build.');
+    return false;
+  }
+  
   try {
     const id        = document.getElementById('create-src-id').value.trim();
     const display   = document.getElementById('create-src-display').value.trim();
@@ -868,10 +875,15 @@ window.submitCreateSource = async function (evt) {
       body: JSON.stringify(payload),
     });
 
+    if (res.status === 501) {
+      showToast('error', 'Not implemented in this build.');
+      return false;
+    }
+    
     if (!res.ok) {
       const t = await res.text();
       console.error('[create source] failed', res.status, t);
-      alert(`Create failed (${res.status}): ${t}`);
+      showToast('error', `Create failed (${res.status}): ${t}`);
       return false;
     }
 
@@ -1239,6 +1251,9 @@ class TelemetryDashboard {
             }
             
             this.updateSystemInfo(system);
+            
+            // Apply feature gates based on system info
+            this.applyFeatureGates(system?.features || {});
 
             // Load metrics (with backoff for 503)
             try {
@@ -1266,7 +1281,8 @@ class TelemetryDashboard {
     updateSystemInfo(system) {
         console.log('Updating system info:', system);
         
-        const version = '0.8.6';
+        // Always display backend version (no hardcode)
+        const version = system?.version || 'dev';
         console.log('Version to display:', version);
         
         // Update version in dashboard and system panels
@@ -1294,6 +1310,41 @@ class TelemetryDashboard {
         if (uptime2) uptime2.textContent = uptime;
 
         // CPU/Memory tiles removed from UI
+    }
+
+    applyFeatureGates(features) {
+        console.log('Applying feature gates:', features);
+        
+        // Feature flags (default false if missing)
+        const allowSources = features.sources === true;
+        
+        // Disable Create Source form/button if not enabled
+        const form = document.getElementById('form-create-source');
+        const btn = document.getElementById('btn-create-source');
+        
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                if (!allowSources) {
+                    e.preventDefault();
+                    this.showToast('error', 'Source management is not available in this build.');
+                }
+            });
+            form.classList.toggle('disabled', !allowSources);
+        }
+        
+        if (btn) {
+            btn.disabled = !allowSources;
+            if (!allowSources) {
+                btn.title = 'Disabled in this build';
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                btn.title = '';
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+        
+        // Store features globally for other functions to access
+        window.FEATURES = features;
     }
 
     updateDashboardMetrics(metrics) {
