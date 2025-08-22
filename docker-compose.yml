@@ -38,7 +38,7 @@ services:
       - ./ti:/data/ti:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost/v1/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost/v1/health', timeout=2)"]
       interval: 10s
       timeout: 3s
       retries: 5
