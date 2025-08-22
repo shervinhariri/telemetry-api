@@ -1254,6 +1254,10 @@ class TelemetryDashboard {
             
             // Apply feature gates based on system info
             this.applyFeatureGates(system?.features || {});
+            
+            // Start UDP head status polling
+            this.loadUdpHeadStatus();
+            setInterval(() => this.loadUdpHeadStatus(), 3000);
 
             // Load metrics (with backoff for 503)
             try {
@@ -1345,6 +1349,19 @@ class TelemetryDashboard {
         
         // Store features globally for other functions to access
         window.FEATURES = features;
+    }
+
+    async loadUdpHeadStatus() {
+        const el = document.querySelector('[data-field="udp-head-status"]');
+        if (!el) return;
+        try {
+            const r = await fetch('http://localhost:8081/health');
+            if (!r.ok) throw new Error("bad status");
+            const j = await r.json();
+            el.textContent = (j.status === 'ok') ? 'Running' : 'Unknown';
+        } catch {
+            el.textContent = 'Stopped';
+        }
     }
 
     updateDashboardMetrics(metrics) {
