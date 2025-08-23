@@ -26,7 +26,13 @@ jobs:
             echo "::error::Dockerfile not found"
             exit 1
           fi
+          if [ ! -f "VERSION" ]; then
+            echo "::error::VERSION file not found"
+            exit 1
+          fi
           echo "✅ Build context validation passed"
+          echo "📦 Version: $(cat VERSION)"
+          echo "🐳 Dockerfile: $(wc -l < Dockerfile) lines"
 
       - name: Validate Docker Hub secrets
         run: |
