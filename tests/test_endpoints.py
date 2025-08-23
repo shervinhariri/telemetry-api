@@ -10,7 +10,7 @@ import random
 from typing import Dict, Any
 
 BASE_URL = "http://localhost"
-API_KEY = "TEST_KEY"
+API_KEY = "TEST_ADMIN_KEY"
 
 def make_request(method: str, endpoint: str, data: Dict[str, Any] = None, headers: Dict[str, str] = None) -> Dict[str, Any]:
     """Make a request to the API"""
