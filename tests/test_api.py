@@ -13,7 +13,10 @@ def test_health_endpoint(client):
     """Test health endpoint"""
     response = client.get("/v1/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["service"] == "telemetry-api"
+    assert data["version"] == "v1"
     assert "X-API-Version" in response.headers
 
 def test_version_endpoint(client):
