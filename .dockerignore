@@ -1,11 +1,57 @@
+# Git and GitHub
 .git
 .github
-.vscode
-.devcontainer
-__pycache__/
+.gitignore
+
+# Python
+**/*.pyc
+**/*.pyo
+**/__pycache__
+.pytest_cache
 *.pyc
+*.pyo
+__pycache__/
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+
+# Documentation
+README.md
+README_TESTS.md
+CHANGELOG.md
+docs/
+*.md
+
+# Tests
+tests/
+test_*.py
+*_test.py
+
+# Logs
 *.log
+logs/
+
+# Environment files
 .env
-data/*.mmdb
-data/*.csv
-samples/*.pcap
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+.artifacts/
+build/
+dist/
+
+# Temporary files
+*.tmp
+*.temp
