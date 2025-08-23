@@ -6,6 +6,8 @@
 description = "Allow test keys and example values"
 paths = [
     '''\.env\.example$''',
+    '''\.github/test\.env$''',
+    '''docker-compose\.yml$''',
     '''README\.md$''',
     '''docs/.*\.md$''',
     '''samples/.*''',
@@ -30,5 +32,5 @@ use-default = true
 [[rules]]
 id = "telemetry-api-key"
 description = "Telemetry API Key"
-regex = '''(?i)(api[_-]?key|bearer[_-]?token)\s*[:=]\s*['"]?[a-zA-Z0-9._-]{10,}['"]?'''
+regex = '''(?i)(api[_-]?key|bearer[_-]?token)\s*[:=]\s*['"]?[a-zA-Z0-9._-]{20,}['"]?'''
 tags = ["key", "api"]

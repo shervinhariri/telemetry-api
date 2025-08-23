@@ -11,7 +11,7 @@ from app.main import app
 client = TestClient(app)
 
 # Test data
-API_KEY = "TEST_KEY"
+API_KEY = "TEST_ADMIN_KEY"
 VALID_HEADERS = {"Authorization": f"Bearer {API_KEY}"}
 
 def test_health_endpoint():

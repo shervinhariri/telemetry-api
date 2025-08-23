@@ -27,7 +27,7 @@ jobs:
           
           # Test API key authentication
           echo "Testing API authentication..."
-          curl -sf -H "Authorization: Bearer TEST_KEY" http://localhost:80/v1/system || { echo "API key test failed"; docker compose logs --no-color | tail -n 100; exit 1; }
+          curl -sf -H "Authorization: Bearer TEST_ADMIN_KEY" http://localhost:80/v1/system || { echo "API key test failed"; docker compose logs --no-color | tail -n 100; exit 1; }
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -43,12 +43,12 @@ jobs:
           sudo apt-get update && sudo apt-get install -y jq
 
       - name: Unit tests
-        run: pytest -q
+        run: docker exec telemetry-api bash -c "cd /app && PYTHONPATH=/app pytest -q"
 
       - name: Scenario tester
         env:
           API_BASE_URL: http://localhost:80
-          API_KEY: TEST_KEY
+          API_KEY: TEST_ADMIN_KEY
         run: |
           python tools/scenario_tester.py | tee scenario_report.json
           echo "---- Summary ----"
