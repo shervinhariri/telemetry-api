@@ -6,6 +6,7 @@
 description = "Allow test keys and example values"
 paths = [
     '''\.env\.example$''',
+    '''\.github/test\.env$''',
     '''README\.md$''',
     '''docs/.*\.md$''',
     '''samples/.*''',
