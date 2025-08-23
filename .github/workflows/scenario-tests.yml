@@ -12,8 +12,8 @@ jobs:
       - name: Start stack
         run: |
           docker compose down || true
-          # Load test environment variables
-          export $(cat .github/test.env | xargs)
+          # Load test environment variables (skip comments)
+          export $(grep -v '^#' .github/test.env | xargs)
           docker compose up -d --build
           echo "Waiting for API to become healthy (up to 80s)..."
           for i in {1..40}; do
