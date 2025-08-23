@@ -14,30 +14,22 @@ import hashlib
 
 @pytest.fixture(scope="session")
 def test_db():
-    """Set up test database"""
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
-    
-    # Set up test tenant and API key
+    """Set up test database - in container, database is already initialized"""
+    # In the container environment, the database is already initialized by bootstrap
+    # We just need to ensure the test API key exists
     from sqlalchemy.orm import sessionmaker
     Session = sessionmaker(bind=engine)
     session = Session()
     
-    # Create test tenant
-    tenant = session.query(Tenant).filter_by(tenant_id="default").one_or_none()
-    if not tenant:
-        tenant = Tenant(tenant_id="default", name="Test Tenant")
-        session.add(tenant)
-        session.commit()
-    
-    # Create test admin API key
+    # Check if test admin API key exists, create if not
     test_admin_key = "TEST_ADMIN_KEY"
     key_hash = hashlib.sha256(test_admin_key.encode()).hexdigest()
     
-    api_key = session.query(ApiKey).filter_by(key_id="admin", tenant_id="default").one_or_none()
+    api_key = session.query(ApiKey).filter_by(hash=key_hash).first()
     if not api_key:
+        # Create test admin API key
         api_key = ApiKey(
-            key_id="admin", 
+            key_id="test-admin", 
             tenant_id="default", 
             hash=key_hash,
             scopes=["admin", "ingest", "read_metrics", "export", "manage_indicators"]
@@ -48,9 +40,6 @@ def test_db():
     session.close()
     
     yield
-    
-    # Clean up
-    Base.metadata.drop_all(bind=engine)
 
 @pytest.fixture
 def client(test_db):
