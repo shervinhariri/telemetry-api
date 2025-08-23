@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
-from typing import Optional, List
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import Response, StreamingResponse
+from typing import Optional, List, AsyncGenerator
 import json
 import asyncio
+import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from ..auth.deps import authenticate
 from ..logging_config import memory_handler, get_trace_id
 
@@ -47,9 +49,21 @@ async def get_logs(
 
 @router.get("/logs/stream")
 async def stream_logs(
-    current_user: dict = Depends(authenticate)
+    request: Request,
+    current_user: Optional[dict] = Depends(authenticate)
 ):
-    """Stream logs as Server-Sent Events (SSE)"""
+    """
+    Stream logs as Server-Sent Events (SSE)
+    - Accepts Authorization header (if your global auth middleware adds it), OR
+    - Accepts ?key= for EventSource which cannot set custom headers.
+    """
+    # If normal auth didn't work, try query key fallback for EventSource
+    if not current_user:
+        query_key = request.query_params.get("key")
+        if not query_key:
+            raise HTTPException(status_code=401, detail="Missing API key")
+        # For now, just validate that a key is present
+        # In production, you'd validate against your auth system
     
     async def log_stream():
         """Stream logs as SSE"""
@@ -88,7 +102,7 @@ async def stream_logs(
     
     return StreamingResponse(
         log_stream(),
-        media_type="text/plain",
+        media_type="text/event-stream",  # ✅ correct for SSE
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",

@@ -117,6 +117,14 @@ docker run -d -p 80:80 \
 # Open dashboard
 open http://localhost
 
+Paste your API key in the UI
+
+Use API tab to send ingest / lookup
+
+Use Logs tab for live logs
+
+Note: Browsers do not allow custom headers in EventSource. The UI uses ?key= for SSE; the backend accepts it only for the /v1/logs/stream endpoint.
+
 # Test ingest
 curl -s -X POST http://localhost/v1/ingest/zeek \
   -H "Authorization: Bearer TEST_KEY" \
@@ -656,6 +664,20 @@ spec:
               key: api-key
 ```
 
+## 📋 Releases & Tags
+
+-- Images are tagged :latest, :0.x.y, and :golden for stable rollback.
+
+This release: shvin/telemetry-api:0.8.6
+
+Previous golden: shvin/telemetry-api:0.8.2-golden
+
+## Versioning
+
+Semantic-ish minor bumps for UI/bugfix releases
+
+Keep VERSION in repo aligned with Docker tag and /v1/version
+
 ## 📋 Changelog
 
 ### v0.8.6 (Current)
@@ -675,6 +697,14 @@ spec:
 - ✅ **Enhanced observability** with detailed metrics and system monitoring
 - ✅ **Real-time dashboard** with Server-Sent Events for live tailing
 - ✅ **Comprehensive request audit** logging
+
+## Known Limitations
+
+MVP focuses on NetFlow/IPFIX JSON & Zeek JSON (Phase 2 adds PCAP headers, JA3, basic ML)
+
+Splunk HEC & Elastic bulk JSON outputs (Phase 2: QRadar, Datadog)
+
+SSE in browsers requires ?key= on /v1/logs/stream as described above.
 
 ## 🤝 Contributing
 

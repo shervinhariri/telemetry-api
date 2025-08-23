@@ -35,6 +35,8 @@ from .api.admin_security import router as admin_security_router
 from .api.admin_flags import router as admin_flags_router
 from .api.utils import router as utils_router
 from .api.ingest import router as ingest_router
+from .api.uploads import router as uploads_router
+from .api.enrichment_geoip import router as geoip_cfg_router
 from .pipeline import ingest_queue, record_batch_accepted, enqueue
 from .logging_config import setup_logging
 from .config import API_VERSION
@@ -232,11 +234,13 @@ app.include_router(system_router, prefix=API_PREFIX)
 app.include_router(keys_router, prefix=API_PREFIX)
 app.include_router(demo_router, prefix=API_PREFIX)
 app.include_router(prometheus_router, prefix=API_PREFIX)
-app.include_router(sources_router, prefix=API_PREFIX)
+# app.include_router(sources_router, prefix=API_PREFIX)  # Disabled until implemented
 app.include_router(admin_security_router, prefix=API_PREFIX)
 app.include_router(admin_flags_router, prefix=API_PREFIX)
 app.include_router(utils_router, prefix=API_PREFIX)
 app.include_router(ingest_router, prefix=API_PREFIX)
+app.include_router(uploads_router, prefix=API_PREFIX)
+app.include_router(geoip_cfg_router, prefix=API_PREFIX)
 
 # UDP Metrics endpoint for mapper reporting
 @app.post(f"{API_PREFIX}/admin/metrics/udp")

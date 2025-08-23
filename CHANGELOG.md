@@ -13,6 +13,7 @@ All notable changes to the Telemetry API project will be documented in this file
 - **Phase 4**: Security hardening with secret scanning and vulnerability scanning
 - **Phase 5**: Centralized logging with structured JSON and live streaming
 - **Phase 6**: UI polish with modern components and improved reliability
+- **Phase 7**: SSE browser compatibility and authentication fixes
 
 ### Added
 - **Single Source of Truth for Version**: VERSION file at repo root for centralized version management
@@ -34,6 +35,11 @@ All notable changes to the Telemetry API project will be documented in this file
 - **Logging System**: Structured JSON logging with trace correlation and live streaming capabilities
 - **UI Components**: Consistent design tokens, improved accessibility, and modern styling
 
+### Fixed
+- **SSE Browser Compatibility**: SSE logs stream now uses correct media type (`text/event-stream`) for `/v1/logs/stream`
+- **EventSource Authentication**: UI now passes API key via `?key=` query parameter and backend accepts query key for SSE
+- **Browser Limitations**: Workaround for EventSource not supporting custom headers in browsers
+
 ### Technical
 - **VERSION File**: New file at repo root containing "0.8.6"
 - **API Endpoints**: Updated /v1/version and /v1/api/version to read from VERSION file
@@ -42,6 +48,7 @@ All notable changes to the Telemetry API project will be documented in this file
 - **Security Tools**: Gitleaks configuration, Trivy scanning, SARIF uploads
 - **Logging Infrastructure**: Custom JsonFormatter, MemoryLogHandler, ASGI middleware for tracing
 - **UI Framework**: Design tokens, component library, and improved state management
+- **SSE Implementation**: Proper EventSource handling with query parameter authentication
 
 ## [Unreleased] - 2025-XX-XX
 

@@ -10,6 +10,7 @@ from typing import Dict, Any, List
 from ..api.version import APP_VERSION, GIT_SHA, IMAGE, DOCKERHUB_TAG
 from ..metrics import metrics
 from ..pipeline import STATS
+from ..config import FEATURES
 
 from app.auth.deps import require_scopes
 
@@ -50,6 +51,7 @@ async def get_system_info() -> Dict[str, Any]:
             "version": APP_VERSION,
             "git_sha": GIT_SHA,
             "image": f"{IMAGE}:{DOCKERHUB_TAG}" if DOCKERHUB_TAG and DOCKERHUB_TAG != "unknown" else f"{IMAGE}:(unknown)",
+            "features": FEATURES,
             "uptime_s": uptime_seconds,
             "workers": 1,  # Single worker for now
             "mem_mb": 0,  # TODO: Implement without psutil

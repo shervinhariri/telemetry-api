@@ -11,7 +11,7 @@ def env_bool(key: str, default: bool = False) -> bool:
     return value in ("true", "1", "yes", "on")
 
 # Version information
-API_VERSION = "0.8.5"
+API_VERSION = "0.8.6"
 
 # Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./telemetry.db")
@@ -130,6 +130,12 @@ class RuntimeConfig:
 
 # Global runtime config instance
 runtime_config = RuntimeConfig()
+
+# Feature flags
+FEATURES = {
+    "sources": env_bool("TELEMETRY_FEATURE_SOURCES", False),
+    "udp": env_bool("TELEMETRY_FEATURE_UDP", False)
+}
 
 # Feature flag accessors
 def get_admission_http_enabled() -> bool:

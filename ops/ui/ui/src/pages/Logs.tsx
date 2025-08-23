@@ -58,48 +58,43 @@ export default function Logs({ api }: { api: any }) {
     }
 
     setStatus("Starting live logs...");
-    setError("");
-
-    try {
-      // Create EventSource for SSE streaming
-      const url = `${api.base}/v1/logs/stream`;
-      const eventSource = new EventSource(url, {
-        headers: api.headers
-      });
-
-      eventSource.onopen = () => {
-        setRunning(true);
-        setStatus("Live logs streaming...");
+    
+    // EventSource cannot send custom headers. We pass the API key via querystring (?key=)
+    // The backend accepts either Authorization header (for non-browser clients) or ?key=
+    const keyFromState = api?.key || localStorage.getItem('api_key') || '';
+    const url = `${api.base}/v1/logs/stream?key=${encodeURIComponent(keyFromState)}`;
+    const eventSource = new EventSource(url);
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("SSE received:", data);
+        setLogs(prev => [data, ...prev].slice(0, 1000));
+        setStatus(`Live logs running. Last update: ${new Date().toLocaleTimeString()}`);
         setError("");
-      };
+      } catch (e: any) {
+        console.error("SSE parsing error:", e);
+        setError(String(e.message || e));
+      }
+    };
+    
+    eventSource.onerror = (event) => {
+      console.error("SSE error:", event);
+      setError("SSE connection error");
+      setStatus("Live logs error - check connection.");
+      eventSource.close();
+    };
+    
+    eventSourceRef.current = eventSource;
+  };
 
-      eventSource.onmessage = (event) => {
-        try {
-          const logEntry: LogEntry = JSON.parse(event.data);
-          setLogs(prev => {
-            const newLogs = [...prev, logEntry];
-            // Keep only last 1000 logs to prevent memory issues
-            return newLogs.slice(-1000);
-          });
-        } catch (e) {
-          console.error("Failed to parse log entry:", e);
-        }
-      };
-
-      eventSource.onerror = (event) => {
-        console.error("EventSource error:", event);
-        setError("Streaming connection lost. Click 'Start Live' to reconnect.");
-        setRunning(false);
-        setStatus("Streaming stopped.");
-        eventSource.close();
-      };
-
-      eventSourceRef.current = eventSource;
-    } catch (e: any) {
-      setError(String(e.message || e));
-      setStatus("Failed to start streaming.");
-      setRunning(false);
+  const stopStreaming = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
+    setRunning(false);
+    setStatus("Live logs stopped.");
   };
 
   const stopStreaming = () => {
