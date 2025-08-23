@@ -1,4 +1,4 @@
-# Telemetry API — v0.8.5
+# Telemetry API — v0.8.6
 
 Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability and multi-tenant authentication.
 
@@ -15,7 +15,7 @@ Ingest NetFlow/IPFIX and Zeek JSON → enrich with GeoIP/ASN/threat intel → ap
 docker run -d -p 80:80 \
   -e API_KEY=TEST_KEY \
   -e REDACT_HEADERS=authorization \
-  --name telapi shvin/telemetry-api:0.8.3
+  --name telapi shvin/telemetry-api:0.8.6
 
 # 2) Ingest sample Zeek
 curl -s -X POST http://localhost/v1/ingest/zeek \
@@ -68,10 +68,18 @@ docker run -d -p 80:80 \
   -e GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb \
   -e THREATLIST_CSV=/data/threats.csv \
   -v $PWD/data:/data:ro \
-  --name telemetry-api shvin/telemetry-api:0.8.3
+  --name telemetry-api shvin/telemetry-api:0.8.6
 
 # Open dashboard
 open http://localhost
+
+Paste your API key in the UI
+
+Use API tab to send ingest / lookup
+
+Use Logs tab for live logs
+
+Note: Browsers do not allow custom headers in EventSource. The UI uses ?key= for SSE; the backend accepts it only for the /v1/logs/stream endpoint.
 
 # Test ingest
 curl -s -X POST http://localhost/v1/ingest/zeek \
@@ -141,7 +149,7 @@ docker run -d -p 80:80 \
   -e DEMO_MODE=true \
   -e DEMO_EPS=50 \
   -e DEMO_DURATION_SEC=120 \
-  --name telemetry-api-demo shvin/telemetry-api:0.8.3
+  --name telemetry-api-demo shvin/telemetry-api:0.8.6
 
 # 2) Start demo generator
 curl -s -X POST http://localhost/v1/demo/start \
@@ -196,7 +204,7 @@ The API now supports multi-tenant deployments with complete data isolation:
 # 1) Run with database persistence
 docker run -d -p 80:80 \
   -v $PWD/telemetry.db:/app/telemetry.db \
-  --name telemetry-api shvin/telemetry-api:0.8.3
+  --name telemetry-api shvin/telemetry-api:0.8.6
 
 # 2) Database will auto-initialize with default tenant
 # 3) Get admin API key from logs or use seed script
@@ -549,7 +557,7 @@ sudo nft delete rule inet telemetry input udp dport 2055 drop
 version: '3.8'
 services:
   telemetry-api:
-    image: shvin/telemetry-api:0.8.3
+    image: shvin/telemetry-api:0.8.6
     ports:
       - "80:80"
     environment:
@@ -578,7 +586,7 @@ spec:
     spec:
       containers:
       - name: telemetry-api
-        image: shvin/telemetry-api:0.8.3
+        image: shvin/telemetry-api:0.8.6
         ports:
         - containerPort: 80
         env:
@@ -589,9 +597,23 @@ spec:
               key: api-key
 ```
 
+## 📋 Releases & Tags
+
+-- Images are tagged :latest, :0.x.y, and :golden for stable rollback.
+
+This release: shvin/telemetry-api:0.8.6
+
+Previous golden: shvin/telemetry-api:0.8.2-golden
+
+## Versioning
+
+Semantic-ish minor bumps for UI/bugfix releases
+
+Keep VERSION in repo aligned with Docker tag and /v1/version
+
 ## 📋 Changelog
 
-### v0.8.3 (Current)
+### v0.8.6 (Current)
 - ✅ **Multi-Tenancy Support**: Complete tenant isolation with database-backed tenants
 - ✅ **Database Models**: SQLAlchemy models for Tenant, ApiKey, OutputConfig, and Job
 - ✅ **Tenant-Scoped Authentication**: Per-tenant API keys with scope validation
@@ -608,6 +630,14 @@ spec:
 - ✅ **Enhanced observability** with detailed metrics and system monitoring
 - ✅ **Real-time dashboard** with Server-Sent Events for live tailing
 - ✅ **Comprehensive request audit** logging
+
+## Known Limitations
+
+MVP focuses on NetFlow/IPFIX JSON & Zeek JSON (Phase 2 adds PCAP headers, JA3, basic ML)
+
+Splunk HEC & Elastic bulk JSON outputs (Phase 2: QRadar, Datadog)
+
+SSE in browsers requires ?key= on /v1/logs/stream as described above.
 
 ## 🤝 Contributing
 

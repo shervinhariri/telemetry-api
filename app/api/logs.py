@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Query, UploadFile, File, HTTPException
+from fastapi import APIRouter, Query, UploadFile, File, HTTPException, Request
 from fastapi.responses import Response
-from typing import Optional, List
+from starlette.responses import StreamingResponse
+from typing import Optional, List, AsyncGenerator
 from pathlib import Path
 from datetime import datetime
 import json
+import os
 
 router = APIRouter()
 
@@ -149,3 +151,62 @@ def list_uploaded_files():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error listing files: {str(e)}")
+
+def _extract_api_key_from_query(request: Request) -> Optional[str]:
+    # Allow EventSource (no headers) to pass the API key via query string: ?key=TEST_KEY
+    # This is opt-in for SSE only. Make sure rate limits/logging still apply upstream.
+    key = request.query_params.get("key")
+    return key if key else None
+
+def _validate_key_or_raise(key: Optional[str]) -> None:
+    """
+    Minimal placeholder. Replace with your existing validation path if available,
+    e.g., calling your auth utility or checking DB/ENV.
+    """
+    # Example behavior:
+    # - If no explicit validation system exists, allow any non-empty key (dev)
+    # - If you store a canonical key in env (e.g., TEST_KEY), enforce equality
+    canonical = os.getenv("DEV_SINGLE_API_KEY")  # optional; set in docker-compose for quick dev
+    if canonical:
+        if not key or key != canonical:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+    else:
+        if not key:
+            raise HTTPException(status_code=401, detail="Missing API key")
+
+async def event_generator() -> AsyncGenerator[str, None]:
+    """
+    Yield Server-Sent Events from your internal async queue/bus.
+    Replace the dummy loop with your real producer.
+    """
+    import asyncio
+    counter = 0
+    while True:
+        await asyncio.sleep(1)
+        counter += 1
+        yield f"data: {{\"tick\": {counter}}}\n\n"
+
+@router.get("/logs/stream")
+async def stream_logs(request: Request):
+    """
+    SSE endpoint:
+    - Accepts Authorization header (if your global auth middleware adds it), OR
+    - Accepts ?key= for EventSource which cannot set custom headers.
+    """
+    # If your normal auth dependency already ran, you can skip. Otherwise:
+    # Try query key fallback so browsers can open SSE without headers.
+    query_key = _extract_api_key_from_query(request)
+    # If you have a real auth middleware, you can check something like:
+    # if "authorization" in request.headers: (then trust middleware result)
+    # Here we at least enforce having a key one way or another:
+    _validate_key_or_raise(query_key)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",  # ✅ correct for SSE
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

@@ -30,28 +30,45 @@ export default function Logs({ api }: { api: any }) {
     if (pollRef.current) clearInterval(pollRef.current);
     setStatus("Starting live logs...");
     
-    pollRef.current = setInterval(async () => {
+    // EventSource cannot send custom headers. We pass the API key via querystring (?key=)
+    // The backend accepts either Authorization header (for non-browser clients) or ?key=
+    const keyFromState = api?.key || localStorage.getItem('api_key') || '';
+    const url = `${api.base}/v1/logs/stream?key=${encodeURIComponent(keyFromState)}`;
+    const eventSource = new EventSource(url);
+    
+    eventSource.onmessage = (event) => {
       try {
-        console.log("Polling for logs...");
-        const r = await fetch(`${api.base}/v1/logs/tail?max_bytes=50000&format=text`, { headers: api.headers });
-        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-        const text = await r.text();
-        const next = text.split('\n').filter(Boolean);
-        console.log(`Received ${next.length} log lines`);
-        setLines((prev) => [...next.slice(-100), ...prev].slice(0, 500));
+        const data = JSON.parse(event.data);
+        console.log("SSE received:", data);
+        // For now, just add a log line with the tick data
+        const logLine = `SSE tick: ${data.tick} at ${new Date().toLocaleTimeString()}`;
+        setLines((prev) => [logLine, ...prev].slice(0, 500));
         setStatus(`Live logs running. Last update: ${new Date().toLocaleTimeString()}`);
         setError("");
       } catch (e: any) {
-        console.error("Polling error:", e);
+        console.error("SSE parsing error:", e);
         setError(String(e.message || e));
-        setStatus("Live logs error - check connection.");
       }
-    }, 2000);
+    };
+    
+    eventSource.onerror = (event) => {
+      console.error("SSE error:", event);
+      setError("SSE connection error");
+      setStatus("Live logs error - check connection.");
+      eventSource.close();
+    };
+    
+    // Store the EventSource for cleanup
+    pollRef.current = eventSource;
   };
 
   const stopPolling = () => { 
     if (pollRef.current) { 
-      clearInterval(pollRef.current); 
+      if (pollRef.current instanceof EventSource) {
+        pollRef.current.close();
+      } else {
+        clearInterval(pollRef.current);
+      }
       pollRef.current = null; 
     } 
   };

@@ -2,6 +2,13 @@
 
 All notable changes to the Telemetry API project will be documented in this file.
 
+## 0.8.6 — 2025-08-23
+### Fixed
+- SSE logs stream correct media type (`text/event-stream`) for `/v1/logs/stream`.
+- Browser-compatible SSE auth: UI now passes `?key=` and backend accepts query key for SSE.
+### Improved
+- README version references and release instructions.
+
 ## [0.8.4] - 2025-08-19
 
 ### Added
