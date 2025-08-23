@@ -5,23 +5,18 @@ Unit and integration tests for Telemetry API
 import pytest
 import json
 import os
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
-
 # Test data
 API_KEY = "TEST_ADMIN_KEY"
 VALID_HEADERS = {"Authorization": f"Bearer {API_KEY}"}
 
-def test_health_endpoint():
+def test_health_endpoint(client):
     """Test health endpoint"""
     response = client.get("/v1/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
     assert "X-API-Version" in response.headers
 
-def test_version_endpoint():
+def test_version_endpoint(client):
     """Test version endpoint"""
     response = client.get("/v1/version")
     assert response.status_code == 200
@@ -31,7 +26,7 @@ def test_version_endpoint():
     assert "image_digest" in data
     assert "X-API-Version" in response.headers
 
-def test_schema_endpoint():
+def test_schema_endpoint(client):
     """Test schema endpoint"""
     response = client.get("/v1/schema")
     assert response.status_code == 200
@@ -40,7 +35,7 @@ def test_schema_endpoint():
     assert "input_schemas" in data
     assert "X-API-Version" in response.headers
 
-def test_ingest_zeek_conn():
+def test_ingest_zeek_conn(client):
     """Test Zeek connection ingest"""
     payload = {
         "collector_id": "test-zeek-1",
@@ -77,7 +72,7 @@ def test_ingest_zeek_conn():
     assert "reasons" in record
     assert "X-API-Version" in response.headers
 
-def test_ingest_flows():
+def test_ingest_flows(client):
     """Test flows ingest"""
     payload = {
         "collector_id": "test-flows-1",
@@ -107,7 +102,7 @@ def test_ingest_flows():
     assert isinstance(record["risk_score"], int)
     assert 0 <= record["risk_score"] <= 100
 
-def test_lookup_endpoint():
+def test_lookup_endpoint(client):
     """Test IP lookup endpoint"""
     payload = {"ip": "8.8.8.8"}
     response = client.post("/v1/lookup", json=payload, headers=VALID_HEADERS)
@@ -118,7 +113,7 @@ def test_lookup_endpoint():
     assert "asn" in data
     assert "threats" in data
 
-def test_configure_splunk():
+def test_configure_splunk(client):
     """Test Splunk configuration"""
     payload = {
         "hec_url": "https://splunk.example.com:8088/services/collector",
@@ -129,7 +124,7 @@ def test_configure_splunk():
     data = response.json()
     assert data["status"] == "configured"
 
-def test_configure_elastic():
+def test_configure_elastic(client):
     """Test Elasticsearch configuration"""
     payload = {
         "url": "https://elastic.example.com:9200",
@@ -141,7 +136,7 @@ def test_configure_elastic():
     data = response.json()
     assert data["status"] == "configured"
 
-def test_metrics_endpoint():
+def test_metrics_endpoint(client):
     """Test metrics endpoint"""
     response = client.get("/v1/metrics")
     assert response.status_code == 200
@@ -151,19 +146,19 @@ def test_metrics_endpoint():
     assert "records_processed" in data
 
 # Error cases
-def test_ingest_no_auth():
+def test_ingest_no_auth(client):
     """Test ingest without authentication"""
     payload = {"collector_id": "test", "format": "zeek.conn.v1", "records": []}
     response = client.post("/v1/ingest", json=payload)
     assert response.status_code == 401
 
-def test_ingest_invalid_format():
+def test_ingest_invalid_format(client):
     """Test ingest with invalid format"""
     payload = {"collector_id": "test", "format": "invalid", "records": []}
     response = client.post("/v1/ingest", json=payload, headers=VALID_HEADERS)
     assert response.status_code == 400
 
-def test_ingest_too_many_records():
+def test_ingest_too_many_records(client):
     """Test ingest with too many records"""
     records = [{"ts": 1723351200, "id_orig_h": "1.1.1.1", "id_orig_p": 80, 
                 "id_resp_h": "2.2.2.2", "id_resp_p": 443, "proto": "tcp"} for _ in range(10001)]
@@ -171,13 +166,13 @@ def test_ingest_too_many_records():
     response = client.post("/v1/ingest", json=payload, headers=VALID_HEADERS)
     assert response.status_code == 413
 
-def test_lookup_invalid_ip():
+def test_lookup_invalid_ip(client):
     """Test lookup with invalid IP"""
     payload = {"ip": "invalid-ip"}
     response = client.post("/v1/lookup", json=payload, headers=VALID_HEADERS)
     assert response.status_code == 400
 
-def test_lookup_missing_ip():
+def test_lookup_missing_ip(client):
     """Test lookup without IP"""
     payload = {}
     response = client.post("/v1/lookup", json=payload, headers=VALID_HEADERS)
