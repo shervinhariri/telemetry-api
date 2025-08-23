@@ -16,17 +16,17 @@ __pycache__/
 node_modules/
 npm-debug.log*
 
-# Documentation
+# Documentation (keep docs/ for Docker build)
 README.md
 README_TESTS.md
 CHANGELOG.md
-docs/
+# docs/
 *.md
 
-# Tests
-tests/
-test_*.py
-*_test.py
+# Tests (keep for Docker build)
+# tests/
+# test_*.py
+# *_test.py
 
 # Logs
 *.log
