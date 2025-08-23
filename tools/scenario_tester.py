@@ -126,19 +126,25 @@ def run():
         scenario_bulk_batch(),
     ]
     results = []
+    failed_scenarios = 0
+    
     for sc in scenarios:
         try:
             r = post("/v1/ingest", sc["req"])
+            is_ok = r.status_code == sc["expect_status"]
             results.append(
                 {
                     "scenario": sc["name"],
                     "status": r.status_code,
-                    "ok": r.status_code == sc["expect_status"],
+                    "ok": is_ok,
                     "resp": safe_json(r),
                 }
             )
+            if not is_ok:
+                failed_scenarios += 1
         except Exception as e:
             results.append({"scenario": sc["name"], "status": "ERR", "ok": False, "resp": str(e)})
+            failed_scenarios += 1
 
     # Check admin feed + ETag
     try:
@@ -167,9 +173,14 @@ def run():
             indent=2,
         )
     )
+    
+    # Return non-zero exit code if any scenarios failed
+    return failed_scenarios
 
 
 if __name__ == "__main__":
-    run()
+    import sys
+    exit_code = run()
+    sys.exit(exit_code)
 
 

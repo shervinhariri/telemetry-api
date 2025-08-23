@@ -1,0 +1,48 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  json:
+    class: app.logging_config.JsonFormatter
+    format: '%(timestamp)s %(level)s %(logger)s %(msg)s %(trace_id)s %(method)s %(path)s %(status)s %(latency_ms)s %(client_ip)s %(tenant_id)s %(component)s'
+  text:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: json
+    stream: ext://sys.stdout
+  
+  memory:
+    class: app.logging_config.MemoryLogHandler
+    level: INFO
+    formatter: json
+    max_size: 10000
+
+loggers:
+  app:
+    level: INFO
+    handlers: [console, memory]
+    propagate: false
+  
+  uvicorn:
+    level: INFO
+    handlers: [console, memory]
+    propagate: false
+  
+  uvicorn.access:
+    level: INFO
+    handlers: [console, memory]
+    propagate: false
+  
+  uvicorn.error:
+    level: INFO
+    handlers: [console, memory]
+    propagate: false
+
+root:
+  level: INFO
+  handlers: [console]

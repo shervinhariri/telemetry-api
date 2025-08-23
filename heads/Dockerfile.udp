@@ -1,0 +1,7 @@
+FROM python:3.11-slim
+WORKDIR /app
+RUN pip install --no-cache-dir fastapi uvicorn
+COPY udp_head.py /app/udp_head.py
+EXPOSE 2055/udp
+EXPOSE 8081
+CMD ["python", "/app/udp_head.py"]

@@ -321,7 +321,7 @@
                     <button id="tab-dashboard" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#14151B] ring-indigo-500/40 text-zinc-100">Dashboard</button>
         <button id="tab-sources" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Sources</button>
         <button id="tab-requests" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">System</button>
-        <button id="tab-api" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Toolbox</button>
+            <button id="tab-toolbox" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Toolbox</button>
         <button id="tab-logs" class="tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200">Logs</button>
         </div>
 
@@ -377,12 +377,18 @@
                 <div class="text-xs uppercase tracking-wide text-zinc-400">Avg Latency</div>
             </div>
             <button onclick="window.open('/docs','_blank')" class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] focus:outline-none flex flex-col items-center justify-center gap-2">
-                <div class="text-2xl font-semibold leading-none" id="version">0.8.6</div>
+                <div class="text-2xl font-semibold leading-none" id="version" data-field="version">0.8.6</div>
                 <div class="text-xs uppercase tracking-wide text-zinc-400">Version</div>
             </button>
             <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col items-center justify-center gap-2">
                 <div class="text-2xl font-semibold leading-none" id="uptime">—</div>
                 <div class="text-xs uppercase tracking-wide text-zinc-400">Uptime</div>
+            </div>
+            <div class="rounded-2xl bg-neutral-800/60 p-5 transition ring-1 ring-transparent hover:ring-emerald-500/40 hover:shadow-[0_0_0_2px_rgba(16,185,129,.25)] flex flex-col items-center justify-center gap-2">
+                <div class="grid gap-2">
+                    <div class="text-sm text-zinc-400">UDP Head</div>
+                    <div class="text-sm font-medium" data-field="udp-head-status">Stopped</div>
+                </div>
             </div>
         </div>
         <div class="mt-2 mb-3 flex items-center justify-between">
@@ -518,44 +524,79 @@
             </div>
         </div>
 
-        <!-- Panel: API -->
-        <div id="panel-api" class="panel hidden mt-6">
 
 
-          <!-- API Tools card -->
-          <section class="card">
-            <div class="card-header">
-              <div class="card-title">API Tools</div>
-              <div class="spacer"></div>
-            </div>
+        <!-- PANEL: TOOLBOX -->
+        <section id="panel-toolbox" class="hidden px-4 md:px-6 pb-10">
+          <div class="space-y-8">
 
-            <div class="card-body">
-            <div id="api-error" class="alert hidden"></div>
+            <!-- 1) API TOOLS -->
+            <section id="toolbox-api-tools" class="mt-6">
+              <div class="card">
+                <div class="card-header">
+                  <div class="card-title">API Tools</div>
+                  <div class="spacer"></div>
+                </div>
 
-            <div class="toolbar" style="margin-bottom:10px">
-              <button id="btn-system"  class="btn-glow-blue">/v1/system</button>
-              <button id="btn-metrics" class="btn-glow-blue">/v1/metrics</button>
-              <input id="lookup-value" class="input" placeholder="value for /v1/lookup" />
-              <button id="btn-lookup" class="btn-ghost-gray">Lookup</button>
-              <div class="spacer"></div>
-              <button id="btn-sample-flows" class="btn-ghost-gray">Insert sample flows.v1</button>
-              <button id="btn-sample-zeek"  class="btn-ghost-gray">Insert sample zeek.conn</button>
-              <button id="btn-send-ingest"  class="btn-glow-green">Send ingest</button>
-            </div>
+                <div class="card-body">
+                <div id="api-error" class="alert hidden"></div>
 
-            <label for="ingest-payload" style="display:block; margin:6px 0 6px; color:var(--muted); font:600 12px var(--sans);">Ingest payload (JSON)</label>
-            <textarea id="ingest-payload" class="codearea" spellcheck="false"></textarea>
+                <div class="toolbar" style="margin-bottom:10px">
+                  <button id="btn-system"  class="btn-glow-blue">/v1/system</button>
+                  <button id="btn-metrics" class="btn-glow-blue">/v1/metrics</button>
+                  <input id="lookup-value" class="input" placeholder="value for /v1/lookup" />
+                  <button id="btn-lookup" class="btn-ghost-gray">Lookup</button>
+                  <div class="spacer"></div>
+                  <button id="btn-sample-flows" class="btn-ghost-gray">Insert sample flows.v1</button>
+                  <button id="btn-sample-zeek"  class="btn-ghost-gray">Insert sample zeek.conn</button>
+                  <button id="btn-send-ingest"  class="btn-glow-green">Send ingest</button>
+                </div>
 
-            <div class="output-bar">
-              <span>Response</span>
-              <div class="spacer"></div>
-              <button id="btn-copy-output"  class="btn-ghost-gray">Copy</button>
-              <button id="btn-clear-output" class="btn-ghost-gray">Clear</button>
-            </div>
-            <pre id="api-output" class="codebox"></pre>
-            </div>
-          </section>
-        </div>
+                <label for="ingest-payload" style="display:block; margin:6px 0 6px; color:var(--muted); font:600 12px var(--sans);">Ingest payload (JSON)</label>
+                <textarea id="ingest-payload" class="codearea" spellcheck="false"></textarea>
+
+                <div class="output-bar">
+                  <span>Response</span>
+                  <div class="spacer"></div>
+                  <button id="btn-copy-output"  class="btn-ghost-gray">Copy</button>
+                  <button id="btn-clear-output" class="btn-ghost-gray">Clear</button>
+                </div>
+                <pre id="api-output" class="codebox"></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- 2) ENRICHMENT -->
+            <section id="toolbox-enrichment">
+              <!-- GeoIP card -->
+              <div id="card-geoip"
+                   class="rounded-2xl ring-1 ring-indigo-500/40 bg-[#14151B] shadow-xl p-4 md:p-6">
+                <div class="text-base font-semibold mb-3">GeoIP (MaxMind)</div>
+                <label class="flex items-center gap-2 text-sm mb-3">
+                  <input type="checkbox" id="geoip-enabled"> Enabled
+                </label>
+
+                <div class="mb-3">
+                  <input id="geoip-path"
+                         class="w-full bg-transparent border border-zinc-700/60 rounded-xl px-3 py-2 text-sm"
+                         placeholder="/data/enrichment/&lt;blob&gt;_GeoLite2-City.mmdb">
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 mb-3">
+                  <button id="geoip-upload" class="btn">Upload .mmdb</button>
+                  <input id="geoip-file" type="file" accept=".mmdb" class="hidden">
+                  <button id="geoip-save" class="btn">Save</button>
+                  <input id="geoip-test-ip" class="input px-3 py-2 text-sm rounded-xl border border-zinc-700/60 bg-transparent"
+                         placeholder="1.1.1.1">
+                  <button id="geoip-test" class="btn">Test</button>
+                </div>
+
+                <div id="geoip-status" class="muted text-xs hidden"></div>
+              </div>
+            </section>
+
+          </div>
+        </section>
     </div>
 
     <!-- Slide over for details -->
@@ -732,7 +773,7 @@
     </div>
 
     <!-- Body -->
-    <form id="create-src-form" class="p-6 space-y-4 pb-28" onsubmit="return window.submitCreateSource(event)">
+    <form id="form-create-source" class="p-6 space-y-4 pb-28" onsubmit="return window.submitCreateSource(event)">
       <div>
         <label class="text-sm text-white/70">Source ID *</label>
         <input id="create-src-id" required pattern="[a-z0-9_\-]+"
@@ -810,7 +851,7 @@
         <button type="button" onclick="window.closeCreateSourceDrawer()" class="btn-ghost-gray">
           Cancel
         </button>
-        <button type="submit" class="btn-glow-blue">
+        <button type="submit" id="btn-create-source" class="btn-glow-blue">
           Create Source
         </button>
       </div>

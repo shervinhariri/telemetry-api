@@ -36,13 +36,14 @@ function isNumberLike(v) {
 
 // Minimal validators for MVP formats
 function validateFlowsV1Record(r, idx) {
-  const missing = requireKeys(r, ['ts','src_ip','dst_ip','src_port','dst_port','proto','bytes'], `records[${idx}]`);
+  const missing = requireKeys(r, ['ts','src_ip','dst_ip','src_port','dst_port','proto','bytes','packets'], `records[${idx}]`);
   const typeErr = [];
   if (missing.length) return { ok:false, msg:`Missing fields: ${missing.join(', ')}` };
   if (!isNumberLike(r.ts)) typeErr.push(`records[${idx}].ts must be number (epoch seconds)`);
   if (!isNumberLike(r.src_port)) typeErr.push(`records[${idx}].src_port must be number`);
   if (!isNumberLike(r.dst_port)) typeErr.push(`records[${idx}].dst_port must be number`);
   if (!isNumberLike(r.bytes))    typeErr.push(`records[${idx}].bytes must be number`);
+  if (!isNumberLike(r.packets))  typeErr.push(`records[${idx}].packets must be number`);
   if (!['tcp','udp','icmp','other'].includes(String(r.proto).toLowerCase())) {
     typeErr.push(`records[${idx}].proto must be one of tcp|udp|icmp|other`);
   }
@@ -81,6 +82,8 @@ function validateIngestBody(body) {
   return { ok:true };
 }
 
+
+
 // ---------- SAMPLE PAYLOADS ----------
 function sampleFlowsV1() {
   const now = Math.floor(Date.now()/1000);
@@ -94,7 +97,8 @@ function sampleFlowsV1() {
       src_port: 51514,
       dst_port: 53,
       proto: "udp",
-      bytes: 1200
+      bytes: 1200,
+      packets: 3
     },{
       ts: now + 1.234,
       src_ip: "10.0.0.5",
@@ -102,7 +106,8 @@ function sampleFlowsV1() {
       src_port: 51514,
       dst_port: 443,
       proto: "tcp",
-      bytes: 4820
+      bytes: 4820,
+      packets: 5
     }]
   };
 }
@@ -158,6 +163,78 @@ function copyOutput() {
   const out = document.querySelector('#api-output');
   if (!out) return;
   navigator.clipboard.writeText(out.textContent || '').catch(()=>{});
+}
+
+// --- Lookup action (/v1/lookup?q=...) ---
+async function doLookup() {
+  clearError('api');
+  const qInput = document.querySelector('#lookup-value');
+  const btn = document.querySelector('#btn-lookup');
+  const qv = (qInput?.value || '').trim();
+  if (!qv) { 
+    showError('api','Enter a value to look up (IP, domain, hash, etc.)'); 
+    showToast('info','Enter a value to look up'); 
+    return; 
+  }
+
+  setLoading(btn, true);
+  try {
+    // If your API expects ?q=, keep as-is. If it expects JSON body, switch to POST.
+    const { resp, data, text } = await apiCall(`/v1/lookup?q=${encodeURIComponent(qv)}`, {}, 'api');
+
+    if (!resp.ok) {
+      const snippet = (text || JSON.stringify(data || {})).slice(0, 500);
+      throw new Error(`Lookup failed (HTTP ${resp.status}): ${snippet}`);
+    }
+
+    setOutput(data ?? { raw: text || 'No body' });
+    showToast('success', `Lookup OK: ${qv}`, '/v1/lookup');
+  } catch (e) {
+    showError('api', e.message);
+    showToast('error', e.message, '/v1/lookup failed');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+// ---------- GEOIP FUNCTIONS ----------
+async function geoipUpload() {
+  const file = document.getElementById('geoip-file').files[0];
+  if (!file) return toast('Choose a .mmdb file');
+  const fd = new FormData(); fd.append('f', file);
+  const r = await fetch('/v1/upload/geoip', { method: 'POST', headers: AUTH_HEADERS_NOJSON(), body: fd });
+  const j = await r.json();
+  if (!r.ok) return toast('Upload failed: ' + (j.error || r.status));
+  document.getElementById('geoip-path').value = j.path;
+  toast('Uploaded ' + file.name);
+}
+
+function setGeoipStatus(txt) {
+  const el = document.getElementById('geoip-status');
+  if (!el) return;
+  if (txt && txt.length) {
+    el.textContent = txt;
+    el.classList.remove('hidden');
+  } else {
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
+}
+
+async function geoipSave() {
+  const enabled = document.getElementById('geoip-enabled').checked;
+  const path = document.getElementById('geoip-path').value.trim();
+  const r = await apiPUT('/v1/config/geoip', { enabled, path });
+  if (!r.ok) return toast('Save failed');
+  setGeoipStatus('Saved.');
+  setTimeout(() => setGeoipStatus(''), 2000);
+}
+
+async function geoipTest() {
+  const ip = (document.getElementById('geoip-test-ip')?.value || '1.1.1.1').trim();
+  const r = await apiPOST('/v1/config/geoip/test?ip=' + encodeURIComponent(ip));
+  const j = await r.json();
+  setGeoipStatus(j?.geo ? JSON.stringify(j.geo) : 'No hit');
 }
 
 // ---------- TOASTS ----------
@@ -225,37 +302,7 @@ function showWarmingUp(detail = "database not ready") {
   }
 }
 
-// --- Lookup action (/v1/lookup?q=...) ---
-async function doLookup() {
-  clearError('api');
-  const qInput = document.querySelector('#lookup-value');
-  const btn = document.querySelector('#btn-lookup');
-  const qv = (qInput?.value || '').trim();
-  if (!qv) { 
-    showError('api','Enter a value to look up (IP, domain, hash, etc.)'); 
-    showToast('info','Enter a value to look up'); 
-    return; 
-  }
 
-  setLoading(btn, true);
-  try {
-    // If your API expects ?q=, keep as-is. If it expects JSON body, switch to POST.
-    const { resp, data, text } = await apiCall(`/v1/lookup?q=${encodeURIComponent(qv)}`, {}, 'api');
-
-    if (!resp.ok) {
-      const snippet = (text || JSON.stringify(data || {})).slice(0, 500);
-      throw new Error(`Lookup failed (HTTP ${resp.status}): ${snippet}`);
-    }
-
-    setOutput(data ?? { raw: text || 'No body' });
-    showToast('success', `Lookup OK: ${qv}`, '/v1/lookup');
-  } catch (e) {
-    showError('api', e.message);
-    showToast('error', e.message, '/v1/lookup failed');
-  } finally {
-    setLoading(btn, false);
-  }
-}
 
 // ===== API KEY STATE (single source of truth) =====
 const KEY_STORAGE = 'telemetry_api_key';
@@ -629,6 +676,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create dashboard instance and make it globally accessible
     window.telemetryDashboard = new TelemetryDashboard();
     
+    // Set Dashboard as the default active tab
+    window.telemetryDashboard.switchTab('dashboard');
+    
     // === VEFIX: event delegation so re-renders don't break clicks ===
     document.addEventListener('click', function (e) {
       console.log('[vefix] Click event detected on:', e.target);
@@ -834,6 +884,13 @@ document.addEventListener('keydown', (e) => {
 // Submit handler
 window.submitCreateSource = async function (evt) {
   evt.preventDefault();
+  
+  // Check feature flag first
+  if (!(window.FEATURES && window.FEATURES.sources === true)) {
+    showToast('error', 'Source management is not available in this build.');
+    return false;
+  }
+  
   try {
     const id        = document.getElementById('create-src-id').value.trim();
     const display   = document.getElementById('create-src-display').value.trim();
@@ -868,10 +925,15 @@ window.submitCreateSource = async function (evt) {
       body: JSON.stringify(payload),
     });
 
+    if (res.status === 501) {
+      showToast('error', 'Not implemented in this build.');
+      return false;
+    }
+    
     if (!res.ok) {
       const t = await res.text();
       console.error('[create source] failed', res.status, t);
-      alert(`Create failed (${res.status}): ${t}`);
+      showToast('error', `Create failed (${res.status}): ${t}`);
       return false;
     }
 
@@ -1097,6 +1159,12 @@ class TelemetryDashboard {
             });
         }
 
+        // GeoIP event listeners
+        document.getElementById('geoip-upload')?.addEventListener('click', () => document.getElementById('geoip-file').click());
+        document.getElementById('geoip-file')?.addEventListener('change', geoipUpload);
+        document.getElementById('geoip-save')?.addEventListener('click', geoipSave);
+        document.getElementById('geoip-test')?.addEventListener('click', geoipTest);
+
         // Slide-over
         const closeSlideOverBtn = document.getElementById('close-slide-over');
         const slideOverBackdrop = document.getElementById('slide-over-backdrop');
@@ -1115,21 +1183,29 @@ class TelemetryDashboard {
     switchTab(tabName) {
         console.log('Switching to tab:', tabName);
         
-        // Update tab buttons
+        // Update tab buttons - reset all to inactive state
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.className = 'tab-btn px-4 py-2 rounded-2xl text-sm ring-1 bg-[#0F1116] ring-white/5 text-zinc-400 hover:text-zinc-200';
         });
         
+        // Set the active tab styling
         const activeTab = document.getElementById(`tab-${tabName.toLowerCase()}`);
         if (activeTab) {
             activeTab.className = 'tab-btn active px-4 py-2 rounded-2xl text-sm ring-1 bg-[#14151B] ring-indigo-500/40 text-zinc-100';
         }
 
-        // Update panels
+        // Hide ALL panels first (including both .panel and #panel-toolbox)
         document.querySelectorAll('.panel').forEach(panel => {
             panel.classList.add('hidden');
         });
         
+        // Also hide toolbox specifically since it doesn't have .panel class
+        const toolboxPanel = document.getElementById('panel-toolbox');
+        if (toolboxPanel) {
+            toolboxPanel.classList.add('hidden');
+        }
+        
+        // Show the target panel
         const targetPanel = document.getElementById(`panel-${tabName.toLowerCase()}`);
         if (targetPanel) {
             targetPanel.classList.remove('hidden');
@@ -1147,6 +1223,11 @@ class TelemetryDashboard {
             this.loadInitialLogs();
         } else if (tabName.toLowerCase() === 'sources') {
             this.loadSourcesData();
+        } else if (tabName.toLowerCase() === 'toolbox') {
+            // Toolbox doesn't need special data loading
+        } else if (tabName.toLowerCase() === 'api') {
+            // API tab removed, redirect to toolbox
+            this.switchTab('toolbox');
         }
     }
 
@@ -1235,10 +1316,17 @@ class TelemetryDashboard {
                     // Don't show error for 503, just keep retrying
                     return;
                 }
-                system = { version: '0.8.6' }; // Set default version
+                system = { version: '0.8.6' }; // Set default version if API fails
             }
             
             this.updateSystemInfo(system);
+            
+            // Apply feature gates based on system info
+            this.applyFeatureGates(system?.features || {});
+            
+            // Start UDP head status polling
+            this.loadUdpHeadStatus();
+            setInterval(() => this.loadUdpHeadStatus(), 3000);
 
             // Load metrics (with backoff for 503)
             try {
@@ -1266,7 +1354,8 @@ class TelemetryDashboard {
     updateSystemInfo(system) {
         console.log('Updating system info:', system);
         
-        const version = '0.8.6';
+        // Always display backend version (no hardcode)
+        const version = system?.version || 'dev';
         console.log('Version to display:', version);
         
         // Update version in dashboard and system panels
@@ -1294,6 +1383,75 @@ class TelemetryDashboard {
         if (uptime2) uptime2.textContent = uptime;
 
         // CPU/Memory tiles removed from UI
+    }
+
+    applyFeatureGates(features) {
+        console.log('Applying feature gates:', features);
+        
+        // Feature flags (default false if missing)
+        const allowSources = features.sources === true;
+        
+        if (!allowSources) {
+            this.hideTab('sources'); // don't show the tab if disabled
+        }
+        
+        // Disable Create Source form/button if not enabled
+        const form = document.getElementById('form-create-source');
+        const btn = document.getElementById('btn-create-source');
+        
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                if (!allowSources) {
+                    e.preventDefault();
+                    this.showToast('error', 'Source management is not available in this build.');
+                }
+            });
+            form.classList.toggle('disabled', !allowSources);
+        }
+        
+        if (btn) {
+            btn.disabled = !allowSources;
+            if (!allowSources) {
+                btn.title = 'Disabled in this build';
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                btn.title = '';
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+        
+        // Belt & suspenders: guard the loader too
+        const oldLoadSources = this.loadSourcesData?.bind(this);
+        this.loadSourcesData = async () => {
+            if (!(window.FEATURES && window.FEATURES.sources === true)) {
+                this.showPanelError('sources', 'Sources are disabled in this build.');
+                return;
+            }
+            return oldLoadSources ? oldLoadSources() : null;
+        };
+        
+        // Store features globally for other functions to access
+        window.FEATURES = features;
+    }
+
+    hideTab(tabId) {
+        const btn = document.getElementById(`tab-${tabId}`);
+        const panel = document.getElementById(`panel-${tabId}`);
+        if (btn) btn.style.display = 'none';
+        if (panel) panel.style.display = 'none';
+    }
+
+    async loadUdpHeadStatus() {
+        const el = document.querySelector('[data-field="udp-head-status"]');
+        if (!el) return;
+        try {
+            const r = await fetch('http://localhost:8081/health');
+            if (!r.ok) throw new Error("bad status");
+            const j = await r.json();
+            el.textContent = (j.status === 'ok') ? 'Running' : 'Unknown';
+        } catch {
+            el.textContent = 'Stopped';
+        }
     }
 
     updateDashboardMetrics(metrics) {
@@ -1716,33 +1874,75 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
             // Load initial logs first
             this.loadInitialLogs();
             
-            // Since SSE is not available, we'll poll the logs endpoint
-            this.logsInterval = setInterval(async () => {
+            // Try SSE first, fallback to polling
+            if (window.EventSource) {
                 try {
-                    const response = await fetch(`${this.apiBase}/v1/logs/tail?max_bytes=50000&format=text`, {
-                        headers: { 'Authorization': `Bearer ${this.apiKey}` }
-                    });
-                    
-                    if (response.ok) {
-                        const text = await response.text();
-                        if (logsContent && text.trim()) {
-                            // Split into lines and show the last 100 lines
-                            const lines = text.split('\n').filter(line => line.trim());
-                            const recentLines = lines.slice(-100);
-                            logsContent.innerHTML = recentLines.join('\n');
+                    this.logsEventSource = new EventSource(`${this.apiBase}/v1/logs/stream`);
+                    this.logsEventSource.onmessage = (event) => {
+                        try {
+                            const logEntry = JSON.parse(event.data);
+                            if (logsContent) {
+                                const timestamp = logEntry.timestamp || '';
+                                const level = logEntry.level || 'INFO';
+                                const msg = logEntry.msg || '';
+                                const traceId = logEntry.trace_id || '';
+                                
+                                const line = `${timestamp} [${level}] ${msg}${traceId ? ` (trace_id: ${traceId})` : ''}`;
+                                logsContent.innerHTML += line + '<br>';
+                                
+                                // Keep only last 100 lines
+                                const lines = logsContent.innerHTML.split('<br>');
+                                if (lines.length > 100) {
+                                    logsContent.innerHTML = lines.slice(-100).join('<br>');
+                                }
+                            }
+                        } catch (parseError) {
+                            console.error('Failed to parse SSE log entry:', parseError);
                         }
-                    } else {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                } catch (error) {
-                    console.error('Logs polling error:', error);
-                    this.showError('logs', `Failed to fetch logs: ${error.message}`);
+                    };
+                    this.logsEventSource.onerror = (error) => {
+                        console.error('SSE error, falling back to polling:', error);
+                        this.logsEventSource.close();
+                        this.startLogsPolling();
+                    };
+                    return;
+                } catch (sseError) {
+                    console.error('SSE not available, using polling:', sseError);
                 }
-            }, 2000); // Poll every 2 seconds
+            }
+            
+            // Fallback to polling
+            this.startLogsPolling();
             
         } catch (error) {
             this.showError('logs', error.message);
         }
+    }
+
+    startLogsPolling() {
+        this.logsInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`${this.apiBase}/v1/logs/tail?max_bytes=50000&format=text`, {
+                    headers: { 'Authorization': `Bearer ${this.apiKey}` }
+                });
+                
+                if (response.ok) {
+                    const text = await response.text();
+                    const logsContent = document.getElementById('logs-content');
+                    if (logsContent && text.trim()) {
+                        // Split into lines and show the last 100 lines
+                        const lines = text.split('\n').filter(line => line.trim());
+                        const recentLines = lines.slice(-100);
+                        logsContent.innerHTML = recentLines.join('<br>');
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('Logs polling error:', error);
+                this.showError('logs', `Failed to fetch logs: ${error.message}`);
+            }
+        }, 2000); // Poll every 2 seconds
     }
 
     async loadInitialLogs() {
@@ -1750,18 +1950,40 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
             const logsContent = document.getElementById('logs-content');
             if (!logsContent) return;
             
-            const response = await fetch(`${this.apiBase}/v1/logs/tail?max_bytes=50000&format=text`, {
+            // Try the new JSON endpoint first
+            const response = await fetch(`${this.apiBase}/v1/logs?limit=50`, {
                 headers: { 'Authorization': `Bearer ${this.apiKey}` }
             });
             
             if (response.ok) {
-                const text = await response.text();
-                if (text.trim()) {
-                    const lines = text.split('\n').filter(line => line.trim());
-                    const recentLines = lines.slice(-50); // Show last 50 lines initially
-                    logsContent.innerHTML = recentLines.join('\n');
+                const data = await response.json();
+                if (data.logs && data.logs.length > 0) {
+                    const lines = data.logs.map(log => {
+                        const timestamp = log.timestamp || '';
+                        const level = log.level || 'INFO';
+                        const msg = log.msg || '';
+                        const traceId = log.trace_id || '';
+                        return `${timestamp} [${level}] ${msg}${traceId ? ` (trace_id: ${traceId})` : ''}`;
+                    });
+                    logsContent.innerHTML = lines.join('<br>');
                 } else {
-                    logsContent.innerHTML = 'No logs available yet.';
+                    // Fallback to tail endpoint
+                    const tailResponse = await fetch(`${this.apiBase}/v1/logs/tail?max_bytes=50000&format=text`, {
+                        headers: { 'Authorization': `Bearer ${this.apiKey}` }
+                    });
+                    
+                    if (tailResponse.ok) {
+                        const text = await tailResponse.text();
+                        if (text.trim()) {
+                            const lines = text.split('\n').filter(line => line.trim());
+                            const recentLines = lines.slice(-50);
+                            logsContent.innerHTML = recentLines.join('<br>');
+                        } else {
+                            logsContent.innerHTML = 'No logs available yet.';
+                        }
+                    } else {
+                        logsContent.innerHTML = `Failed to load logs: HTTP ${tailResponse.status}`;
+                    }
                 }
             } else {
                 logsContent.innerHTML = `Failed to load logs: HTTP ${response.status}`;
@@ -1873,19 +2095,30 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
             
             setLoading(btn, true);
             
-            // Make API call
-            const result = await this.apiCall('/ingest', {
-                method: 'POST',
-                body: JSON.stringify(bodyObj)
-            });
-            
-            setOutput(result);
-            showToast('success', 'Ingest accepted.', '/v1/ingest');
-            
-            // Optionally refresh metrics after successful ingest
-            try { 
-                await this.fetchMetrics(); 
-            } catch (_) {}
+            // Make API call with better error handling
+            try {
+                const result = await this.apiCall('/ingest', {
+                    method: 'POST',
+                    body: JSON.stringify(bodyObj)
+                });
+                
+                setOutput(result);
+                showToast('success', 'Ingest accepted.', '/v1/ingest');
+                
+                // Optionally refresh metrics after successful ingest
+                try { 
+                    await this.fetchMetrics(); 
+                } catch (_) {}
+                
+            } catch (apiError) {
+                // Handle API errors with better detail
+                let errorMessage = apiError.message;
+                if (apiError.status) {
+                    errorMessage = `HTTP ${apiError.status}: ${apiError.message}`;
+                }
+                this.showError('api', errorMessage);
+                showToast('error', errorMessage, '/v1/ingest failed');
+            }
             
         } catch (error) {
             this.showError('api', error.message);

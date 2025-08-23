@@ -33,26 +33,52 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Echo who we are and try a pull (soft)
         run: |
           echo "Logged in as: ${{ secrets.DOCKERHUB_USERNAME }}"
           docker pull ${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:nonexistent || true
 
-      - name: Extract version
+      - name: Extract version and build args
         id: ver
         run: |
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+            echo "GOLDEN_VERSION=${GITHUB_REF_NAME}-golden" >> $GITHUB_OUTPUT
           else
-            echo "VERSION=v0.8.1" >> $GITHUB_OUTPUT
+            # Read from VERSION file, fallback to hardcoded version
+            if [ -f "VERSION" ]; then
+              VERSION_FROM_FILE=$(cat VERSION | tr -d '\n\r')
+              echo "VERSION=v${VERSION_FROM_FILE}" >> $GITHUB_OUTPUT
+            else
+              echo "VERSION=v0.8.6" >> $GITHUB_OUTPUT
+            fi
           fi
+          
+          # Get git SHA for build args
+          echo "GIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Build & push to Docker Hub
+      - name: Build & push to Docker Hub and GHCR
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            APP_VERSION=${{ steps.ver.outputs.VERSION }}
+            GIT_SHA=${{ steps.ver.outputs.GIT_SHA }}
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.GOLDEN_VERSION }}
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.VERSION }}
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.GOLDEN_VERSION }}
+
+

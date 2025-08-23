@@ -1,289 +1,248 @@
 import logging
-import logging.handlers
+import logging.config
 import os
+import yaml
 import json
-import time
 import threading
-import random
-from pathlib import Path
 from datetime import datetime
+from collections import deque
 from typing import Dict, Any, Optional
-from queue import Queue
-import asyncio
+import contextvars
 
-# Global configuration
-LOG_CONFIG = {
-    "level": os.getenv("LOG_LEVEL", "INFO").upper(),
-    "format": os.getenv("LOG_FORMAT", "json").lower(),
-    "http_enabled": os.getenv("HTTP_LOG_ENABLED", "true").lower() == "true",
-    "http_sample_rate": float(os.getenv("HTTP_LOG_SAMPLE_RATE", "0.01")),
-    "http_exclude_paths": set(os.getenv("HTTP_LOG_EXCLUDE_PATHS", "/v1/metrics,/v1/system,/v1/logs/tail,/v1/admin/requests").split(",")),
-    "redact_headers": set(os.getenv("REDACT_HEADERS", "authorization,x-api-key").split(",")),
-    "is_dev": os.getenv("ENVIRONMENT", "production").lower() == "development"
-}
+# Context variable for trace ID
+trace_id_var = contextvars.ContextVar('trace_id', default=None)
 
-# Global log queue for async logging
-log_queue = Queue(maxsize=10000)
-log_listener = None
-
-class StructuredFormatter:
-    """JSON formatter for structured logging"""
-    
-    def __init__(self, is_dev: bool = False):
-        self.is_dev = is_dev
-    
-    def format(self, record: logging.LogRecord) -> str:
-        # Base structured log entry
-        log_entry = {
-            "ts": datetime.fromtimestamp(record.created).isoformat(),
-            "level": record.levelname,
-            "msg": record.getMessage(),
-            "logger": record.name,
-            "module": record.module,
-            "function": record.funcName,
-            "line": record.lineno
-        }
-        
-        # Add extra fields if present
-        if hasattr(record, 'trace_id'):
-            log_entry['trace_id'] = record.trace_id
-        if hasattr(record, 'client_ip'):
-            log_entry['client_ip'] = record.client_ip
-        if hasattr(record, 'tenant_id'):
-            log_entry['tenant_id'] = record.tenant_id
-        if hasattr(record, 'method'):
-            log_entry['method'] = record.method
-        if hasattr(record, 'path'):
-            log_entry['path'] = record.path
-        if hasattr(record, 'status'):
-            log_entry['status'] = record.status
-        if hasattr(record, 'latency_ms'):
-            log_entry['latency_ms'] = record.latency_ms
-        
-        # Add exception info if present
-        if record.exc_info:
-            log_entry['exception'] = self.formatException(record.exc_info)
-        
-        # Development mode: pretty print with emojis
-        if self.is_dev:
-            return self._format_dev(log_entry)
-        
-        # Production mode: compact JSON
-        return json.dumps(log_entry, separators=(',', ':'))
-    
-    def _format_dev(self, log_entry: Dict[str, Any]) -> str:
-        """Development-friendly formatting with emojis"""
-        emoji_map = {
-            "INFO": "ℹ️",
-            "WARNING": "⚠️", 
-            "ERROR": "❌",
-            "CRITICAL": "🚨",
-            "DEBUG": "🐛"
-        }
-        
-        emoji = emoji_map.get(log_entry["level"], "📝")
-        timestamp = log_entry["ts"]
-        level = log_entry["level"]
-        message = log_entry["msg"]
-        
-        # Build dev-friendly log line
-        parts = [f"{timestamp} | {emoji} {level:8} | {message}"]
-        
-        # Add extra context if present
-        if 'trace_id' in log_entry:
-            parts.append(f"🔍 Trace: {log_entry['trace_id']}")
-        if 'client_ip' in log_entry:
-            parts.append(f"📍 Client: {log_entry['client_ip']}")
-        if 'method' in log_entry and 'path' in log_entry:
-            parts.append(f"🌐 {log_entry['method']} {log_entry['path']}")
-        if 'status' in log_entry:
-            status_emoji = "✅" if log_entry['status'] < 400 else "❌" if log_entry['status'] >= 500 else "⚠️"
-            parts.append(f"{status_emoji} Status: {log_entry['status']}")
-        if 'latency_ms' in log_entry:
-            latency_color = "🟢" if log_entry['latency_ms'] < 100 else "🟡" if log_entry['latency_ms'] < 500 else "🔴"
-            parts.append(f"{latency_color} Latency: {log_entry['latency_ms']}ms")
-        
-        return " | ".join(parts)
-    
-    def formatException(self, exc_info):
-        """Format exception information"""
-        import traceback
-        return ''.join(traceback.format_exception(*exc_info))
-
-class QueueHandler(logging.Handler):
-    """Non-blocking queue handler for async logging"""
-    
-    def __init__(self, queue: Queue):
-        super().__init__()
-        self.queue = queue
-    
-    def emit(self, record):
-        try:
-            # Don't block if queue is full
-            self.queue.put_nowait(record)
-        except:
-            # Fallback to stderr if queue is full
-            import sys
-            print(f"Log queue full, dropping log: {record.getMessage()}", file=sys.stderr)
-
-class QueueListener(threading.Thread):
-    """Background thread to process log queue"""
-    
-    def __init__(self, queue: Queue, handler: logging.Handler):
-        super().__init__(daemon=True)
-        self.queue = queue
-        self.handler = handler
-        self.running = True
-    
-    def run(self):
-        while self.running:
-            try:
-                record = self.queue.get(timeout=1)
-                self.handler.handle(record)
-            except:
-                continue
-    
-    def stop(self):
-        self.running = False
-
-def setup_logging():
-    """Configure structured logging with queue-based async processing"""
-    global log_listener
-    
-    # Configure root logger
-    logger = logging.getLogger()
-    logger.setLevel(getattr(logging, LOG_CONFIG["level"]))
-    
-    # Remove existing handlers
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-    
-    # Create formatter
-    formatter = StructuredFormatter(is_dev=LOG_CONFIG["is_dev"])
-    
-    # Create stdout handler (for Docker/Kubernetes log collection)
-    stdout_handler = logging.StreamHandler()
-    stdout_handler.setFormatter(formatter)
-    
-    # Create queue handler for async processing
-    queue_handler = QueueHandler(log_queue)
-    queue_handler.setFormatter(formatter)
-    
-    # Start background listener
-    log_listener = QueueListener(log_queue, stdout_handler)
-    log_listener.start()
-    
-    # Add queue handler to root logger
-    logger.addHandler(queue_handler)
-    
-    # Log startup
-    startup_logger = logging.getLogger("startup")
-    startup_logger.info("🚀 TELEMETRY API STARTING UP", extra={
-        "trace_id": "startup"
-    })
-    startup_logger.info(f"📊 Log Configuration", extra={
-        "trace_id": "startup",
-        "level": LOG_CONFIG["level"],
-        "format": LOG_CONFIG["format"],
-        "http_enabled": LOG_CONFIG["http_enabled"],
-        "http_sample_rate": LOG_CONFIG["http_sample_rate"],
-        "is_dev": LOG_CONFIG["is_dev"]
-    })
-
-def should_log_request(method: str, path: str, status: int) -> bool:
-    """Determine if HTTP request should be logged based on sampling and filtering rules"""
-    # Always log errors
-    if status >= 400:
-        return True
-    
-    # Skip excluded paths
-    if path in LOG_CONFIG["http_exclude_paths"]:
-        return False
-    
-    # Sample successful requests
-    if status < 400:
-        return random.random() < LOG_CONFIG["http_sample_rate"]
-    
-    return True
-
-def log_http_request(method: str, path: str, status: int, duration_ms: int, 
-                    client_ip: str, trace_id: str, tenant_id: str = "unknown"):
-    """Log HTTP request with structured data"""
-    if not LOG_CONFIG["http_enabled"]:
-        return
-    
-    if not should_log_request(method, path, status):
-        return
-    
-    logger = logging.getLogger("http")
-    logger.info("HTTP Request", extra={
-        "trace_id": trace_id,
-        "client_ip": client_ip,
-        "tenant_id": tenant_id,
-        "method": method,
-        "path": path,
-        "status": status,
-        "latency_ms": duration_ms
-    })
-
-# Alias for backward compatibility
-log_request = log_http_request
-
-def log_system_event(event_type: str, message: str, details: Optional[Dict[str, Any]] = None, 
-                    trace_id: str = "system"):
-    """Log system events with structured data"""
-    logger = logging.getLogger("system")
-    
-    extra = {
-        "trace_id": trace_id,
-        "event_type": event_type
-    }
-    
-    if details:
-        extra.update(details)
-    
-    logger.info(message, extra=extra)
-
-def log_ingest_operation(records_count: int, success_count: int, failed_count: int, 
-                        duration_ms: int, trace_id: str):
-    """Log ingest operations with structured data"""
-    logger = logging.getLogger("ingest")
-    
-    success_rate = (success_count / records_count * 100) if records_count > 0 else 0
-    
-    logger.info("Ingest Operation", extra={
-        "trace_id": trace_id,
-        "records_count": records_count,
-        "success_count": success_count,
-        "failed_count": failed_count,
-        "success_rate": round(success_rate, 1),
-        "duration_ms": duration_ms
-    })
+def get_trace_id() -> Optional[str]:
+    """Get the current trace ID from context"""
+    return trace_id_var.get()
 
 def log_pipeline_event(event_type: str, message: str, **kwargs):
     """Log pipeline events with structured data"""
-    logger = logging.getLogger("pipeline")
+    logger = logging.getLogger("app")
+    logger.info(message, extra={
+        "event_type": event_type,
+        "component": "pipeline",
+        **kwargs
+    })
+
+class JsonFormatter(logging.Formatter):
+    """Custom JSON formatter with structured fields"""
     
-    extra = {
-        "event_type": event_type
+    def format(self, record: logging.LogRecord) -> str:
+        # Get trace ID from context
+        trace_id = get_trace_id()
+        
+        # Build structured log entry
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+            "trace_id": trace_id,
+            "method": getattr(record, 'method', None),
+            "path": getattr(record, 'path', None),
+            "status": getattr(record, 'status', None),
+            "latency_ms": getattr(record, 'latency_ms', None),
+            "client_ip": getattr(record, 'client_ip', None),
+            "tenant_id": getattr(record, 'tenant_id', None),
+            "component": getattr(record, 'component', 'api')
+        }
+        
+        # Add exception info if present
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        
+        # Add extra fields
+        for key, value in record.__dict__.items():
+            if key not in ['name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 
+                          'filename', 'module', 'lineno', 'funcName', 'created', 
+                          'msecs', 'relativeCreated', 'thread', 'threadName', 
+                          'processName', 'process', 'getMessage', 'exc_info', 
+                          'exc_text', 'stack_info', 'method', 'path', 'status', 
+                          'latency_ms', 'client_ip', 'tenant_id', 'component']:
+                log_entry[key] = value
+        
+        return json.dumps(log_entry)
+
+class MemoryLogHandler(logging.Handler):
+    """In-memory log handler with ring buffer for live logs"""
+    
+    def __init__(self, max_size: int = 10000):
+        super().__init__()
+        self.max_size = max_size
+        self.logs = deque(maxlen=max_size)
+        self._lock = threading.Lock()
+    
+    def emit(self, record: logging.LogRecord):
+        try:
+            # Format the record
+            msg = self.format(record)
+            
+            # If using JSON formatter, parse the JSON
+            if isinstance(self.formatter, JsonFormatter):
+                try:
+                    log_entry = json.loads(msg)
+                except json.JSONDecodeError:
+                    log_entry = {"msg": msg, "timestamp": datetime.utcnow().isoformat() + "Z"}
+            else:
+                # For text formatter, create structured entry
+                log_entry = {
+                    "msg": msg,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "level": record.levelname,
+                    "logger": record.name
+                }
+            
+            # Add to ring buffer
+            with self._lock:
+                self.logs.append(log_entry)
+                
+        except Exception:
+            self.handleError(record)
+    
+    def get_logs(self, since: Optional[str] = None, limit: int = 1000) -> list:
+        """Get logs from memory buffer with optional filtering"""
+        with self._lock:
+            logs = list(self.logs)
+        
+        # Filter by timestamp if provided
+        if since:
+            try:
+                since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
+                logs = [log for log in logs if log.get('timestamp') and 
+                       datetime.fromisoformat(log['timestamp'].replace('Z', '+00:00')) >= since_dt]
+            except ValueError:
+                pass  # Invalid timestamp, return all logs
+        
+        # Apply limit
+        return logs[-limit:] if limit else logs
+
+# Global memory handler instance
+memory_handler = MemoryLogHandler()
+
+def setup_logging():
+    """Setup logging configuration from YAML file or environment"""
+    
+    # Read environment overrides
+    log_format = os.getenv("LOG_FORMAT", "json")
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    log_sample_rate = float(os.getenv("LOG_SAMPLE_RATE", "1.0"))
+    log_exclude_paths = os.getenv("LOG_EXCLUDE_PATHS", "/v1/health,/v1/metrics/prometheus").split(",")
+    
+    # Try to load YAML config
+    config = None
+    if os.path.exists("LOGGING.yaml"):
+        try:
+            with open("LOGGING.yaml", 'r') as f:
+                config = yaml.safe_load(f)
+        except Exception as e:
+            print(f"Warning: Could not load LOGGING.yaml: {e}")
+    
+    # Fallback to basic config if YAML not available
+    if not config:
+        config = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "json": {"()": JsonFormatter},
+                "text": {
+                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                    "datefmt": "%Y-%m-%d %H:%M:%S"
+                }
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "level": log_level,
+                    "formatter": log_format,
+                    "stream": "ext://sys.stdout"
+                },
+                "memory": {
+                    "()": MemoryLogHandler,
+                    "level": log_level,
+                    "formatter": log_format,
+                    "max_size": 10000
+                }
+            },
+            "loggers": {
+                "app": {
+                    "level": log_level,
+                    "handlers": ["console", "memory"],
+                    "propagate": True
+                },
+                "uvicorn": {
+                    "level": log_level,
+                    "handlers": ["console", "memory"],
+                    "propagate": True
+                },
+                "uvicorn.error": {
+                    "level": log_level,
+                    "handlers": ["console", "memory"],
+                    "propagate": True
+                },
+                "uvicorn.access": {
+                    "level": log_level,
+                    "handlers": ["console", "memory"],
+                    "propagate": True
+                }
+            },
+            "root": {
+                "level": log_level,
+                "handlers": ["console", "memory"]
+            }
+        }
+    
+    # Apply environment overrides
+    if log_format == "text":
+        for handler in config.get("handlers", {}).values():
+            if "formatter" in handler:
+                handler["formatter"] = "text"
+    
+    # Apply log level override
+    for logger in config.get("loggers", {}).values():
+        logger["level"] = log_level
+    
+    # Configure logging
+    logging.config.dictConfig(config)
+    
+    # Replace any existing memory handlers with our global instance
+    loggers_to_update = [
+        logging.getLogger(),  # root logger
+        logging.getLogger("app"),
+        logging.getLogger("uvicorn"),
+        logging.getLogger("uvicorn.error"),
+        logging.getLogger("uvicorn.access")
+    ]
+    
+    # Get the formatter from the config
+    formatter_name = log_format
+    if formatter_name == "json":
+        formatter = JsonFormatter()
+    else:
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    
+    # Set formatter on memory handler
+    memory_handler.setFormatter(formatter)
+    
+    for logger in loggers_to_update:
+        # Remove any existing memory handlers
+        logger.handlers = [h for h in logger.handlers if not isinstance(h, MemoryLogHandler)]
+        # Add our global memory handler
+        logger.addHandler(memory_handler)
+        logger.propagate = True  # Ensure logs propagate to parent loggers
+    
+    # Store configuration for middleware
+    logging._config = {
+        "exclude_paths": log_exclude_paths,
+        "sample_rate": log_sample_rate
     }
-    extra.update(kwargs)
     
-    logger.info(message, extra=extra)
+    return config
 
-def redact_sensitive_data(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Redact sensitive information from log data"""
-    redacted = data.copy()
-    
-    for header in LOG_CONFIG["redact_headers"]:
-        if header in redacted:
-            redacted[header] = "[REDACTED]"
-    
-    return redacted
+def get_memory_handler():
+    """Get the singleton memory handler instance"""
+    return memory_handler
 
-def cleanup_logging():
-    """Cleanup logging resources"""
-    global log_listener
-    if log_listener:
-        log_listener.stop()
-        log_listener.join(timeout=5)
+def get_memory_buffer():
+    """Get the memory buffer for external access"""
+    return memory_handler.logs

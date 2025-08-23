@@ -1,4 +1,4 @@
-# Telemetry API — v0.8.5
+# Telemetry API — v0.8.6
 
 Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability and multi-tenant authentication.
 
@@ -15,7 +15,7 @@ Ingest NetFlow/IPFIX and Zeek JSON → enrich with GeoIP/ASN/threat intel → ap
 docker run -d -p 80:80 \
   -e API_KEY=TEST_KEY \
   -e REDACT_HEADERS=authorization \
-  --name telapi shvin/telemetry-api:0.8.3
+  --name telapi shvin/telemetry-api:0.8.6
 
 # 2) Ingest sample Zeek
 curl -s -X POST http://localhost/v1/ingest/zeek \
@@ -33,7 +33,51 @@ curl -s "http://localhost/v1/download/json?limit=50" \
 
 ## Quick Start
 
-### Option 1: All-in-One Container (Recommended)
+### 🏆 Golden Release (Recommended for Production)
+
+For production deployments, use the golden release which has been thoroughly tested and validated:
+
+```bash
+# Pull and run the golden release
+docker pull shvin/telemetry-api:0.8.6-golden
+docker run -d -p 80:80 \
+  -e API_KEY=YOUR_API_KEY \
+  --name telemetry-api-golden \
+  shvin/telemetry-api:0.8.6-golden
+
+# Verify the golden release
+curl -s http://localhost/v1/health | jq
+```
+
+**Golden Release Benefits:**
+- ✅ Thoroughly tested and validated
+- ✅ SBOM available for security audit
+- ✅ Checksums verified for integrity
+- ✅ Release notes and changelog included
+- ✅ Immutable tag for reproducible deployments
+
+**Rollback to Golden:**
+```bash
+# Stop current container
+docker stop telemetry-api-current
+
+# Pull and run golden release
+docker pull shvin/telemetry-api:0.8.6-golden
+docker run -d -p 80:80 \
+  -e API_KEY=YOUR_API_KEY \
+  --name telemetry-api-golden \
+  shvin/telemetry-api:0.8.6-golden
+
+# Verify rollback
+curl -s http://localhost/v1/health | jq
+```
+
+**Release Assets:**
+- [Release Page](https://github.com/shervinhariri/telemetry-api/releases/tag/v0.8.6)
+- [SBOM (SPDX JSON)](https://github.com/shervinhariri/telemetry-api/releases/download/v0.8.6/sbom-0.8.6.spdx.json)
+- [Checksums](https://github.com/shervinhariri/telemetry-api/releases/download/v0.8.6/checksums-0.8.6.txt)
+
+### Option 1: All-in-One Container (Development)
 
 A single container that includes the API, NetFlow collector, and mapper:
 
@@ -68,10 +112,18 @@ docker run -d -p 80:80 \
   -e GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb \
   -e THREATLIST_CSV=/data/threats.csv \
   -v $PWD/data:/data:ro \
-  --name telemetry-api shvin/telemetry-api:0.8.3
+  --name telemetry-api shvin/telemetry-api:0.8.6
 
 # Open dashboard
 open http://localhost
+
+Paste your API key in the UI
+
+Use API tab to send ingest / lookup
+
+Use Logs tab for live logs
+
+Note: Browsers do not allow custom headers in EventSource. The UI uses ?key= for SSE; the backend accepts it only for the /v1/logs/stream endpoint.
 
 # Test ingest
 curl -s -X POST http://localhost/v1/ingest/zeek \
@@ -100,23 +152,23 @@ export HTTP_LOG_SAMPLE_RATE=1.0  # Log all requests
 
 ## Golden Release and Rollback
 
-This repository maintains a golden tag for the stable build of 0.8.3:
+This repository maintains a golden tag for the stable build of 0.8.6:
 
-- Git tag: `v0.8.3-golden`
-- Docker image: `shvin/telemetry-api:0.8.3-golden`
+- Git tag: `v0.8.6-golden`
+- Docker image: `shvin/telemetry-api:0.8.6-golden`
 
 Rollback instructions:
 
 ```bash
 git fetch --tags
-git checkout v0.8.3-golden
+git checkout v0.8.6-golden
 
-docker pull shvin/telemetry-api:0.8.3-golden
+docker pull shvin/telemetry-api:0.8.6-golden
 docker rm -f telemetry-api || true
 docker run -d -p 80:80 \
   -v $PWD/telemetry.db:/app/telemetry.db \
   --name telemetry-api \
-  shvin/telemetry-api:0.8.3-golden
+  shvin/telemetry-api:0.8.6-golden
 ```
 
 ### Production Mode
@@ -141,7 +193,7 @@ docker run -d -p 80:80 \
   -e DEMO_MODE=true \
   -e DEMO_EPS=50 \
   -e DEMO_DURATION_SEC=120 \
-  --name telemetry-api-demo shvin/telemetry-api:0.8.3
+  --name telemetry-api-demo shvin/telemetry-api:0.8.6
 
 # 2) Start demo generator
 curl -s -X POST http://localhost/v1/demo/start \
@@ -179,7 +231,7 @@ curl -s -X POST http://localhost/v1/demo/stop \
 - **No metrics**: Verify `/v1/metrics/prometheus` endpoint is accessible
 - **Grafana import fails**: Ensure Prometheus data source is configured correctly
 
-## 🏢 Multi-Tenancy (v0.8.3)
+## 🏢 Multi-Tenancy (v0.8.6)
 
 The API now supports multi-tenant deployments with complete data isolation:
 
@@ -196,7 +248,7 @@ The API now supports multi-tenant deployments with complete data isolation:
 # 1) Run with database persistence
 docker run -d -p 80:80 \
   -v $PWD/telemetry.db:/app/telemetry.db \
-  --name telemetry-api shvin/telemetry-api:0.8.3
+  --name telemetry-api shvin/telemetry-api:0.8.6
 
 # 2) Database will auto-initialize with default tenant
 # 3) Get admin API key from logs or use seed script
@@ -224,7 +276,7 @@ curl -H "Authorization: Bearer ADMIN_KEY" \
 | `DEV_BYPASS_SCOPES` | `false` | Development scope bypass |
 ```
 
-## 🏢 Multi-Tenancy (v0.8.3)
+## 🏢 Multi-Tenancy (v0.8.6)
 
 The API now supports multi-tenant deployments with complete data isolation:
 
@@ -243,7 +295,7 @@ docker run -d -p 80:80 \
   -e DATABASE_URL=sqlite:///./telemetry.db \
   -e ADMIN_API_KEY=YOUR_ADMIN_KEY \
   -v $PWD/data:/data \
-  --name telemetry-api shvin/telemetry-api:0.8.3
+  --name telemetry-api shvin/telemetry-api:0.8.6
 
 # 2) Create default tenant and admin key
 docker exec telemetry-api python3 scripts/seed_default_tenant.py
@@ -395,7 +447,30 @@ docker compose logs -f collector
 
 # Full test suite
 ./scripts/run_tests.sh
+
+# All-in-one verification (recommended)
+export API_KEY=TEST_KEY
+bash scripts/verify_allinone.sh
 ```
+
+### Continuous Integration
+
+The project uses GitHub Actions for automated testing and builds:
+
+- **Scenario Tests**: Comprehensive end-to-end testing with real API calls
+- **Unit Tests**: Fast unit tests using pytest
+- **Docker Builds**: Multi-architecture container builds (AMD64/ARM64)
+- **Registry Mirrors**: Images pushed to Docker Hub (public) and GHCR (private)
+
+**Test failures fail the build** - no `|| true` workarounds. The CI pipeline includes:
+
+1. **Container startup** with 80-second health check timeout
+2. **Python dependency caching** for faster runs  
+3. **Unit tests** that must pass (`pytest -q`)
+4. **Scenario tests** that verify API behavior and return proper exit codes
+5. **Automatic log collection** on failures for debugging
+
+View build status: ![Build](https://github.com/shervinhariri/telemetry-api/actions/workflows/docker.yml/badge.svg)
 
 ### Phase B Tests (Admission Control & Metrics)
 ```bash
@@ -549,7 +624,7 @@ sudo nft delete rule inet telemetry input udp dport 2055 drop
 version: '3.8'
 services:
   telemetry-api:
-    image: shvin/telemetry-api:0.8.3
+    image: shvin/telemetry-api:0.8.6
     ports:
       - "80:80"
     environment:
@@ -578,7 +653,7 @@ spec:
     spec:
       containers:
       - name: telemetry-api
-        image: shvin/telemetry-api:0.8.3
+        image: shvin/telemetry-api:0.8.6
         ports:
         - containerPort: 80
         env:
@@ -589,9 +664,23 @@ spec:
               key: api-key
 ```
 
+## 📋 Releases & Tags
+
+-- Images are tagged :latest, :0.x.y, and :golden for stable rollback.
+
+This release: shvin/telemetry-api:0.8.6
+
+Previous golden: shvin/telemetry-api:0.8.2-golden
+
+## Versioning
+
+Semantic-ish minor bumps for UI/bugfix releases
+
+Keep VERSION in repo aligned with Docker tag and /v1/version
+
 ## 📋 Changelog
 
-### v0.8.3 (Current)
+### v0.8.6 (Current)
 - ✅ **Multi-Tenancy Support**: Complete tenant isolation with database-backed tenants
 - ✅ **Database Models**: SQLAlchemy models for Tenant, ApiKey, OutputConfig, and Job
 - ✅ **Tenant-Scoped Authentication**: Per-tenant API keys with scope validation
@@ -608,6 +697,14 @@ spec:
 - ✅ **Enhanced observability** with detailed metrics and system monitoring
 - ✅ **Real-time dashboard** with Server-Sent Events for live tailing
 - ✅ **Comprehensive request audit** logging
+
+## Known Limitations
+
+MVP focuses on NetFlow/IPFIX JSON & Zeek JSON (Phase 2 adds PCAP headers, JA3, basic ML)
+
+Splunk HEC & Elastic bulk JSON outputs (Phase 2: QRadar, Datadog)
+
+SSE in browsers requires ?key= on /v1/logs/stream as described above.
 
 ## 🤝 Contributing
 

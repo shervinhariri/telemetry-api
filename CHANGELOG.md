@@ -2,6 +2,59 @@
 
 All notable changes to the Telemetry API project will be documented in this file.
 
+## [0.8.6] - 2025-08-21
+
+[Full Changelog](https://github.com/shervinhariri/telemetry-api/compare/v0.8.4...v0.8.6)
+
+**Highlights:**
+- **Phase 1**: Single source of truth for version management
+- **Phase 2**: Consolidated verification scripts with environment variable support
+- **Phase 3**: CI pipeline improvements with proper failure handling
+- **Phase 4**: Security hardening with secret scanning and vulnerability scanning
+- **Phase 5**: Centralized logging with structured JSON and live streaming
+- **Phase 6**: UI polish with modern components and improved reliability
+- **Phase 7**: SSE browser compatibility and authentication fixes
+
+### Added
+- **Single Source of Truth for Version**: VERSION file at repo root for centralized version management
+- **Dynamic Version Reading**: Backend version endpoints now read from VERSION file with fallback to environment variables
+- **UI Version Integration**: Both legacy and React UIs now fetch version from API instead of hardcoded values
+- **Consolidated Verification Scripts**: Merged and parameterized verification scripts with environment variable support
+- **CI Pipeline Improvements**: Removed `|| true` workarounds, added Python dependency caching, proper exit codes
+- **Security Hardening**: Secret scanning with Gitleaks, container vulnerability scanning with Trivy, dependency pinning
+- **Centralized Logging**: JSON structured logging with request tracing, in-memory ring buffer, and SSE streaming
+- **UI Polish & Reliability**: Modern donut gauges, consistent button components, improved layouts, and live logs streaming
+
+### Changed
+- **Version Management**: Moved from hardcoded version strings to VERSION file-based system
+- **Docker CI**: Updated workflow to use VERSION file for tag generation, added GHCR mirror
+- **Backend Version Logic**: Unified version reading across all version endpoints
+- **Verification Scripts**: Single canonical `scripts/verify_allinone.sh` with environment variable configuration
+- **CI Pipeline**: Fails on real test failures, faster runs with dependency caching
+- **Security Posture**: Base image pinning, dependency hashes, secret scanning, vulnerability scanning
+- **Logging System**: Structured JSON logging with trace correlation and live streaming capabilities
+- **UI Components**: Consistent design tokens, improved accessibility, and modern styling
+
+### Fixed
+- **SSE Browser Compatibility**: SSE logs stream now uses correct media type (`text/event-stream`) for `/v1/logs/stream`
+- **EventSource Authentication**: UI now passes API key via `?key=` query parameter and backend accepts query key for SSE
+- **Browser Limitations**: Workaround for EventSource not supporting custom headers in browsers
+
+### Technical
+- **VERSION File**: New file at repo root containing "0.8.6"
+- **API Endpoints**: Updated /v1/version and /v1/api/version to read from VERSION file
+- **Fallback Chain**: VERSION file → APP_VERSION env var → config.py API_VERSION
+- **Docker Tags**: CI now generates both "latest" and "v0.8.6" tags
+- **Security Tools**: Gitleaks configuration, Trivy scanning, SARIF uploads
+- **Logging Infrastructure**: Custom JsonFormatter, MemoryLogHandler, ASGI middleware for tracing
+- **UI Framework**: Design tokens, component library, and improved state management
+- **SSE Implementation**: Proper EventSource handling with query parameter authentication
+
+## [Unreleased] - 2025-XX-XX
+
+### Added
+- Development version for next release cycle
+
 ## [0.8.4] - 2025-08-19
 
 ### Added

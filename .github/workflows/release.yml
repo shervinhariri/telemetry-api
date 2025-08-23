@@ -1,0 +1,124 @@
+name: Release
+
+on:
+  push:
+    tags: [ "v*" ]
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: ver
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT
+
+      - name: Generate SBOM
+        run: |
+          # Wait for image to be available
+          sleep 30
+          
+          # Generate SBOM using syft
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            anchore/syft:latest \
+            shvin/telemetry-api:${{ steps.ver.outputs.TAG }} \
+            -o spdx-json > sbom-${{ steps.ver.outputs.VERSION }}.spdx.json
+          
+          # Also generate in table format for readability
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            anchore/syft:latest \
+            shvin/telemetry-api:${{ steps.ver.outputs.TAG }} \
+            -o table > sbom-${{ steps.ver.outputs.VERSION }}.txt
+
+      - name: Generate checksums
+        run: |
+          # Create checksums for SBOM files
+          sha256sum sbom-${{ steps.ver.outputs.VERSION }}.spdx.json > checksums-${{ steps.ver.outputs.VERSION }}.txt
+          sha256sum sbom-${{ steps.ver.outputs.VERSION }}.txt >> checksums-${{ steps.ver.outputs.VERSION }}.txt
+          
+          # Add checksums for sample files
+          if [ -f "docker-compose.yml" ]; then
+            sha256sum docker-compose.yml >> checksums-${{ steps.ver.outputs.VERSION }}.txt
+          fi
+          if [ -f "docker-compose.override.yml" ]; then
+            sha256sum docker-compose.override.yml >> checksums-${{ steps.ver.outputs.VERSION }}.txt
+          fi
+
+      - name: Extract changelog
+        run: |
+          # Extract the changelog for this version
+          awk '/^## \['${{ steps.ver.outputs.VERSION }}'\]/,/^## \[/ {if (NR>1) print; if ($0 ~ /^## \[/ && NR>1) exit}' CHANGELOG.md > changelog-${{ steps.ver.outputs.VERSION }}.md
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.ver.outputs.TAG }}
+          release_name: Telemetry API ${{ steps.ver.outputs.VERSION }}
+          body_path: changelog-${{ steps.ver.outputs.VERSION }}.md
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./sbom-${{ steps.ver.outputs.VERSION }}.spdx.json
+          asset_name: sbom-${{ steps.ver.outputs.VERSION }}.spdx.json
+          asset_content_type: application/json
+
+      - name: Upload SBOM Table
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./sbom-${{ steps.ver.outputs.VERSION }}.txt
+          asset_name: sbom-${{ steps.ver.outputs.VERSION }}.txt
+          asset_content_type: text/plain
+
+      - name: Upload Checksums
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./checksums-${{ steps.ver.outputs.VERSION }}.txt
+          asset_name: checksums-${{ steps.ver.outputs.VERSION }}.txt
+          asset_content_type: text/plain
+
+      - name: Get Image Digest
+        run: |
+          # Get the image digest for the golden tag
+          DIGEST=$(docker inspect --format='{{.RepoDigests}}' shvin/telemetry-api:${{ steps.ver.outputs.TAG }}-golden | grep -o 'sha256:[a-f0-9]*')
+          echo "GOLDEN_DIGEST=$DIGEST" >> $GITHUB_ENV
+          echo "Golden image digest: $DIGEST"
+
+      - name: Create Image Digest File
+        run: |
+          echo "${{ env.GOLDEN_DIGEST }}" > golden-digest-${{ steps.ver.outputs.VERSION }}.txt
+
+      - name: Upload Image Digest
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./golden-digest-${{ steps.ver.outputs.VERSION }}.txt
+          asset_name: golden-digest-${{ steps.ver.outputs.VERSION }}.txt
+          asset_content_type: text/plain

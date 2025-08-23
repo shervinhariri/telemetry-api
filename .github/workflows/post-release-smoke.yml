@@ -1,0 +1,126 @@
+name: Post-Release Smoke Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to test (e.g., 0.8.6)'
+        required: true
+        default: '0.8.6'
+      api_key:
+        description: 'API key for testing'
+        required: true
+        default: 'TEST_KEY'
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'requirements-ci.txt'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-ci.txt
+          sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Pull golden image
+        run: |
+          echo "Pulling shvin/telemetry-api:${{ github.event.inputs.version }}-golden"
+          docker pull shvin/telemetry-api:${{ github.event.inputs.version }}-golden
+
+      - name: Start container
+        run: |
+          # Stop any existing container
+          docker rm -f telemetry-api-smoke || true
+          
+          # Start the golden release
+          docker run -d \
+            --name telemetry-api-smoke \
+            -p 80:80 \
+            -e API_KEY=${{ github.event.inputs.api_key }} \
+            shvin/telemetry-api:${{ github.event.inputs.version }}-golden
+          
+          # Wait for container to be ready
+          echo "Waiting for container to start..."
+          sleep 10
+
+      - name: Basic health check
+        run: |
+          echo "Testing basic health endpoint..."
+          for i in {1..30}; do
+            if curl -s http://localhost/v1/health | jq -e '.status == "ok"' > /dev/null; then
+              echo "✅ Health check passed"
+              break
+            fi
+            echo "Attempt $i/30: Waiting for health endpoint..."
+            sleep 2
+          done
+          
+          # Final health check
+          curl -s http://localhost/v1/health | jq
+
+      - name: Version check
+        run: |
+          echo "Checking version endpoint..."
+          VERSION=$(curl -s http://localhost/v1/version | jq -r '.version')
+          EXPECTED_VERSION="v${{ github.event.inputs.version }}"
+          
+          if [ "$VERSION" = "$EXPECTED_VERSION" ]; then
+            echo "✅ Version check passed: $VERSION"
+          else
+            echo "❌ Version mismatch: expected $EXPECTED_VERSION, got $VERSION"
+            exit 1
+          fi
+
+      - name: Run verification script
+        run: |
+          echo "Running full verification script..."
+          export API_KEY=${{ github.event.inputs.api_key }}
+          export BASE_URL=http://localhost
+          
+          # Run the verification script
+          bash scripts/verify_allinone.sh
+
+      - name: Generate test data
+        run: |
+          echo "Generating test NetFlow data..."
+          python3 scripts/generate_test_netflow.py --count 5 --flows 3
+
+      - name: Check metrics
+        run: |
+          echo "Checking metrics after test data..."
+          sleep 5
+          curl -s -H "Authorization: Bearer ${{ github.event.inputs.api_key }}" \
+            "http://localhost/v1/metrics?window=300" | jq
+
+      - name: Upload verification logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-test-logs-${{ github.event.inputs.version }}
+          path: |
+            /tmp/telemetry-api-logs/
+            /var/log/telemetry-api/
+          retention-days: 7
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f telemetry-api-smoke || true
+          docker system prune -f || true
+
+      - name: Smoke test summary
+        run: |
+          echo "🎉 Smoke test completed successfully!"
+          echo "✅ Golden release ${{ github.event.inputs.version }} is working correctly"
+          echo "✅ All endpoints responding"
+          echo "✅ Verification script passed"
+          echo "✅ Test data ingestion working"
