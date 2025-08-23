@@ -43,7 +43,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y jq
 
       - name: Unit tests
-        run: pytest -q
+        run: docker exec telemetry-api pytest -q
 
       - name: Scenario tester
         env:
