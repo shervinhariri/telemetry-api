@@ -56,8 +56,10 @@ jobs:
             if [ -f "VERSION" ]; then
               VERSION_FROM_FILE=$(cat VERSION | tr -d '\n\r')
               echo "VERSION=v${VERSION_FROM_FILE}" >> $GITHUB_OUTPUT
+              echo "GOLDEN_VERSION=v${VERSION_FROM_FILE}-golden" >> $GITHUB_OUTPUT
             else
               echo "VERSION=v0.8.6" >> $GITHUB_OUTPUT
+              echo "GOLDEN_VERSION=v0.8.6-golden" >> $GITHUB_OUTPUT
             fi
           fi
           
