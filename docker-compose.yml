@@ -29,8 +29,8 @@ services:
       - MAX_RECORDS=10000
       - RATE_LIMIT_PER_MIN=600
       - BOOTSTRAP_TENANT_ID=default
-      - BOOTSTRAP_ADMIN_API_KEY=DEV_ADMIN_KEY_5a8f9ffdc3
-      - API_KEY=TEST_KEY
+      - BOOTSTRAP_ADMIN_API_KEY=${BOOTSTRAP_ADMIN_API_KEY:-}
+      - API_KEY=${API_KEY:-}
     ports:
       - "80:80"
     volumes:

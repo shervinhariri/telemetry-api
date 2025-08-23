@@ -16,6 +16,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate build context
+        run: |
+          if [ ! -f "requirements.txt" ]; then
+            echo "::error::requirements.txt not found"
+            exit 1
+          fi
+          if [ ! -f "Dockerfile" ]; then
+            echo "::error::Dockerfile not found"
+            exit 1
+          fi
+          echo "✅ Build context validation passed"
+
       - name: Validate Docker Hub secrets
         run: |
           if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ] || [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
@@ -40,10 +52,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Echo who we are and try a pull (soft)
-        run: |
-          echo "Logged in as: ${{ secrets.DOCKERHUB_USERNAME }}"
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:nonexistent || true
+
 
       - name: Extract version and build args
         id: ver
@@ -82,5 +91,13 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
             ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.VERSION }}
             ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.GOLDEN_VERSION }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.VERSION }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
 
 
