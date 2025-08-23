@@ -109,7 +109,7 @@ class TestPrometheusEndpoint:
     """Test the Prometheus metrics endpoint."""
     
     @pytest.mark.asyncio
-    async def test_prometheus_endpoint(self, client):
+    async def test_prometheus_endpoint(self):
         """Test the /v1/metrics/prometheus endpoint."""
         from app.api.prometheus import get_prometheus_metrics
         
