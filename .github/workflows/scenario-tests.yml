@@ -47,14 +47,16 @@ jobs:
 
       - name: DB check (verify scopes format)
         run: |
-          docker exec telemetry-api sh -lc 'python - <<"PY"
-          from app.db import SessionLocal
-          from sqlalchemy import text
-          s = SessionLocal()
-          print("DB scopes check:")
-          for row in s.execute(text("select key_id, scopes from api_keys")).fetchmany(3):
-              print(f"  {row[0]}: {row[1]}")
-          s.close()
+          docker exec telemetry-api bash -lc 'python - <<"PY"
+          from sqlalchemy import create_engine, text
+          import os, json
+          db=os.getenv("DB_URL","sqlite:////app/telemetry.db")
+          e=create_engine(db, future=True)
+          with e.connect() as c:
+              rows=c.execute(text("select key_id, scopes from api_keys limit 3;")).all()
+              print("DB scopes check:")
+              for row in rows:
+                  print(f"  {row[0]}: {row[1]}")
           PY'
 
       # Run ALL tests inside the container to share the same DB/migrations
@@ -83,7 +85,16 @@ jobs:
           docker compose ps
           docker compose logs --no-color | tail -n 500
           echo "=== Database contents ==="
-          docker exec telemetry-api sqlite3 /app/telemetry.db "SELECT key_id, scopes, disabled FROM api_keys;"
+          docker exec telemetry-api bash -lc 'python - <<"PY"
+          from sqlalchemy import create_engine, text
+          import os
+          db=os.getenv("DB_URL","sqlite:////app/telemetry.db")
+          e=create_engine(db, future=True)
+          with e.connect() as c:
+              rows=c.execute(text("SELECT key_id, scopes, disabled FROM api_keys;")).all()
+              for row in rows:
+                  print(f"  {row[0]}: {row[1]} (disabled={row[2]})")
+          PY'
 
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
