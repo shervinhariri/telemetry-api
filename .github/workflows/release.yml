@@ -15,8 +15,8 @@ concurrency:
 
 env:
   IMAGE: shvin/telemetry-api
-  VERSION: v0.8.9
-  GOLDEN_TAG: v0.8.9-golden
+  VERSION: ${{ github.ref_name }}
+  GOLDEN_TAG: ${{ github.ref_name }}-golden
 
 jobs:
   build-and-push:
@@ -60,6 +60,9 @@ jobs:
     needs: [build-and-push]
     runs-on: ubuntu-latest
     steps:
+      - name: Pull exact image by digest
+        run: docker pull ${{ env.IMAGE }}@${{ needs.build-and-push.outputs.IMAGE_DIGEST }}
+
       - name: Pull golden image
         run: docker pull ${{ env.IMAGE }}:${{ env.GOLDEN_TAG }}
 
