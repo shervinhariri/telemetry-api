@@ -163,6 +163,15 @@ def test_sources_endpoint(client):
     assert isinstance(data["pages"], int)
     assert isinstance(data["items"], list)
 
+def test_sources_endpoint_with_admin_key(client):
+    """Test sources endpoint with admin key returns 200 and has items field"""
+    admin_headers = {"Authorization": "Bearer TEST_ADMIN_KEY"}
+    response = client.get("/v1/sources", headers=admin_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert "items" in data
+    assert isinstance(data["items"], list)
+
 # Error cases
 def test_ingest_no_auth(client):
     """Test ingest without authentication - skip due to middleware complexity"""

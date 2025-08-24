@@ -57,5 +57,5 @@ def ensure_schema_and_seed_keys():
         res = db.execute(text("SELECT key_id, scopes, disabled FROM api_keys"))
         keys = res.fetchall()
         log.info("DB_BOOT: ensured schema; total_keys=%d (seeded=%d)", len(keys), len(tokens))
-        for key in keys[:3]:  # Show first 3 keys for debugging
+        for key in keys[:2]:  # Show first 2 keys with their scopes
             log.info("DB_BOOT: key_id=%s scopes=%s disabled=%s", key[0], key[1], key[2])

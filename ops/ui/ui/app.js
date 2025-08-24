@@ -483,11 +483,7 @@ window.addEventListener('api-key-changed', (e) => {
 window.openSourceDetails = async function (sourceId, mode = 'edit') {
   console.log('[UI] openSourceDetails', { sourceId, mode });
   try {
-    const res = await fetch(`/v1/sources/${encodeURIComponent(sourceId)}`, { 
-      headers: { 'Authorization': `Bearer ${getApiKey()}` }
-    });
-    if (!res.ok) throw new Error(`GET /v1/sources/${sourceId} -> ${res.status}`);
-    const src = await res.json();
+    const src = await window.telemetryDashboard.apiCall(`/sources/${encodeURIComponent(sourceId)}`);
     // Always use our drawer
     window.showSourceDrawer(src, mode);
   } catch (e) {
@@ -916,12 +912,8 @@ window.submitCreateSource = async function (evt) {
       allowed_ips, max_eps, block_on_exceed: block
     };
 
-    const res = await fetch('/v1/sources', {
+    const res = await window.telemetryDashboard.apiCall('/sources', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${window.getApiKey?.() || ''}`,
-      },
       body: JSON.stringify(payload),
     });
 
@@ -987,12 +979,8 @@ window.submitEditSource = async function (evt) {
       block_on_exceed: block
     };
 
-    const res = await fetch(`/v1/sources/${encodeURIComponent(id)}`, {
+    const res = await window.telemetryDashboard.apiCall(`/sources/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${window.getApiKey?.() || ''}`,
-      },
       body: JSON.stringify(payload),
     });
 
@@ -1231,21 +1219,29 @@ class TelemetryDashboard {
         }
     }
 
+    getAuthHeaders() {
+        const token = this.state?.apiKey || localStorage.getItem("telemetry_api_key") || "";
+        const headers = { "Content-Type": "application/json" };
+        if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+            // also add "X-API-Key" header for backward compat
+            headers["X-API-Key"] = token;
+        }
+        return headers;
+    }
+
     async apiCall(endpoint, options = {}) {
         try {
             const url = `${this.apiBase}/v1${endpoint}`;
-            const apiKey = getApiKey(); // Read from localStorage at call time
             const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
+                ...this.getAuthHeaders(),
                 ...options.headers
             };
 
             console.log('API call:', url);
-            console.log('Headers:', headers);
+            console.log('Headers present:', Object.keys(headers).filter(k => k !== 'Authorization' && k !== 'X-API-Key'));
             const response = await fetch(url, { ...options, headers });
             console.log('Response status:', response.status);
-            console.log('Response headers:', response.headers);
             
             if (!response.ok) {
                 if (response.status === 503) {
@@ -1270,7 +1266,6 @@ class TelemetryDashboard {
             
             const text = await response.text();
             console.log('Response text length:', text.length);
-            console.log('Response text preview:', text.substring(0, 100));
             
             if (!text.trim()) {
                 console.log('Empty response received');
@@ -1324,9 +1319,14 @@ class TelemetryDashboard {
             // Apply feature gates based on system info
             this.applyFeatureGates(system?.features || {});
             
-            // Start UDP head status polling
-            this.loadUdpHeadStatus();
-            setInterval(() => this.loadUdpHeadStatus(), 3000);
+            // Start UDP head status polling only if feature is enabled
+            if (this.features?.udp_head) {
+                this.loadUdpHeadStatus();
+                this.udpHeadInterval = setInterval(() => this.loadUdpHeadStatus(), 3000);
+                console.log('UDP head polling started (feature enabled)');
+            } else {
+                console.log('UDP head polling disabled (feature not enabled)');
+            }
 
             // Load metrics (with backoff for 503)
             try {
@@ -1387,6 +1387,9 @@ class TelemetryDashboard {
 
     applyFeatureGates(features) {
         console.log('Applying feature gates:', features);
+        
+        // Store features for later use
+        this.features = features;
         
         // Feature flags (default false if missing)
         let allowSources = features.sources === true;
@@ -1454,6 +1457,19 @@ class TelemetryDashboard {
         
         // Store features globally for other functions to access
         window.FEATURES = features;
+        
+        // Handle UDP head polling based on feature flag
+        if (features.udp_head && !this.udpHeadInterval) {
+            // Start UDP polling if enabled and not already running
+            this.loadUdpHeadStatus();
+            this.udpHeadInterval = setInterval(() => this.loadUdpHeadStatus(), 3000);
+            console.log('UDP head polling started (feature enabled)');
+        } else if (!features.udp_head && this.udpHeadInterval) {
+            // Stop UDP polling if disabled and currently running
+            clearInterval(this.udpHeadInterval);
+            this.udpHeadInterval = null;
+            console.log('UDP head polling stopped (feature disabled)');
+        }
     }
 
     hideTab(tabId) {
@@ -2301,7 +2317,9 @@ function addSourcesFunctionality() {
 
     dashboard.loadSourcesData = async function() {
         try {
-            console.log('Loading sources data...');
+            console.log('Loading sources...');
+            const headers = this.getAuthHeaders();
+            console.log('Auth headers present:', Object.keys(headers).filter(k => k !== 'Authorization' && k !== 'X-API-Key'));
             this.hideError('sources');
             
             const params = new URLSearchParams();

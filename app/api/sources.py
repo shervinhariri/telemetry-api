@@ -2,6 +2,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from app.db import SessionLocal
+from app.auth.deps import require_scopes
 
 from app.schemas.source import (
     SourceCreate, SourceResponse, SourceListResponse, SourceMetrics, SourceStatus
@@ -38,7 +39,7 @@ async def create_source(
         db.close()
 
 
-@router.get("/sources", response_model=SourceListResponse)
+@router.get("/sources", response_model=SourceListResponse, dependencies=[Depends(require_scopes("read_sources"))])
 async def list_sources(
     request: Request,
     tenant: Optional[str] = Query(None, description="Filter by tenant"),
@@ -51,10 +52,6 @@ async def list_sources(
     page_size: Optional[int] = Query(None, ge=1, le=100, description="Alias for page size")
 ):
     """Get paginated list of sources"""
-    # Check if user has read_metrics scope
-    scopes = getattr(request.state, 'scopes', [])
-    if "read_metrics" not in scopes:
-        raise HTTPException(status_code=403, detail="read_metrics scope required")
     
     # Use tenant from auth if not specified
     tenant_id = tenant or getattr(request.state, 'tenant_id', 'default')
@@ -92,18 +89,13 @@ async def list_sources(
         db.close()
 
 
-@router.get("/sources/{source_id}", response_model=SourceResponse)
+@router.get("/sources/{source_id}", response_model=SourceResponse, dependencies=[Depends(require_scopes("read_sources"))])
 async def get_source(
     source_id: str,
     request: Request
 ):
     """Get source details by ID"""
-    # Check if user has read_metrics scope
-    scopes = getattr(request.state, 'scopes', [])
     tenant_id = getattr(request.state, 'tenant_id', 'default')
-    
-    if "read_metrics" not in scopes:
-        raise HTTPException(status_code=403, detail="read_metrics scope required")
     
     db = SessionLocal()
     try:
@@ -120,18 +112,13 @@ async def get_source(
         db.close()
 
 
-@router.get("/sources/{source_id}/status", response_model=SourceStatus)
+@router.get("/sources/{source_id}/status", response_model=SourceStatus, dependencies=[Depends(require_scopes("read_sources"))])
 async def get_source_status(
     source_id: str,
     request: Request
 ):
     """Get source status with EPS and error percentage"""
-    # Check if user has read_metrics scope
-    scopes = getattr(request.state, 'scopes', [])
     tenant_id = getattr(request.state, 'tenant_id', 'default')
-    
-    if "read_metrics" not in scopes:
-        raise HTTPException(status_code=403, detail="read_metrics scope required")
     
     db = SessionLocal()
     try:
@@ -154,19 +141,14 @@ async def get_source_status(
         db.close()
 
 
-@router.get("/sources/{source_id}/metrics", response_model=SourceMetrics)
+@router.get("/sources/{source_id}/metrics", response_model=SourceMetrics, dependencies=[Depends(require_scopes("read_sources"))])
 async def get_source_metrics(
     source_id: str,
     request: Request,
     window: int = Query(900, ge=60, le=3600, description="Metrics window in seconds")
 ):
     """Get source metrics"""
-    # Check if user has read_metrics scope
-    scopes = getattr(request.state, 'scopes', [])
     tenant_id = getattr(request.state, 'tenant_id', 'default')
-    
-    if "read_metrics" not in scopes:
-        raise HTTPException(status_code=403, detail="read_metrics scope required")
     
     db = SessionLocal()
     try:
