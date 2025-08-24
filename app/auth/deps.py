@@ -16,6 +16,7 @@ log = logging.getLogger("telemetry")
 async def authenticate(request: Request):
     # Ensure schema exists + seed default keys if empty (idempotent, guarded)
     init_schema_and_seed_if_needed()
+    
     # Check for API key in various header formats
     token = None
     
@@ -24,9 +25,9 @@ async def authenticate(request: Request):
     
     # Fallback to Authorization Bearer header
     if not token:
-        auth = request.headers.get("authorization","")
+        auth = request.headers.get("authorization", "") or request.headers.get("Authorization", "")
         if auth.lower().startswith("bearer "):
-            token = auth.split(" ",1)[1].strip()
+            token = auth.split(" ", 1)[1].strip()
     
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
@@ -39,20 +40,30 @@ async def authenticate(request: Request):
                 token_hash = hash_token(token)
                 row = db.execute(text("SELECT key_id, disabled, scopes FROM api_keys WHERE hash = :h LIMIT 1"),
                                  {"h": token_hash}).fetchone()
-                if not row or row.disabled:
+                if not row:
+                    log.warning("AUTH: token not found in database")
                     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
-                request.state.scopes = (row.scopes or "").split(",")
+                
+                if row.disabled:
+                    log.warning("AUTH: token disabled, key_id=%s", row.key_id)
+                    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key disabled")
+                
+                # Parse scopes properly
+                scopes_str = row.scopes or ""
+                scopes_list = [s.strip().lower() for s in scopes_str.split(",") if s.strip()]
+                request.state.scopes = scopes_list
                 request.state.key_id = row.key_id
+                request.state.tenant_id = "default"  # For now, use default tenant
+                
+                log.info("AUTH: token matched, key_id=%s, scopes=%s", row.key_id, scopes_list)
                 break
-        except OperationalError:
+                
+        except OperationalError as e:
             attempts += 1
             if attempts >= 3:
-                # degrade to 401 instead of 500
+                log.error("AUTH: DB operational error after %d attempts: %s", attempts, e)
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Auth backend unavailable")
             time.sleep(0.05)
-        
-        # For now, use default tenant since we're using raw SQL
-        request.state.tenant_id = "default"
 
 # ----- Scope dependency helpers -----
 ADMIN_SUPER = {"admin"}
@@ -62,14 +73,14 @@ def _norm_scopes(val) -> set:
         return set()
     if isinstance(val, str):
         parts = re.split(r"[\s,]+", val.strip())
-        return {p for p in parts if p}
+        return {p.lower() for p in parts if p}
     try:
-        return set(val)
+        return {str(s).lower() for s in val}
     except TypeError:
         return set()
 
 def require_scopes(*allowed: str):
-    allowed_set = set(allowed)
+    allowed_set = {s.lower() for s in allowed}
 
     async def dep(request: Request):
         # Optional dev bypass
@@ -77,14 +88,24 @@ def require_scopes(*allowed: str):
             return True
 
         token_scopes = _norm_scopes(getattr(request.state, "scopes", []))
+        
+        # Check for wildcard scope
+        if "*" in token_scopes:
+            log.info("AUTH: scope allowed by wildcard (*), required=%s, token=%s", sorted(allowed_set), sorted(token_scopes))
+            return True
+            
         # admin is always enough
         if token_scopes & ADMIN_SUPER:
+            log.info("AUTH: scope allowed by admin, required=%s, token=%s", sorted(allowed_set), sorted(token_scopes))
             return True
+            
         # any one of the allowed scopes is enough
         if token_scopes & allowed_set:
+            log.info("AUTH: scope allowed by specific scope, required=%s, token=%s", sorted(allowed_set), sorted(token_scopes))
             return True
-        log.warning("scope denied: need=%s token=%s", sorted(allowed_set), sorted(token_scopes))
-        raise HTTPException(status_code=403, detail="forbidden: missing scope")
+            
+        log.warning("AUTH: scope denied, need=%s token=%s", sorted(allowed_set), sorted(token_scopes))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden: missing scope")
 
     return dep
 
