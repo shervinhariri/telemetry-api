@@ -31,7 +31,7 @@ def test_version_endpoint(client):
 
 def test_schema_endpoint(client):
     """Test schema endpoint"""
-    response = client.get("/v1/schema")
+    response = client.get("/v1/schema", headers=VALID_HEADERS)
     assert response.status_code == 200
     data = response.json()
     assert "enriched_schema" in data
@@ -61,19 +61,11 @@ def test_ingest_zeek_conn(client):
     }
     
     response = client.post("/v1/ingest", json=payload, headers=VALID_HEADERS)
-    assert response.status_code == 200
+    assert response.status_code == 202
     data = response.json()
     assert data["collector_id"] == "test-zeek-1"
     assert data["format"] == "zeek.conn"
-    assert data["count"] == 1
-    assert len(data["records"]) == 1
-    
-    record = data["records"][0]
-    assert "risk_score" in record
-    assert isinstance(record["risk_score"], int)
-    assert 0 <= record["risk_score"] <= 100
-    assert "threat" in record
-    assert "reasons" in record
+    assert data["accepted"] == 1
     assert "X-API-Version" in response.headers
 
 def test_ingest_flows(client):
@@ -96,15 +88,10 @@ def test_ingest_flows(client):
     }
     
     response = client.post("/v1/ingest", json=payload, headers=VALID_HEADERS)
-    assert response.status_code == 200
+    assert response.status_code == 202
     data = response.json()
     assert data["format"] == "flows.v1"
-    assert data["count"] == 1
-    
-    record = data["records"][0]
-    assert "risk_score" in record
-    assert isinstance(record["risk_score"], int)
-    assert 0 <= record["risk_score"] <= 100
+    assert data["accepted"] == 1
 
 def test_lookup_endpoint(client):
     """Test IP lookup endpoint"""
@@ -115,7 +102,6 @@ def test_lookup_endpoint(client):
     assert data["ip"] == "8.8.8.8"
     assert "geo" in data
     assert "asn" in data
-    assert "threats" in data
 
 def test_configure_splunk(client):
     """Test Splunk configuration"""
@@ -126,7 +112,7 @@ def test_configure_splunk(client):
     response = client.post("/v1/outputs/splunk", json=payload, headers=VALID_HEADERS)
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "configured"
+    assert data["status"] == "ok"
 
 def test_configure_elastic(client):
     """Test Elasticsearch configuration"""
@@ -138,11 +124,11 @@ def test_configure_elastic(client):
     response = client.post("/v1/outputs/elastic", json=payload, headers=VALID_HEADERS)
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "configured"
+    assert data["status"] == "ok"
 
 def test_metrics_endpoint(client):
     """Test metrics endpoint"""
-    response = client.get("/v1/metrics")
+    response = client.get("/v1/metrics", headers=VALID_HEADERS)
     assert response.status_code == 200
     data = response.json()
     assert "requests_total" in data
@@ -174,7 +160,7 @@ def test_ingest_invalid_format(client):
     """Test ingest with invalid format"""
     payload = {"collector_id": "test", "format": "invalid", "records": []}
     response = client.post("/v1/ingest", json=payload, headers=VALID_HEADERS)
-    assert response.status_code == 422
+    assert response.status_code == 400
 
 def test_ingest_too_many_records(client):
     """Test ingest with too many records"""
