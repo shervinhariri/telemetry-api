@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from .middleware import TracingMiddleware
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Optional, List, Dict, Any
 import os
 import ipaddress
@@ -42,6 +42,7 @@ from .logging_config import setup_logging
 from .config import API_VERSION
 from .auth.deps import require_scopes
 from .auth.tenant import require_tenant
+from . import pipeline as pipeline_mod  # import the *module*, not the FastAPI instance
 
 # Import configuration
 from .config import (
@@ -60,7 +61,7 @@ logger = logging.getLogger("app")
 logger.info("startup: logging configured", extra={"component":"api"})
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(application: FastAPI):
     # Startup
     from .pipeline import worker_loop
     from .db import SessionLocal
@@ -77,17 +78,17 @@ async def lifespan(app: FastAPI):
         "component": "api"
     })
     
-    # Create async objects bound to the current event loop
-    app.state.event_queue = asyncio.Queue(maxsize=10000)
-    
-    # Set the queue in the pipeline module
-    from .pipeline import ingest_queue
-    import app.pipeline
-    app.pipeline.ingest_queue = app.state.event_queue
-    
-    # Start two worker processes
-    asyncio.create_task(worker_loop())
-    asyncio.create_task(worker_loop())
+    # Bind async primitives to the *active* event loop
+    application.state.event_queue = asyncio.Queue(maxsize=10000)
+
+    # Back-compat: point pipeline module's queue at the new loop-bound queue
+    pipeline_mod.ingest_queue = application.state.event_queue
+
+    # Start workers and keep handles for clean shutdown
+    application.state.worker_tasks = [
+        asyncio.create_task(pipeline_mod.worker_loop()),
+        asyncio.create_task(pipeline_mod.worker_loop()),
+    ]
     
     # Start metrics ticker
     async def metrics_ticker():
@@ -122,12 +123,20 @@ async def lifespan(app: FastAPI):
         "component": "api"
     })
     
-    yield
-    # Shutdown
-    logger.info("Telemetry API shutting down", extra={
-        "details": "Stopping pipeline workers",
-        "component": "api"
-    })
+    try:
+        yield
+    finally:
+        # Graceful shutdown
+        for t in application.state.worker_tasks:
+            t.cancel()
+        for t in application.state.worker_tasks:
+            with suppress(asyncio.CancelledError):
+                await t
+        
+        logger.info("Telemetry API shutting down", extra={
+            "details": "Stopping pipeline workers",
+            "component": "api"
+        })
 
 app = FastAPI(title="Live Network Threat Telemetry API (MVP)", lifespan=lifespan)
 

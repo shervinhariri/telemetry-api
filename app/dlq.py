@@ -10,7 +10,7 @@ from pathlib import Path
 import logging
 
 # Configuration
-DLQ_DIR = Path("/data/dlq")
+DLQ_DIR = Path(os.getenv("TELEMETRY_DLQ_DIR", "/tmp/dlq"))
 DLQ_MAX_SIZE_MB = int(os.getenv("DLQ_MAX_SIZE_MB", "100"))  # 100MB default
 DLQ_MAX_AGE_DAYS = int(os.getenv("DLQ_MAX_AGE_DAYS", "7"))  # 7 days default
 

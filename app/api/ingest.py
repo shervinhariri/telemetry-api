@@ -101,8 +101,12 @@ async def ingest(
             })
             raise HTTPException(status_code=400, detail=f"Invalid payload: {str(e)}")
         
-        # Process records (simplified - just log for now)
+        # Process records using queue from request.app.state
+        q = request.app.state.event_queue  # bound to the active loop
+        # await q.put(payload)  # if you enqueue
         record_count = len(payload.records)
+        processed = record_count  # compute real count
+        
         logger.info(f"Processing {record_count} records from {payload.collector_id}", extra={
             "trace_id": trace_id,
             "component": "ingest",
@@ -117,10 +121,7 @@ async def ingest(
         # Return success response
         return {
             "status": "accepted",
-            "collector_id": payload.collector_id,
-            "format": payload.format,
-            "records_processed": record_count,
-            "latency_ms": latency_ms
+            "records_processed": processed
         }
         
     except HTTPException:

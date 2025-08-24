@@ -42,7 +42,7 @@ ingest_queue: asyncio.Queue = None
 def record_batch_accepted(count: int):
     """Record that a batch was accepted"""
     STATS["batches_accepted"] += 1
-    STATS["queue_depth"] = ingest_queue.qsize()
+    STATS["queue_depth"] = ingest_queue.qsize() if ingest_queue is not None else 0
     # Also record in new metrics system
     from .metrics import record_batch
     record_batch(count, 0, [], [])  # count, threat_matches, risk_scores, sources
@@ -198,7 +198,8 @@ async def worker_loop():
                                  record_id=record.get('ts', 'no-ts'))
                 # TODO: implement dead letter queue
             finally:
-                ingest_queue.task_done()
+                if ingest_queue is not None:
+                    ingest_queue.task_done()
                 
         except Exception as e:
             log_pipeline_event("worker_error", f"Worker loop error: {e}", error=str(e))

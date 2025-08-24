@@ -245,7 +245,7 @@ def validate_http_source_admission(
     return True, "allowed"
 
 
-def admission_should_block_udp(source_obj, exporter_ip: str) -> tuple[bool, str | None]:
+def admission_should_block_udp(source_obj, exporter_ip: str) -> tuple[bool, Optional[str]]:
     """
     Check if UDP packet from exporter_ip should be blocked based on source configuration.
     

@@ -13,10 +13,20 @@ def _hash(s: str) -> str:
     return hashlib.sha256(s.encode()).hexdigest()
 
 async def authenticate(request: Request):
-    auth = request.headers.get("authorization","")
-    if not auth.lower().startswith("bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
-    token = auth.split(" ",1)[1].strip()
+    # Check for API key in various header formats
+    token = None
+    
+    # Try X-API-Key or X-Api-Key headers first
+    token = request.headers.get("X-API-Key") or request.headers.get("X-Api-Key")
+    
+    # Fallback to Authorization Bearer header
+    if not token:
+        auth = request.headers.get("authorization","")
+        if auth.lower().startswith("bearer "):
+            token = auth.split(" ",1)[1].strip()
+    
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
     
     with SessionLocal() as db:
         token_hash = _hash(token)

@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Union
 from pydantic import BaseModel, Field
 from datetime import datetime
 
@@ -86,5 +86,5 @@ class SourceListResponse(BaseModel):
     size: int
     pages: int
     # New alias fields for UI/contract compatibility
-    items: List[SourceResponse] | None = None
-    page_size: int | None = None
+    items: Optional[List[SourceResponse]] = None
+    page_size: Optional[int] = None

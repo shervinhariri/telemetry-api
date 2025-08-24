@@ -3,6 +3,7 @@ import os
 import httpx
 from packaging import version as semver
 from pathlib import Path
+from .. import config
 
 router = APIRouter()
 
@@ -34,12 +35,26 @@ DOCKERHUB_TAG = os.getenv("DOCKERHUB_TAG", APP_VERSION)
 
 @router.get("/version")
 def get_version():
+    image_version = (
+        getattr(config, "APP_VERSION", None)
+        or getattr(config, "IMAGE_VERSION", None)
+        or os.getenv("IMAGE_VERSION")
+        or "dev"
+    )
+    git_sha = os.getenv("GIT_SHA", getattr(config, "GIT_SHA", "unknown"))
+    image_digest = os.getenv("IMAGE_DIGEST", getattr(config, "IMAGE_DIGEST", "unknown"))
+    image = os.getenv("IMAGE", getattr(config, "IMAGE", "unknown"))
+    image_tag = os.getenv("DOCKERHUB_TAG", getattr(config, "DOCKERHUB_TAG", image_version))
     return {
-        "service": APP_NAME,
-        "version": APP_VERSION,
-        "git_sha": GIT_SHA[:7],
-        "image": IMAGE,
-        "image_digest": DOCKERHUB_TAG,
+        "status": "ok",
+        "api_version": "v1",
+        "image_version": image_version,
+        # legacy keys many tests assert:
+        "version": image_version,
+        "git_sha": (git_sha[:7] if isinstance(git_sha, str) else "unknown"),
+        "image": image,
+        "image_tag": image_tag,
+        "image_digest": image_digest,
     }
 
 async def _fetch_latest_tag(repo: str) -> str:

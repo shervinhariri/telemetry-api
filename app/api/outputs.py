@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
-from pydantic import BaseModel, AnyHttpUrl, Field
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, AnyHttpUrl, Field, model_validator
 from typing import List, Optional, Dict, Any
 import time
 import httpx
@@ -24,13 +25,23 @@ class SplunkConfig(BaseModel):
     extra_fields: Dict[str, Any] = {}
 
 class ElasticConfig(BaseModel):
-    urls: List[AnyHttpUrl] = Field(..., min_items=1)
-    index_prefix: str = "telemetry-"
-    bulk_size: int = 1000
-    max_retries: int = 5
-    backoff_ms: int = 200
-    pipeline: Optional[str] = None
-    verify_tls: bool = True
+    url: Optional[str] = None
+    urls: Optional[List[str]] = None
+    index: Optional[str] = "telemetry"
+    username: Optional[str] = None
+    password: Optional[str] = None
+    api_key: Optional[str] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def choose_url(cls, values):
+        if isinstance(values, dict):
+            url, urls = values.get("url"), values.get("urls")
+            if not url and urls:
+                values["url"] = urls[0]
+            if not values.get("url"):
+                raise ValueError("At least one Elastic URL is required (url or urls).")
+        return values
 
 STATE: Dict[str, Any] = {
     "splunk": None,
@@ -166,8 +177,11 @@ async def test_splunk(request: Request):
 @router.post("/outputs/elastic")
 @router.put("/outputs/elastic")
 def set_elastic(cfg: ElasticConfig):
-    STATE["elastic"] = cfg.model_dump()
-    return {"status": "ok", "elastic": STATE["elastic"]}
+    try:
+        STATE["elastic"] = cfg.model_dump()
+        return {"status": "ok"}
+    except ValueError as e:
+        return JSONResponse(status_code=422, content={"status": "error", "error": str(e)})
 
 @router.get("/outputs/elastic")
 def get_elastic():
