@@ -1,47 +1,54 @@
 from typing import Iterable, Tuple
-from .db import Base, engine, session_scope
-from .auth.deps import _hash  # already exists in your repo
-from .models.apikey import ApiKey  # adjust import if your model path differs
-from .models.tenant import Tenant  # for foreign key constraint
+from threading import Lock
 
-DEFAULT_KEYS: Iterable[Tuple[str, str, str]] = [
+from .db import Base, engine, SessionLocal
+from .utils.crypto import hash_token
+
+# Import your ApiKey SQLAlchemy model (adjust the path if needed)
+from .models.apikey import ApiKey
+from .models.tenant import Tenant
+
+_DEFAULT_KEYS: Iterable[Tuple[str, str, str]] = [
     ("TEST_KEY", "tenant-default", "ingest,read"),
     ("TEST_ADMIN_KEY", "tenant-default", "admin,ingest,read"),
 ]
 
-def init_schema_and_seed() -> None:
+_initialized = False
+_init_lock = Lock()
+
+def init_schema_and_seed_if_needed() -> None:
     """
     Ensure DB schema exists and seed default API keys if table is empty.
-    Safe to call multiple times.
+    Safe to call multiple times; guarded to run once per process.
     """
-    # 1) Create tables if they do not exist
-    Base.metadata.create_all(bind=engine)
-
-    # 2) Seed default tenant if empty
-    with session_scope() as s:
-        tenant_count = s.query(Tenant).count()
-        if tenant_count == 0:
-            s.add(Tenant(
-                tenant_id="tenant-default",
-                name="Default Tenant",
-                retention_days=7,
-                quotas={"eps": 600, "batch_max": 10000, "dlq_max": 100000},
-                redaction={"fields": []}
-            ))
-    
-    # 3) Seed API keys if empty
-    with session_scope() as s:
-        count = s.query(ApiKey).count()
-        if count == 0:
-            for token, tenant_id, scopes in DEFAULT_KEYS:
-                # Generate a key_id for the API key
-                import uuid
-                key_id = str(uuid.uuid4()).replace('-', '')[:32]
-                
-                s.add(ApiKey(
-                    key_id=key_id,
-                    tenant_id=tenant_id,
-                    hash=_hash(token),
-                    scopes=scopes.split(','),
-                    disabled=False,
-                ))
+    global _initialized
+    if _initialized:
+        return
+    with _init_lock:
+        if _initialized:
+            return
+        # 1) Ensure tables exist
+        Base.metadata.create_all(bind=engine)
+        # 2) Seed keys if table empty
+        with SessionLocal() as s:
+            try:
+                count = s.query(ApiKey).count()
+            except Exception:
+                # If the table wasn't created for any reason, try again then re-count
+                Base.metadata.create_all(bind=engine)
+                count = s.query(ApiKey).count()
+            if count == 0:
+                for token, tenant_id, scopes in _DEFAULT_KEYS:
+                    # Generate a key_id for the API key
+                    import uuid
+                    key_id = str(uuid.uuid4()).replace('-', '')[:32]
+                    
+                    s.add(ApiKey(
+                        key_id=key_id,
+                        tenant_id=tenant_id,
+                        hash=hash_token(token),
+                        scopes=scopes.split(','),
+                        disabled=False,
+                    ))
+                s.commit()
+        _initialized = True

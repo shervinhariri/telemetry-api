@@ -14,6 +14,13 @@ from . import DEMO_MODE, DEMO_EPS, DEMO_DURATION_SEC, DEMO_VARIANTS
 
 logger = logging.getLogger(__name__)
 
+# Try to import log_system_event; if missing, define a safe fallback
+try:
+    from ..logging_config import log_system_event
+except Exception:
+    def log_system_event(event_type: str, message: str = "", fields: dict = None):
+        logger.info(f"log_system_event fallback: {event_type} - {message}", extra={"event_type": event_type, **(fields or {})})
+
 class DemoService:
     """Service for managing demo event generation."""
     
@@ -135,7 +142,6 @@ class DemoService:
         """Main generator loop that produces events at the specified EPS rate."""
         from ..pipeline import enqueue
         
-        from ..logging_config import log_system_event
         log_system_event("demo_start", f"Demo generator started: {DEMO_EPS} EPS for {DEMO_DURATION_SEC} seconds", {
             "eps": DEMO_EPS,
             "duration_sec": DEMO_DURATION_SEC,

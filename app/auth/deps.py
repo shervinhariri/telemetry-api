@@ -5,14 +5,14 @@ import re
 from app.db import SessionLocal
 from app.models.apikey import ApiKey
 from app.models.tenant import Tenant
-import hashlib
+from app.utils.crypto import hash_token
+from app.db_init import init_schema_and_seed_if_needed
 
 log = logging.getLogger("telemetry")
 
-def _hash(s: str) -> str: 
-    return hashlib.sha256(s.encode()).hexdigest()
-
 async def authenticate(request: Request):
+    # Ensure schema exists + seed default keys if empty (idempotent, guarded)
+    init_schema_and_seed_if_needed()
     # Check for API key in various header formats
     token = None
     
@@ -29,7 +29,7 @@ async def authenticate(request: Request):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
     
     with SessionLocal() as db:
-        token_hash = _hash(token)
+        token_hash = hash_token(token)
         key = db.query(ApiKey).filter(ApiKey.hash == token_hash, ApiKey.disabled == False).first()
         if not key:
             log.warning("auth: key not found for hash=%s", token_hash)
