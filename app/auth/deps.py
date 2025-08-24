@@ -2,6 +2,7 @@ from fastapi import Request, HTTPException, status, Depends
 import logging
 import os
 import re
+from sqlalchemy.exc import OperationalError
 from app.db import SessionLocal
 from app.models.apikey import ApiKey
 from app.models.tenant import Tenant
@@ -30,7 +31,12 @@ async def authenticate(request: Request):
     
     with SessionLocal() as db:
         token_hash = hash_token(token)
-        key = db.query(ApiKey).filter(ApiKey.hash == token_hash, ApiKey.disabled == False).first()
+        try:
+            key = db.query(ApiKey).filter(ApiKey.hash == token_hash, ApiKey.disabled == False).first()
+        except OperationalError:
+            # Table missing in this process? Initialize and retry once.
+            init_schema_and_seed_if_needed()
+            key = db.query(ApiKey).filter(ApiKey.hash == token_hash, ApiKey.disabled == False).first()
         if not key:
             log.warning("auth: key not found for hash=%s", token_hash)
             raise HTTPException(
