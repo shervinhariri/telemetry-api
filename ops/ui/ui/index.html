@@ -283,18 +283,27 @@
           box-shadow: 0 0 0 2px rgba(16,185,129,0.8) !important;
           border-color: rgba(16,185,129,0.6) !important;
         }
+        
+        /* Logs body container */
+        .logs-output, #logs-output, #logs-pre, #logs-content {
+          white-space: pre-wrap;
+          word-break: break-word;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          line-height: 1.25;
+          font-size: 13px;
+        }
     </style>
 </head>
 <body class="min-h-screen w-full bg-[#0B0C10] text-zinc-100 antialiased">
     <div class="max-w-7xl mx-auto px-5 pb-24">
         <div class="sticky top-0 z-30 backdrop-blur bg-[#0B0C10]/70">
             <div class="pt-8 pb-6 flex items-center gap-3">
-                <button onclick="window.location.reload()" class="inline-flex items-center justify-center px-8 py-3 rounded-2xl bg-neutral-800/60 hover:bg-neutral-700/60 text-white ring-2 ring-emerald-500/60 shadow-[0_0_0_2px_rgba(16,185,129,.25)] transition-colors transition-shadow cursor-pointer">
+                <a href="#" id="logoLink" title="Hard refresh" class="inline-flex items-center justify-center px-8 py-3 rounded-2xl bg-neutral-800/60 hover:bg-neutral-700/60 text-white ring-2 ring-emerald-500/60 shadow-[0_0_0_2px_rgba(16,185,129,.25)] transition-colors transition-shadow cursor-pointer">
                     <span class="flex items-center font-bold tracking-tight">
                         <span class="text-white text-lg">NETREE</span>
                         <span class="text-emerald-400 text-3xl">X</span>
                     </span>
-                </button>
+                </a>
                 <div class="ml-auto flex items-center gap-2 text-xs text-zinc-400">
                     <!-- Global API Key Chip (visible on all pages) -->
                     <div id="api-key-container" class="chip chip--dark" style="position:relative;">

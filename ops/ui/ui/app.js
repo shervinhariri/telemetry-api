@@ -669,11 +669,39 @@ document.addEventListener('DOMContentLoaded', function() {
     // In apiCall(), read from localStorage each time or from window.API_KEY
     window.API_KEY = getApiKey();
     
+    // --- Simple hash router helpers ---
+    function getTabFromHash() {
+      const h = window.location.hash.replace(/^#/, '').trim();
+      return h || 'dashboard';
+    }
+    function setTabHash(tab) {
+      if (!tab) return;
+      if (window.location.hash !== '#' + tab) {
+        window.location.hash = '#' + tab;
+      }
+    }
+
     // Create dashboard instance and make it globally accessible
     window.telemetryDashboard = new TelemetryDashboard();
     
-    // Set Dashboard as the default active tab
-    window.telemetryDashboard.switchTab('dashboard');
+    // On load, prefer hash, then lastTab, else dashboard:
+    let initial = getTabFromHash();
+    if (!initial) {
+      try { initial = localStorage.getItem('lastTab') || 'dashboard'; } catch(_) {}
+    }
+    window.telemetryDashboard.switchTab(initial);
+
+    // React to the user editing the hash or using back/forward:
+    window.addEventListener('hashchange', () => {
+      const t = getTabFromHash();
+      window.telemetryDashboard.switchTab(t);
+    });
+
+    // Brand click = hard reload *without* changing hash:
+    document.getElementById('logoLink')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.reload();   // reload preserves hash, so we stay on the same tab
+    });
     
     // === VEFIX: event delegation so re-renders don't break clicks ===
     document.addEventListener('click', function (e) {
@@ -1170,6 +1198,12 @@ class TelemetryDashboard {
 
     switchTab(tabName) {
         console.log('Switching to tab:', tabName);
+        
+        // Sync the hash
+        if (window.location.hash !== '#' + tabName) {
+            window.location.hash = '#' + tabName;
+        }
+        try { localStorage.setItem('lastTab', tabName); } catch(_) {}
         
         // Update tab buttons - reset all to inactive state
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1908,6 +1942,20 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
         `;
     }
 
+    // Logs text normalization helper
+    normalizeLogText(s) {
+        if (!s) return '';
+        // If backend returned JSON string with escaped sequences, decode the common ones
+        // 1) normalize CRLF/CR -> LF, 2) turn literal "\n" into real newlines, "\t" into 4 spaces
+        s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        s = s.replace(/\\n/g, '\n').replace(/\\t/g, '    ');
+        // Some payloads wrap the entire block in quotes; strip them
+        if (s.length > 1 && s[0] === '"' && s[s.length - 1] === '"') {
+            s = s.slice(1, -1);
+        }
+        return s;
+    }
+
     startLogs() {
         try {
             this.hideError('logs');
@@ -1975,8 +2023,9 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
                     const text = await response.text();
                     const logsContent = document.getElementById('logs-content');
                     if (logsContent && text.trim()) {
-                        // Split into lines and show the last 100 lines
-                        const lines = text.split('\n').filter(line => line.trim());
+                        // Normalize and split into lines and show the last 100 lines
+                        const normalizedText = this.normalizeLogText(text);
+                        const lines = normalizedText.split('\n').filter(line => line.trim());
                         const recentLines = lines.slice(-100);
                         logsContent.textContent = recentLines.join('\n');
                     }
@@ -2017,12 +2066,13 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
                         headers: { 'Authorization': `Bearer ${this.apiKey}` }
                     });
                     
-                    if (tailResponse.ok) {
+                                        if (tailResponse.ok) {
                         const text = await tailResponse.text();
                         if (text.trim()) {
-                                                    const lines = text.split('\n').filter(line => line.trim());
-                        const recentLines = lines.slice(-50);
-                        logsContent.textContent = recentLines.join('\n');
+                            const normalizedText = this.normalizeLogText(text);
+                            const lines = normalizedText.split('\n').filter(line => line.trim());
+                            const recentLines = lines.slice(-50);
+                            logsContent.textContent = recentLines.join('\n');
                         } else {
                             logsContent.textContent = 'No logs available yet.';
                         }
