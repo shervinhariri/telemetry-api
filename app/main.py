@@ -89,11 +89,15 @@ async def lifespan(application: FastAPI):
     except Exception as e:
         logger.error("DB_BOOT failed: %s", e)
     
-    # Sanitize legacy scopes persisted as 'admin,*' (invalid JSON)
+    # Rewrite any legacy non-JSON scopes to a valid JSON array
     try:
         with SessionLocal() as s:
             s.execute(
-                text("UPDATE api_keys SET scopes='[\"admin\",\"*\"]' WHERE scopes='admin,*'")
+                text("""
+                    UPDATE api_keys
+                    SET scopes='["admin","*"]'
+                    WHERE scopes NOT LIKE '[%' AND scopes NOT LIKE '{%}'
+                """)
             )
             s.commit()
             logger.info("DB_BOOT: sanitized legacy scopes")

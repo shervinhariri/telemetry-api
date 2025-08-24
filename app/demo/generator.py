@@ -158,8 +158,9 @@ class DemoService:
             "duration_sec": DEMO_DURATION_SEC,
             "variants": DEMO_VARIANTS
         })
-        # Use timestamp for the generator loop
-        self.start_time = time.time()
+        # Convert datetime to timestamp for the generator loop
+        if isinstance(self.start_time, datetime):
+            self.start_time = self.start_time.timestamp()
         
         # Calculate delay between events to achieve target EPS
         delay = 1.0 / DEMO_EPS
@@ -203,9 +204,9 @@ class DemoService:
             return False
         
         try:
-            # mark service start as soon as init succeeds
+            # mark start immediately when configuration is valid
             self.start_time = datetime.now(timezone.utc)
-            # existing logic to spin producer...
+            # ... existing logic to spin up the generator ...
             self.is_running = True
             self.task = asyncio.create_task(self._generator_loop())
             log_system_event("demo_started", "Demo generator started successfully")

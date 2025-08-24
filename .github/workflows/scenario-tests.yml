@@ -23,6 +23,7 @@ jobs:
           # Use the test image instead of building
           docker run -d --rm --name telemetry-api -p 80:80 \
             -e TELEMETRY_SEED_KEYS="$TELEMETRY_SEED_KEYS" \
+            -e DEMO_BASE_URL="http://localhost" \
             -e FEATURE_SOURCES=1 \
             -e FEATURE_UDP_HEAD=0 \
             local/telemetry-api:test

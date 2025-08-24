@@ -38,7 +38,7 @@ class ZeekConnRecord(BaseModel):
 
 class IngestPayload(BaseModel):
     collector_id: constr(strip_whitespace=True, min_length=1) = Field(..., description="Collector ID")
-    format: Literal["flows.v1", "zeek.conn"] = Field(..., description="Data format")
+    format: Literal["flows.v1", "zeek.conn", "zeek"] = Field(..., description="Data format")
     records: List[Union[FlowRecord, ZeekConnRecord]] = Field(..., min_items=1, description="Flow records")
 
 def _maybe_gunzip(body: bytes, content_encoding: Optional[str]) -> bytes:
@@ -90,6 +90,10 @@ async def ingest(
                 "component": "ingest"
             })
             raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
+        
+        # Handle both "type" and "format" fields for compatibility
+        if "type" in payload_dict and "format" not in payload_dict:
+            payload_dict["format"] = payload_dict["type"]
         
         # Validate with Pydantic
         try:
