@@ -669,39 +669,53 @@ document.addEventListener('DOMContentLoaded', function() {
     // In apiCall(), read from localStorage each time or from window.API_KEY
     window.API_KEY = getApiKey();
     
-    // --- Simple hash router helpers ---
+    // --- Router helpers ---
     function getTabFromHash() {
       const h = window.location.hash.replace(/^#/, '').trim();
-      return h || 'dashboard';
+      return h || '';
     }
     function setTabHash(tab) {
       if (!tab) return;
-      if (window.location.hash !== '#' + tab) {
-        window.location.hash = '#' + tab;
-      }
+      if (window.location.hash !== '#' + tab) window.location.hash = '#' + tab;
+      try { localStorage.setItem('lastTab', tab); } catch {}
+    }
+    function getLastTab() {
+      try { return localStorage.getItem('lastTab') || ''; } catch { return ''; }
     }
 
     // Create dashboard instance and make it globally accessible
     window.telemetryDashboard = new TelemetryDashboard();
     
-    // On load, prefer hash, then lastTab, else dashboard:
-    let initial = getTabFromHash();
-    if (!initial) {
-      try { initial = localStorage.getItem('lastTab') || 'dashboard'; } catch(_) {}
-    }
+    // Ensure switchTab always syncs the hash + localStorage
+    const _origSwitchTab = window.telemetryDashboard.switchTab.bind(window.telemetryDashboard);
+    window.telemetryDashboard.switchTab = function(tab) {
+      _origSwitchTab(tab);
+      setTabHash(tab);
+    };
+    
+    // On load: prefer hash; else lastTab; else 'dashboard'
+    let initial = getTabFromHash() || getLastTab() || 'dashboard';
     window.telemetryDashboard.switchTab(initial);
 
-    // React to the user editing the hash or using back/forward:
+    // Back/forward support
     window.addEventListener('hashchange', () => {
-      const t = getTabFromHash();
-      window.telemetryDashboard.switchTab(t);
+      const t = getTabFromHash() || 'dashboard';
+      _origSwitchTab(t);        // Don't re-set hash here to avoid loops
+      try { localStorage.setItem('lastTab', t); } catch {}
     });
 
-    // Brand click = hard reload *without* changing hash:
-    document.getElementById('logoLink')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      window.location.reload();   // reload preserves hash, so we stay on the same tab
-    });
+    // Brand click: keep current tab, then hard reload
+    const logo = document.getElementById('logoLink');
+    if (logo) {
+      logo.addEventListener('click', (e) => {
+        e.preventDefault();
+        const current = getTabFromHash() || getLastTab() || 'dashboard';
+        // Ensure URL has the tab BEFORE reload
+        setTabHash(current);
+        // Force reload (preserves hash)
+        window.location.reload();
+      });
+    }
     
     // === VEFIX: event delegation so re-renders don't break clicks ===
     document.addEventListener('click', function (e) {
@@ -1198,12 +1212,6 @@ class TelemetryDashboard {
 
     switchTab(tabName) {
         console.log('Switching to tab:', tabName);
-        
-        // Sync the hash
-        if (window.location.hash !== '#' + tabName) {
-            window.location.hash = '#' + tabName;
-        }
-        try { localStorage.setItem('lastTab', tabName); } catch(_) {}
         
         // Update tab buttons - reset all to inactive state
         document.querySelectorAll('.tab-btn').forEach(btn => {
