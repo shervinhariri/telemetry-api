@@ -39,7 +39,7 @@ def get_version():
         "version": APP_VERSION,
         "git_sha": GIT_SHA[:7],
         "image": IMAGE,
-        "image_tag": DOCKERHUB_TAG,
+        "image_digest": DOCKERHUB_TAG,
     }
 
 async def _fetch_latest_tag(repo: str) -> str:

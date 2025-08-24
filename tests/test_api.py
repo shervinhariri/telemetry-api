@@ -116,12 +116,12 @@ def test_configure_splunk(client):
 def test_configure_elastic(client):
     """Test Elasticsearch configuration"""
     payload = {
-        "url": "https://elastic.example.com:9200",
+        "urls": ["https://elastic.example.com:9200"],
         "username": "elastic",
         "password": "test-pass"
     }
     response = client.post("/v1/outputs/elastic", json=payload, headers=VALID_HEADERS)
-    assert response.status_code == 422  # Validation error expected
+    assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
 

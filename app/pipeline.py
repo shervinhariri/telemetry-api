@@ -36,8 +36,8 @@ DATA_DIR = _default_data if os.access(_default_data.parent, os.W_OK) else Path("
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 (DATA_DIR / "uploads").mkdir(parents=True, exist_ok=True)
 
-# Ingest queue
-ingest_queue: asyncio.Queue = asyncio.Queue(maxsize=10000)
+# Ingest queue - will be set from app state during startup
+ingest_queue: asyncio.Queue = None
 
 def record_batch_accepted(count: int):
     """Record that a batch was accepted"""
@@ -52,8 +52,12 @@ def enqueue(record: Dict[str, Any]):
     try:
         # Add enqueue timestamp for lag tracking
         record["_enqueued_ts"] = int(time.time() * 1000)
-        ingest_queue.put_nowait(record)
-        STATS["queue_depth"] = ingest_queue.qsize()
+        if ingest_queue is not None:
+            ingest_queue.put_nowait(record)
+            STATS["queue_depth"] = ingest_queue.qsize()
+        else:
+            # Fallback for when queue is not initialized
+            STATS["queue_depth"] = 0
     except asyncio.QueueFull:
         raise
 
@@ -130,7 +134,7 @@ def _update_stats():
     elapsed = now - STATS["start_time"]
     if elapsed > 0:
         STATS["eps"] = STATS["records_processed"] / elapsed
-    STATS["queue_depth"] = ingest_queue.qsize()
+    STATS["queue_depth"] = ingest_queue.qsize() if ingest_queue is not None else 0
     STATS["last_processed"] = datetime.now().isoformat()
 
 async def worker_loop():
@@ -141,6 +145,9 @@ async def worker_loop():
     
     while True:
         try:
+            if ingest_queue is None:
+                await asyncio.sleep(1)
+                continue
             record = await ingest_queue.get()
             try:
                 # Check for queue lag

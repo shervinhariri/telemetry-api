@@ -77,6 +77,14 @@ async def lifespan(app: FastAPI):
         "component": "api"
     })
     
+    # Create async objects bound to the current event loop
+    app.state.event_queue = asyncio.Queue(maxsize=10000)
+    
+    # Set the queue in the pipeline module
+    from .pipeline import ingest_queue
+    import app.pipeline
+    app.pipeline.ingest_queue = app.state.event_queue
+    
     # Start two worker processes
     asyncio.create_task(worker_loop())
     asyncio.create_task(worker_loop())
@@ -144,6 +152,17 @@ app.add_middleware(
 
 # Add tracing middleware
 app.add_middleware(TracingMiddleware)
+
+# Add API version header middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class ApiVersionHeaderMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-API-Version"] = "v1"
+        return response
+
+app.add_middleware(ApiVersionHeaderMiddleware)
 
 # ------------------------------------------------------------
 # Public endpoint allowlist and middleware helpers
