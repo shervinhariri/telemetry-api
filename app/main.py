@@ -44,6 +44,7 @@ from .auth.deps import require_scopes
 from .auth.tenant import require_tenant
 from . import pipeline as pipeline_mod  # import the *module*, not the FastAPI instance
 from .db_init import init_schema_and_seed_if_needed
+from .db_boot import ensure_schema_and_seed_keys
 
 # Import configuration
 from .config import (
@@ -82,6 +83,12 @@ async def lifespan(application: FastAPI):
     # Bind async primitives to the *active* event loop
     application.state.event_queue = asyncio.Queue(maxsize=10000)
 
+    # DB bootstrap
+    try:
+        ensure_schema_and_seed_keys()
+    except Exception as e:
+        logger.error("DB_BOOT failed: %s", e)
+    
     # Ensure DB schema + seed default API keys (idempotent)
     init_schema_and_seed_if_needed()
 

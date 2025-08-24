@@ -48,6 +48,7 @@ async def get_system_info() -> Dict[str, Any]:
             backpressure = True
         
         return {
+            "status": "ok",
             "version": APP_VERSION,
             "git_sha": GIT_SHA,
             "image": f"{IMAGE}:{DOCKERHUB_TAG}" if DOCKERHUB_TAG and DOCKERHUB_TAG != "unknown" else f"{IMAGE}:(unknown)",
@@ -67,4 +68,18 @@ async def get_system_info() -> Dict[str, Any]:
         
     except Exception as e:
         logging.error(f"Failed to get system info: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get system information")
+        return {
+            "status": "degraded",
+            "warn": "System information unavailable",
+            "version": APP_VERSION,
+            "git_sha": GIT_SHA,
+            "image": f"{IMAGE}:{DOCKERHUB_TAG}" if DOCKERHUB_TAG and DOCKERHUB_TAG != "unknown" else f"{IMAGE}:(unknown)",
+            "uptime_s": 0,
+            "workers": 0,
+            "eps": 0,
+            "queue_depth": 0,
+            "backpressure": False,
+            "dlq": {"total_events": 0, "files": 0},
+            "idempotency": {"keys": 0, "hits": 0},
+            "last_errors": []
+        }

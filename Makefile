@@ -1,6 +1,6 @@
 # Local Hub repro Makefile for telemetry-api
 
-.PHONY: pull down up logs wait smoke repro deepclean
+.PHONY: pull down up logs wait smoke repro deepclean seed-admin
 
 pull:
 	@echo "📥 Pulling Hub image..."
@@ -42,6 +42,9 @@ deepclean:
 	@echo "🧹 Removing project images..."
 	docker compose images -q | sort -u | xargs -r docker image rm -f
 
+seed-admin:
+	@docker exec -e TELEMETRY_SEED_KEYS="$${TELEMETRY_SEED_KEYS:-DEV_ADMIN_KEY_5a8f9ffdc3}" telemetry-api python -c "import app.db_boot as b; b.ensure_schema_and_seed_keys(); print('seeded')"
+
 help:
 	@echo "Available targets:"
 	@echo "  repro      - Full repro: down, pull, up, wait, smoke, logs"
@@ -52,6 +55,7 @@ help:
 	@echo "  smoke      - Run Python smoke tests"
 	@echo "  logs       - Show recent logs"
 	@echo "  deepclean  - Remove project images"
+	@echo "  seed-admin - Seed admin keys in running container"
 	@echo ""
 	@echo "Usage examples:"
 	@echo "  make repro                    # Default: shvin/telemetry-api:v0.8.6-golden"
