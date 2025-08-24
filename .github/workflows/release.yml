@@ -6,6 +6,13 @@ on:
     tags:
       - 'v*.*.*'
 
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   IMAGE: shvin/telemetry-api
   VERSION: v0.8.9
@@ -61,15 +68,18 @@ jobs:
           docker run -d --rm --name telemetry-api -p 80:80 \
             -e TELEMETRY_SEED_KEYS="TEST_ADMIN_KEY,DEV_ADMIN_KEY_5a8f9ffdc3" \
             ${{ env.IMAGE }}:${{ env.GOLDEN_TAG }}
-          sleep 4
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do curl -sf http://localhost/v1/health && break; sleep 2; done
 
       - name: Smoke - health
         run: curl -sf http://localhost/v1/health
 
       - name: Smoke - version
         run: |
-          v=$(curl -sf http://localhost/v1/version)
-          test "$v" = "0.8.9" || (echo "Expected 0.8.9, got $v" && exit 1)
+          v=$(curl -sf http://localhost/v1/version | tr -d '\n\r"')
+          test "$v" = "0.8.9" || (echo "Expected 0.8.9, got '$v'"; exit 1)
 
       - name: Smoke - metrics
         run: |
