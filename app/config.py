@@ -133,8 +133,8 @@ runtime_config = RuntimeConfig()
 
 # Feature flags
 FEATURES = {
-    "sources": env_bool("TELEMETRY_FEATURE_SOURCES", False),
-    "udp": env_bool("TELEMETRY_FEATURE_UDP", False)
+    "sources": env_bool("FEATURE_SOURCES", True),
+    "udp_head": env_bool("FEATURE_UDP_HEAD", False)
 }
 
 # Feature flag accessors

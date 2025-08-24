@@ -1389,7 +1389,29 @@ class TelemetryDashboard {
         console.log('Applying feature gates:', features);
         
         // Feature flags (default false if missing)
-        const allowSources = features.sources === true;
+        let allowSources = features.sources === true;
+        
+        // Capability probe fallback: if features.sources is not explicitly true,
+        // try a lightweight probe to /v1/sources to see if it's available
+        if (!allowSources && features.sources !== false) {
+            // Probe the sources endpoint to see if it's available
+            fetch('/v1/sources', { 
+                method: 'HEAD',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('telemetry_api_key') || ''}` }
+            })
+            .then(response => {
+                if (response.ok) {
+                    console.log('Sources capability probe: endpoint available, enabling Sources tab');
+                    allowSources = true;
+                    this.showTab('sources');
+                } else {
+                    console.log('Sources capability probe: endpoint not available (status:', response.status, ')');
+                }
+            })
+            .catch(error => {
+                console.log('Sources capability probe: endpoint not available (error:', error.message, ')');
+            });
+        }
         
         if (!allowSources) {
             this.hideTab('sources'); // don't show the tab if disabled
@@ -1439,6 +1461,13 @@ class TelemetryDashboard {
         const panel = document.getElementById(`panel-${tabId}`);
         if (btn) btn.style.display = 'none';
         if (panel) panel.style.display = 'none';
+    }
+
+    showTab(tabId) {
+        const btn = document.getElementById(`tab-${tabId}`);
+        const panel = document.getElementById(`panel-${tabId}`);
+        if (btn) btn.style.display = '';
+        if (panel) panel.style.display = '';
     }
 
     async loadUdpHeadStatus() {
