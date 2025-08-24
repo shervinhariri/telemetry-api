@@ -1353,7 +1353,7 @@ class TelemetryDashboard {
                     // Don't show error for 503, just keep retrying
                     return;
                 }
-                system = { version: '0.8.6' }; // Set default version if API fails
+                system = { version: '0.8.9' }; // Set default version if API fails
             }
             
             this.updateSystemInfo(system);

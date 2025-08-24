@@ -81,8 +81,9 @@ jobs:
 
       - name: Smoke - version
         run: |
-          v=$(curl -sf http://localhost/v1/version | tr -d '\n\r"')
-          test "$v" = "0.8.9" || (echo "Expected 0.8.9, got '$v'"; exit 1)
+          expected="v$(cat VERSION)"
+          v=$(curl -sf http://localhost/v1/version | jq -r '.version')
+          test "$v" = "$expected" || (echo "Expected $expected, got '$v'"; exit 1)
 
       - name: Smoke - metrics
         run: |

@@ -11,7 +11,20 @@ def env_bool(key: str, default: bool = False) -> bool:
     return value in ("true", "1", "yes", "on")
 
 # Version information
-API_VERSION = "0.8.6"
+from pathlib import Path
+
+def _read_version_from_repo(default: str = "dev") -> str:
+    try:
+        # repo root: app/.. (two parents up)
+        version_file = Path(__file__).resolve().parents[2] / "VERSION"
+        v = version_file.read_text(encoding="utf-8").strip()
+        if v:
+            return v
+    except Exception:
+        pass
+    return os.getenv("APP_VERSION", default)
+
+API_VERSION = _read_version_from_repo()
 
 # Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./telemetry.db")

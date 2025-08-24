@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION=${1:-0.8.6}
+VERSION=${1:-0.8.9}
 IMAGE_NAME=${2:-shvin/telemetry-api}
 
 echo "Generating SBOM for ${IMAGE_NAME}:${VERSION}"

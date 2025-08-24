@@ -2,6 +2,17 @@
 
 All notable changes to the Telemetry API project will be documented in this file.
 
+## [0.8.9] - 2025-08-25
+
+### Changed
+- Unified versioning to read from `VERSION` across API, Docker labels, and CI.
+- Updated docs and workflows to standardize on 0.8.9 and remove stale fallbacks.
+- Split production vs dev/CI dependencies to slim runtime image.
+
+### Fixed
+- Release smoke tests now compare `/v1/version` to `VERSION` instead of hard-coded values.
+- README references `scripts/verify_allinone.sh` (removed `*_final.sh` confusion).
+
 ## [0.8.6] - 2025-08-21
 
 [Full Changelog](https://github.com/shervinhariri/telemetry-api/compare/v0.8.4...v0.8.6)

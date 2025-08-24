@@ -1,4 +1,4 @@
-# Telemetry API — v0.8.6
+# Telemetry API — v0.8.9
 
 Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability and multi-tenant authentication.
 
@@ -15,7 +15,7 @@ Ingest NetFlow/IPFIX and Zeek JSON → enrich with GeoIP/ASN/threat intel → ap
 docker run -d -p 80:80 \
   -e API_KEY=TEST_KEY \
   -e REDACT_HEADERS=authorization \
-  --name telapi shvin/telemetry-api:0.8.6
+        --name telapi shvin/telemetry-api:0.8.9
 
 # 2) Ingest sample Zeek
 curl -s -X POST http://localhost/v1/ingest/zeek \
@@ -39,11 +39,11 @@ For production deployments, use the golden release which has been thoroughly tes
 
 ```bash
 # Pull and run the golden release
-docker pull shvin/telemetry-api:0.8.6-golden
+docker pull shvin/telemetry-api:0.8.9-golden
 docker run -d -p 80:80 \
   -e API_KEY=YOUR_API_KEY \
   --name telemetry-api-golden \
-  shvin/telemetry-api:0.8.6-golden
+  shvin/telemetry-api:0.8.9-golden
 
 # Verify the golden release
 curl -s http://localhost/v1/health | jq
@@ -62,20 +62,20 @@ curl -s http://localhost/v1/health | jq
 docker stop telemetry-api-current
 
 # Pull and run golden release
-docker pull shvin/telemetry-api:0.8.6-golden
+docker pull shvin/telemetry-api:0.8.9-golden
 docker run -d -p 80:80 \
   -e API_KEY=YOUR_API_KEY \
   --name telemetry-api-golden \
-  shvin/telemetry-api:0.8.6-golden
+  shvin/telemetry-api:0.8.9-golden
 
 # Verify rollback
 curl -s http://localhost/v1/health | jq
 ```
 
 **Release Assets:**
-- [Release Page](https://github.com/shervinhariri/telemetry-api/releases/tag/v0.8.6)
-- [SBOM (SPDX JSON)](https://github.com/shervinhariri/telemetry-api/releases/download/v0.8.6/sbom-0.8.6.spdx.json)
-- [Checksums](https://github.com/shervinhariri/telemetry-api/releases/download/v0.8.6/checksums-0.8.6.txt)
+- [Release Page](https://github.com/shervinhariri/telemetry-api/releases/tag/v0.8.9)
+- [SBOM (SPDX JSON)](https://github.com/shervinhariri/telemetry-api/releases/download/v0.8.9/sbom-0.8.9.spdx.json)
+- [Checksums](https://github.com/shervinhariri/telemetry-api/releases/download/v0.8.9/checksums-0.8.9.txt)
 
 ### Option 1: All-in-One Container (Development)
 
@@ -86,7 +86,7 @@ A single container that includes the API, NetFlow collector, and mapper:
 docker compose up -d telemetry-allinone
 
 # Verify everything is working
-./scripts/verify_allinone_final.sh
+./scripts/verify_allinone.sh
 
 # Generate test NetFlow data
 python3 scripts/generate_test_netflow.py --count 10 --flows 5
@@ -112,7 +112,7 @@ docker run -d -p 80:80 \
   -e GEOIP_DB_ASN=/data/GeoLite2-ASN.mmdb \
   -e THREATLIST_CSV=/data/threats.csv \
   -v $PWD/data:/data:ro \
-  --name telemetry-api shvin/telemetry-api:0.8.6
+  --name telemetry-api shvin/telemetry-api:0.8.9
 
 # Open dashboard
 open http://localhost
@@ -131,6 +131,16 @@ curl -s -X POST http://localhost/v1/ingest/zeek \
   -H "Content-Type: application/json" \
   --data @samples/zeek_conn_small.json | jq
 ```
+
+## Configuration (env vars)
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `TELEMETRY_SEED_KEYS` | Seed comma‑separated admin API keys on startup | *(none)* |
+| `API_KEY` | (Legacy single key) if not using `TELEMETRY_SEED_KEYS` | `TEST_KEY` |
+| `FEATURE_UDP_HEAD` | Enable experimental UDP head | `false` |
+| `ENRICH_ENABLE_{GEOIP,ASN,TI}` | Toggle enrichments | `true` |
+| `RETENTION_DAYS` | Data retention window | `7` |
 
 ## 📊 Structured Logging
 
@@ -152,23 +162,23 @@ export HTTP_LOG_SAMPLE_RATE=1.0  # Log all requests
 
 ## Golden Release and Rollback
 
-This repository maintains a golden tag for the stable build of 0.8.6:
+This repository maintains a golden tag for the stable build of 0.8.9:
 
-- Git tag: `v0.8.6-golden`
-- Docker image: `shvin/telemetry-api:0.8.6-golden`
+- Git tag: `v0.8.9-golden`
+- Docker image: `shvin/telemetry-api:0.8.9-golden`
 
 Rollback instructions:
 
 ```bash
 git fetch --tags
-git checkout v0.8.6-golden
+git checkout v0.8.9-golden
 
-docker pull shvin/telemetry-api:0.8.6-golden
+docker pull shvin/telemetry-api:0.8.9-golden
 docker rm -f telemetry-api || true
 docker run -d -p 80:80 \
   -v $PWD/telemetry.db:/app/telemetry.db \
   --name telemetry-api \
-  shvin/telemetry-api:0.8.6-golden
+  shvin/telemetry-api:0.8.9-golden
 ```
 
 ### Production Mode
@@ -193,7 +203,7 @@ docker run -d -p 80:80 \
   -e DEMO_MODE=true \
   -e DEMO_EPS=50 \
   -e DEMO_DURATION_SEC=120 \
-  --name telemetry-api-demo shvin/telemetry-api:0.8.6
+  --name telemetry-api-demo shvin/telemetry-api:0.8.9
 
 # 2) Start demo generator
 curl -s -X POST http://localhost/v1/demo/start \
@@ -231,7 +241,7 @@ curl -s -X POST http://localhost/v1/demo/stop \
 - **No metrics**: Verify `/v1/metrics/prometheus` endpoint is accessible
 - **Grafana import fails**: Ensure Prometheus data source is configured correctly
 
-## 🏢 Multi-Tenancy (v0.8.6)
+## 🏢 Multi-Tenancy (v0.8.9)
 
 The API now supports multi-tenant deployments with complete data isolation:
 
@@ -248,7 +258,7 @@ The API now supports multi-tenant deployments with complete data isolation:
 # 1) Run with database persistence
 docker run -d -p 80:80 \
   -v $PWD/telemetry.db:/app/telemetry.db \
-  --name telemetry-api shvin/telemetry-api:0.8.6
+  --name telemetry-api shvin/telemetry-api:0.8.9
 
 # 2) Database will auto-initialize with default tenant
 # 3) Get admin API key from logs or use seed script
@@ -276,7 +286,7 @@ curl -H "Authorization: Bearer ADMIN_KEY" \
 | `DEV_BYPASS_SCOPES` | `false` | Development scope bypass |
 ```
 
-## 🏢 Multi-Tenancy (v0.8.6)
+## 🏢 Multi-Tenancy (v0.8.9)
 
 The API now supports multi-tenant deployments with complete data isolation:
 
@@ -295,7 +305,7 @@ docker run -d -p 80:80 \
   -e DATABASE_URL=sqlite:///./telemetry.db \
   -e ADMIN_API_KEY=YOUR_ADMIN_KEY \
   -v $PWD/data:/data \
-  --name telemetry-api shvin/telemetry-api:0.8.6
+  --name telemetry-api shvin/telemetry-api:0.8.9
 
 # 2) Create default tenant and admin key
 docker exec telemetry-api python3 scripts/seed_default_tenant.py
@@ -624,7 +634,7 @@ sudo nft delete rule inet telemetry input udp dport 2055 drop
 version: '3.8'
 services:
   telemetry-api:
-    image: shvin/telemetry-api:0.8.6
+    image: shvin/telemetry-api:0.8.9
     ports:
       - "80:80"
     environment:
@@ -653,7 +663,7 @@ spec:
     spec:
       containers:
       - name: telemetry-api
-        image: shvin/telemetry-api:0.8.6
+        image: shvin/telemetry-api:0.8.9
         ports:
         - containerPort: 80
         env:
@@ -668,7 +678,7 @@ spec:
 
 -- Images are tagged :latest, :0.x.y, and :golden for stable rollback.
 
-This release: shvin/telemetry-api:0.8.6
+This release: shvin/telemetry-api:0.8.9
 
 Previous golden: shvin/telemetry-api:0.8.2-golden
 
@@ -680,7 +690,7 @@ Keep VERSION in repo aligned with Docker tag and /v1/version
 
 ## 📋 Changelog
 
-### v0.8.6 (Current)
+### v0.8.9 (Current)
 - ✅ **Multi-Tenancy Support**: Complete tenant isolation with database-backed tenants
 - ✅ **Database Models**: SQLAlchemy models for Tenant, ApiKey, OutputConfig, and Job
 - ✅ **Tenant-Scoped Authentication**: Per-tenant API keys with scope validation

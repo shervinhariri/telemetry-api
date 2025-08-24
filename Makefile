@@ -59,6 +59,6 @@ help:
 	@echo ""
 	@echo "Usage examples:"
 	@echo "  make repro                    # Default: shvin/telemetry-api:v0.8.9-golden"
-	@echo "  make repro IMAGE_TAG=v0.8.6   # Specific tag"
+	@echo "  make repro IMAGE_TAG=v0.8.9   # Specific tag"
 	@echo "  make logs                     # View logs"
 	@echo "  make down                     # Stop & clean"
