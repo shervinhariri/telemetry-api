@@ -31,14 +31,17 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'requirements-ci.txt'
 
-      - name: Python deps
+      - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip install -r requirements-ci.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-ci.txt ]; then pip install -r requirements-ci.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
           sudo apt-get update && sudo apt-get install -y jq
 
       - name: Run e2e tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           pytest -q
 
