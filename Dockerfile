@@ -6,8 +6,8 @@ RUN git clone --depth 1 --branch ${GOFLOW_VERSION} https://github.com/netsampler
 # Build the main binary
 RUN CGO_ENABLED=0 go build -o /out/goflow2 ./cmd/goflow2
 
-# ---- Stage 2: app image (API + mapper + goflow2) ----
-FROM python:3.11-slim@sha256:1d6131b5d479888b43200645e03a78443c7157efbdb730e6b48129740727c312 as app
+# ---- Stage 2: base image (shared dependencies) ----
+FROM python:3.11-slim@sha256:1d6131b5d479888b43200645e03a78443c7157efbdb730e6b48129740727c312 as base
 
 ARG APP_VERSION=dev
 ARG GIT_SHA=dev
@@ -23,6 +23,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# System deps for runtime (keep tiny)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install prod deps only
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -86,4 +92,17 @@ LABEL org.opencontainers.image.title="telemetry-api" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.description="Live Network Threat Telemetry API (MVP)"
 
+# ---- Stage 3: runtime (prod) ----
+FROM base AS runtime
+# nothing extra; keep it slim
+ENV APP_ENV=prod
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+# ---- Stage 4: test (CI/e2e) ----
+FROM base AS test
+# tools only for tests
+RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 && rm -rf /var/lib/apt/lists/*
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+ENV APP_ENV=test
 ENTRYPOINT ["/app/entrypoint.sh"]

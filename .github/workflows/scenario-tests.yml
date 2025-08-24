@@ -9,6 +9,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build test image (with tools)
+        run: docker build --target test -t local/telemetry-api:test .
+
       - name: Start e2e stack
         env:
           TELEMETRY_DLQ_DIR: /tmp/dlq
@@ -17,7 +20,12 @@ jobs:
           # Load test environment variables (skip comments)
           export $(grep -v '^#' .github/test.env | xargs)
           echo "Loaded env vars: TELEMETRY_SEED_KEYS=$TELEMETRY_SEED_KEYS"
-          docker compose up -d --build
+          # Use the test image instead of building
+          docker run -d --rm --name telemetry-api -p 80:80 \
+            -e TELEMETRY_SEED_KEYS="$TELEMETRY_SEED_KEYS" \
+            -e FEATURE_SOURCES=1 \
+            -e FEATURE_UDP_HEAD=0 \
+            local/telemetry-api:test
           echo "Waiting for API to become healthy (up to 80s)..."
           ok=0
           for i in $(seq 1 40); do
@@ -29,7 +37,12 @@ jobs:
             fi
             sleep 2
           done
-          [ "$ok" = "1" ] || { docker compose ps; docker compose logs --no-color | tail -n 300; exit 1; }
+          [ "$ok" = "1" ] || { docker ps; docker logs telemetry-api --tail 300; exit 1; }
+
+      - name: Sanity check test tools
+        run: |
+          docker exec telemetry-api sqlite3 -version
+          docker exec telemetry-api python -c "import pytest, sqlite3; print('pytest+sqlite3 OK')"
 
       # Run ALL tests inside the container to share the same DB/migrations
       - name: Run tests inside container
