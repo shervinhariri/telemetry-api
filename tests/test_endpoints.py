@@ -42,63 +42,92 @@ def test_health():
     """Test health endpoint"""
     print("🔍 Testing /v1/health...")
     response = requests.get(f"{BASE_URL}/v1/health")
-    if response.status_code == 200:
-        print("✅ Health check passed")
-        return True
-    else:
-        print(f"❌ Health check failed: {response.status_code}")
-        return False
+    assert response.status_code == 200, f"Health check failed: {response.status_code}"
+    print("✅ Health check passed")
 
 def test_version():
     """Test version endpoint"""
     print("🔍 Testing /v1/version...")
     result = make_request("GET", "/v1/version")
-    if result and result.get("version"):
-        print(f"✅ Version check passed: {result.get('version')}")
-        return True
-    else:
-        print(f"❌ Version check failed: {result}")
-        return False
+    assert result is not None, "Version request failed"
+    assert result.get("version"), f"Version check failed: {result}"
+    print(f"✅ Version check passed: {result.get('version')}")
 
 def test_ingest_zeek():
     """Test Zeek ingest endpoint"""
     print("🔍 Testing /v1/ingest/zeek...")
     
-    # Load sample data
-    with open("samples/zeek_conn_small.json", "r") as f:
-        zeek_data = json.load(f)
+    # Create sample data instead of loading from file
+    zeek_data = {
+        "collector_id": "test-zeek",
+        "format": "zeek.conn",
+        "records": [
+            {
+                "ts": 1723351200.456,
+                "id_orig_h": "10.1.2.3",
+                "id_orig_p": 55342,
+                "id_resp_h": "8.8.8.8",
+                "id_resp_p": 53,
+                "proto": "udp",
+                "service": "dns",
+                "duration": 0.025,
+                "orig_bytes": 78,
+                "resp_bytes": 256
+            }
+        ]
+    }
     
-    result = make_request("POST", "/v1/ingest/zeek", zeek_data)
-    if result and result.get("accepted", 0) > 0:
-        print(f"✅ Zeek ingest passed: {result.get('accepted')} records accepted")
-        return True
-    else:
-        print(f"❌ Zeek ingest failed: {result}")
-        return False
+    result = make_request("POST", "/v1/ingest", zeek_data)
+    assert result is not None, "Zeek ingest request failed"
+    assert result.get("accepted", 0) > 0, f"Zeek ingest failed: {result}"
+    print(f"✅ Zeek ingest passed: {result.get('accepted')} records accepted")
 
 def test_ingest_netflow():
     """Test NetFlow ingest endpoint"""
     print("🔍 Testing /v1/ingest/netflow...")
     
-    # Load sample data
-    with open("samples/netflow_small.json", "r") as f:
-        netflow_data = json.load(f)
+    # Create sample data instead of loading from file
+    netflow_data = {
+        "collector_id": "test-netflow",
+        "format": "flows.v1",
+        "records": [
+            {
+                "ts": 1723351200.456,
+                "src_ip": "192.168.1.100",
+                "dst_ip": "1.1.1.1",
+                "src_port": 12345,
+                "dst_port": 80,
+                "protocol": "tcp",
+                "bytes": 1024,
+                "packets": 10
+            }
+        ]
+    }
     
-    result = make_request("POST", "/v1/ingest/netflow", netflow_data)
-    if result and result.get("accepted", 0) > 0:
-        print(f"✅ NetFlow ingest passed: {result.get('accepted')} records accepted")
-        return True
-    else:
-        print(f"❌ NetFlow ingest failed: {result}")
-        return False
+    result = make_request("POST", "/v1/ingest", netflow_data)
+    assert result is not None, "NetFlow ingest request failed"
+    assert result.get("accepted", 0) > 0, f"NetFlow ingest failed: {result}"
+    print(f"✅ NetFlow ingest passed: {result.get('accepted')} records accepted")
 
 def test_ingest_bulk():
     """Test bulk ingest endpoint"""
     print("🔍 Testing /v1/ingest/bulk...")
     
-    # Load sample data
-    with open("samples/zeek_conn_small.json", "r") as f:
-        zeek_data = json.load(f)
+    # Create sample data instead of loading from file
+    zeek_data = [
+        {
+            "ts": 1723351200.456,
+            "id_orig_h": "10.1.2.3",
+            "id_orig_p": 55342,
+            "id_resp_h": "8.8.8.8",
+            "id_resp_p": 53,
+            "proto": "udp",
+            "service": "dns",
+            "duration": 0.025,
+            "orig_bytes": 78,
+            "resp_bytes": 256
+        }
+    ]
     
     bulk_data = {
         "type": "zeek",
@@ -106,12 +135,9 @@ def test_ingest_bulk():
     }
     
     result = make_request("POST", "/v1/ingest/bulk", bulk_data)
-    if result and result.get("accepted", 0) > 0:
-        print(f"✅ Bulk ingest passed: {result.get('accepted')} records accepted")
-        return True
-    else:
-        print(f"❌ Bulk ingest failed: {result}")
-        return False
+    assert result is not None, "Bulk ingest request failed"
+    assert result.get("accepted", 0) > 0, f"Bulk ingest failed: {result}"
+    print(f"✅ Bulk ingest passed: {result.get('accepted')} records accepted")
 
 def test_indicators():
     """Test threat intelligence endpoints"""
@@ -125,21 +151,16 @@ def test_indicators():
     }
     
     result = make_request("PUT", "/v1/indicators", indicator_data)
-    if result and result.get("status") == "added":
-        indicator_id = result.get("id")
-        print(f"✅ Add indicator passed: {indicator_id}")
-        
-        # Test deleting indicator
-        delete_result = make_request("DELETE", f"/v1/indicators/{indicator_id}")
-        if delete_result and delete_result.get("status") == "deleted":
-            print(f"✅ Delete indicator passed: {indicator_id}")
-            return True
-        else:
-            print(f"❌ Delete indicator failed: {delete_result}")
-            return False
-    else:
-        print(f"❌ Add indicator failed: {result}")
-        return False
+    assert result is not None, "Add indicator request failed"
+    assert result.get("status") == "added", f"Add indicator failed: {result}"
+    indicator_id = result.get("id")
+    print(f"✅ Add indicator passed: {indicator_id}")
+    
+    # Test deleting indicator
+    delete_result = make_request("DELETE", f"/v1/indicators/{indicator_id}")
+    assert delete_result is not None, "Delete indicator request failed"
+    assert delete_result.get("status") == "deleted", f"Delete indicator failed: {delete_result}"
+    print(f"✅ Delete indicator passed: {indicator_id}")
 
 def test_download():
     """Test download endpoint"""
@@ -149,42 +170,31 @@ def test_download():
     try:
         response = requests.get(
             "http://localhost/v1/download/json?limit=10",
-            headers={"Authorization": "Bearer TEST_KEY"},
+            headers={"Authorization": "Bearer TEST_ADMIN_KEY"},
             stream=True
         )
-        if response.status_code == 200:
-            print("✅ Download endpoint accessible")
-            return True
-        else:
-            print(f"❌ Download endpoint failed: {response.status_code}")
-            return False
+        assert response.status_code == 200, f"Download endpoint failed: {response.status_code}"
+        print("✅ Download endpoint accessible")
     except Exception as e:
-        print(f"❌ Download endpoint failed: {e}")
-        return False
+        assert False, f"Download endpoint failed: {e}"
 
 def test_requests_api():
     """Test requests API endpoint"""
     print("🔍 Testing /v1/api/requests...")
     
     result = make_request("GET", "/v1/api/requests?limit=10&window=15m")
-    if result and "items" in result:
-        print(f"✅ Requests API passed: {len(result.get('items', []))} requests")
-        return True
-    else:
-        print(f"❌ Requests API failed: {result}")
-        return False
+    assert result is not None, "Requests API request failed"
+    assert "items" in result, f"Requests API failed: {result}"
+    print(f"✅ Requests API passed: {len(result.get('items', []))} requests")
 
 def test_metrics():
     """Test metrics endpoint"""
     print("🔍 Testing /v1/metrics...")
     
     result = make_request("GET", "/v1/metrics")
-    if result and isinstance(result, dict):
-        print("✅ Metrics endpoint passed")
-        return True
-    else:
-        print(f"❌ Metrics endpoint failed: {result}")
-        return False
+    assert result is not None, "Metrics request failed"
+    assert isinstance(result, dict), f"Metrics endpoint failed: {result}"
+    print("✅ Metrics endpoint passed")
 
 def main():
     """Run all tests"""
@@ -210,10 +220,10 @@ def main():
     
     for test in tests:
         try:
-            if test():
-                passed += 1
+            test()
+            passed += 1
         except Exception as e:
-            print(f"❌ Test {test.__name__} crashed: {e}")
+            print(f"❌ Test {test.__name__} failed: {e}")
         print()
     
     print(f"📊 Test Results: {passed}/{total} passed")
