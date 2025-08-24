@@ -51,7 +51,7 @@ async def get_system_info() -> Dict[str, Any]:
             "status": "ok",
             "version": APP_VERSION,
             "git_sha": GIT_SHA,
-            "image": f"{IMAGE}:{DOCKERHUB_TAG}" if DOCKERHUB_TAG and DOCKERHUB_TAG != "unknown" else f"{IMAGE}:(unknown)",
+            "image": f"{IMAGE}:{DOCKERHUB_TAG}" if DOCKERHUB_TAG and DOCKERHUB_TAG != "unknown" else f"{IMAGE}:{APP_VERSION}",
             "features": FEATURES,
             "uptime_s": uptime_seconds,
             "workers": 1,  # Single worker for now
@@ -73,7 +73,7 @@ async def get_system_info() -> Dict[str, Any]:
             "warn": "System information unavailable",
             "version": APP_VERSION,
             "git_sha": GIT_SHA,
-            "image": f"{IMAGE}:{DOCKERHUB_TAG}" if DOCKERHUB_TAG and DOCKERHUB_TAG != "unknown" else f"{IMAGE}:(unknown)",
+            "image": f"{IMAGE}:{DOCKERHUB_TAG}" if DOCKERHUB_TAG and DOCKERHUB_TAG != "unknown" else f"{IMAGE}:{APP_VERSION}",
             "uptime_s": 0,
             "workers": 0,
             "eps": 0,

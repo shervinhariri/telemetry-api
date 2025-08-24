@@ -1,8 +1,9 @@
 name: Release
 
 on:
-  push:
-    tags: [ "v*" ]
+  workflow_run:
+    workflows: ["Docker CI"]
+    types: [completed]
 
 jobs:
   create-release:
@@ -16,59 +17,86 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Extract version
+      - name: Read version
         id: ver
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "TAG=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT
+          V=$(cat VERSION)
+          echo "version=$V" >> $GITHUB_OUTPUT
+          echo "golden=${V}-golden" >> $GITHUB_OUTPUT
 
-      - name: Generate SBOM
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Wait for image to be available on Docker Hub
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api
+          TAG: ${{ steps.ver.outputs.golden }}
         run: |
-          # Wait for image to be available
-          sleep 30
-          
-          # Generate SBOM using syft
+          echo "Waiting for $IMAGE:$TAG ..."
+          for i in {1..90}; do
+            if docker manifest inspect "$IMAGE:$TAG" >/dev/null 2>&1; then
+              echo "Found $IMAGE:$TAG"
+              exit 0
+            fi
+            echo "Not yet... ($i)"; sleep 10
+          done
+          echo "Timeout waiting for image $IMAGE:$TAG" >&2
+          exit 1
+
+      - name: Pull image
+        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:${{ steps.ver.outputs.golden }}
+
+      - name: Generate SBOM with syft
+        run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             anchore/syft:latest \
-            shvin/telemetry-api:${{ steps.ver.outputs.TAG }} \
-            -o spdx-json > sbom-${{ steps.ver.outputs.VERSION }}.spdx.json
-          
-          # Also generate in table format for readability
+            packages docker:${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:${{ steps.ver.outputs.golden }} -o cyclonedx-json > sbom.json
+
+      - name: Generate SBOM Table
+        run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             anchore/syft:latest \
-            shvin/telemetry-api:${{ steps.ver.outputs.TAG }} \
-            -o table > sbom-${{ steps.ver.outputs.VERSION }}.txt
+            packages docker:${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:${{ steps.ver.outputs.golden }} -o table > sbom-table.txt
 
       - name: Generate checksums
         run: |
           # Create checksums for SBOM files
-          sha256sum sbom-${{ steps.ver.outputs.VERSION }}.spdx.json > checksums-${{ steps.ver.outputs.VERSION }}.txt
-          sha256sum sbom-${{ steps.ver.outputs.VERSION }}.txt >> checksums-${{ steps.ver.outputs.VERSION }}.txt
+          sha256sum sbom.json > checksums.txt
+          sha256sum sbom-table.txt >> checksums.txt
           
           # Add checksums for sample files
           if [ -f "docker-compose.yml" ]; then
-            sha256sum docker-compose.yml >> checksums-${{ steps.ver.outputs.VERSION }}.txt
+            sha256sum docker-compose.yml >> checksums.txt
           fi
           if [ -f "docker-compose.override.yml" ]; then
-            sha256sum docker-compose.override.yml >> checksums-${{ steps.ver.outputs.VERSION }}.txt
+            sha256sum docker-compose.override.yml >> checksums.txt
           fi
 
       - name: Extract changelog
         run: |
           # Extract the changelog for this version
-          awk '/^## \['${{ steps.ver.outputs.VERSION }}'\]/,/^## \[/ {if (NR>1) print; if ($0 ~ /^## \[/ && NR>1) exit}' CHANGELOG.md > changelog-${{ steps.ver.outputs.VERSION }}.md
+          awk '/^## \['${{ steps.ver.outputs.version }}'\]/,/^## \[/ {if (NR>1) print; if ($0 ~ /^## \[/ && NR>1) exit}' CHANGELOG.md > changelog.md
+
+      - name: Get Image Digest
+        run: |
+          # Get the image digest for the golden tag
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:${{ steps.ver.outputs.golden }})
+          echo "GOLDEN_DIGEST=$DIGEST" >> $GITHUB_ENV
+          echo "Golden image digest: $DIGEST"
 
       - name: Create Release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.ver.outputs.TAG }}
-          release_name: Telemetry API ${{ steps.ver.outputs.VERSION }}
-          body_path: changelog-${{ steps.ver.outputs.VERSION }}.md
+          tag_name: v${{ steps.ver.outputs.version }}
+          release_name: Telemetry API ${{ steps.ver.outputs.version }}
+          body_path: changelog.md
           draft: false
           prerelease: false
 
@@ -78,8 +106,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./sbom-${{ steps.ver.outputs.VERSION }}.spdx.json
-          asset_name: sbom-${{ steps.ver.outputs.VERSION }}.spdx.json
+          asset_path: ./sbom.json
+          asset_name: sbom-${{ steps.ver.outputs.version }}.json
           asset_content_type: application/json
 
       - name: Upload SBOM Table
@@ -88,8 +116,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./sbom-${{ steps.ver.outputs.VERSION }}.txt
-          asset_name: sbom-${{ steps.ver.outputs.VERSION }}.txt
+          asset_path: ./sbom-table.txt
+          asset_name: sbom-${{ steps.ver.outputs.version }}.txt
           asset_content_type: text/plain
 
       - name: Upload Checksums
@@ -98,20 +126,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./checksums-${{ steps.ver.outputs.VERSION }}.txt
-          asset_name: checksums-${{ steps.ver.outputs.VERSION }}.txt
+          asset_path: ./checksums.txt
+          asset_name: checksums-${{ steps.ver.outputs.version }}.txt
           asset_content_type: text/plain
-
-      - name: Get Image Digest
-        run: |
-          # Get the image digest for the golden tag
-          DIGEST=$(docker inspect --format='{{.RepoDigests}}' shvin/telemetry-api:${{ steps.ver.outputs.TAG }}-golden | grep -o 'sha256:[a-f0-9]*')
-          echo "GOLDEN_DIGEST=$DIGEST" >> $GITHUB_ENV
-          echo "Golden image digest: $DIGEST"
 
       - name: Create Image Digest File
         run: |
-          echo "${{ env.GOLDEN_DIGEST }}" > golden-digest-${{ steps.ver.outputs.VERSION }}.txt
+          echo "${{ env.GOLDEN_DIGEST }}" > golden-digest.txt
 
       - name: Upload Image Digest
         uses: actions/upload-release-asset@v1
@@ -119,6 +140,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./golden-digest-${{ steps.ver.outputs.VERSION }}.txt
-          asset_name: golden-digest-${{ steps.ver.outputs.VERSION }}.txt
+          asset_path: ./golden-digest.txt
+          asset_name: golden-digest-${{ steps.ver.outputs.version }}.txt
           asset_content_type: text/plain

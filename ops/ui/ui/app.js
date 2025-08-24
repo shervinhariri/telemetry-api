@@ -1913,7 +1913,7 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
             this.hideError('logs');
             const logsContent = document.getElementById('logs-content');
             if (logsContent) {
-                logsContent.innerHTML = 'Starting live logs...\n';
+                logsContent.textContent = 'Starting live logs...\n';
             }
             
             // Load initial logs first
@@ -1933,12 +1933,12 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
                                 const traceId = logEntry.trace_id || '';
                                 
                                 const line = `${timestamp} [${level}] ${msg}${traceId ? ` (trace_id: ${traceId})` : ''}`;
-                                logsContent.innerHTML += line + '<br>';
+                                logsContent.textContent += line + '\n';
                                 
                                 // Keep only last 100 lines
-                                const lines = logsContent.innerHTML.split('<br>');
+                                const lines = logsContent.textContent.split('\n');
                                 if (lines.length > 100) {
-                                    logsContent.innerHTML = lines.slice(-100).join('<br>');
+                                    logsContent.textContent = lines.slice(-100).join('\n');
                                 }
                             }
                         } catch (parseError) {
@@ -1978,7 +1978,7 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
                         // Split into lines and show the last 100 lines
                         const lines = text.split('\n').filter(line => line.trim());
                         const recentLines = lines.slice(-100);
-                        logsContent.innerHTML = recentLines.join('<br>');
+                        logsContent.textContent = recentLines.join('\n');
                     }
                 } else {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -2010,7 +2010,7 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
                         const traceId = log.trace_id || '';
                         return `${timestamp} [${level}] ${msg}${traceId ? ` (trace_id: ${traceId})` : ''}`;
                     });
-                    logsContent.innerHTML = lines.join('<br>');
+                    logsContent.textContent = lines.join('\n');
                 } else {
                     // Fallback to tail endpoint
                     const tailResponse = await fetch(`${this.apiBase}/v1/logs/tail?max_bytes=50000&format=text`, {
@@ -2020,24 +2020,24 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
                     if (tailResponse.ok) {
                         const text = await tailResponse.text();
                         if (text.trim()) {
-                            const lines = text.split('\n').filter(line => line.trim());
-                            const recentLines = lines.slice(-50);
-                            logsContent.innerHTML = recentLines.join('<br>');
+                                                    const lines = text.split('\n').filter(line => line.trim());
+                        const recentLines = lines.slice(-50);
+                        logsContent.textContent = recentLines.join('\n');
                         } else {
-                            logsContent.innerHTML = 'No logs available yet.';
+                            logsContent.textContent = 'No logs available yet.';
                         }
                     } else {
-                        logsContent.innerHTML = `Failed to load logs: HTTP ${tailResponse.status}`;
+                        logsContent.textContent = `Failed to load logs: HTTP ${tailResponse.status}`;
                     }
                 }
             } else {
-                logsContent.innerHTML = `Failed to load logs: HTTP ${response.status}`;
+                logsContent.textContent = `Failed to load logs: HTTP ${response.status}`;
             }
         } catch (error) {
             console.error('Initial logs loading error:', error);
             const logsContent = document.getElementById('logs-content');
             if (logsContent) {
-                logsContent.innerHTML = `Error loading logs: ${error.message}`;
+                logsContent.textContent = `Error loading logs: ${error.message}`;
             }
         }
     }
@@ -2053,7 +2053,7 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
         }
         const logsContent = document.getElementById('logs-content');
         if (logsContent) {
-            logsContent.innerHTML = 'Live logs stopped.';
+            logsContent.textContent = 'Live logs stopped.';
         }
     }
 
