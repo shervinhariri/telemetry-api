@@ -1,28 +1,30 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows: ["Docker CI"]
-    types: [completed]
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  IMAGE: shvin/telemetry-api
+  VERSION: v0.8.9
+  GOLDEN_TAG: v0.8.9-golden
 
 jobs:
-  create-release:
+  build-and-push:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: read
+    outputs:
+      IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Read version
-        id: ver
-        run: |
-          V=$(cat VERSION)
-          echo "version=$V" >> $GITHUB_OUTPUT
-          echo "golden=${V}-golden" >> $GITHUB_OUTPUT
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -30,116 +32,86 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Wait for image to be available on Docker Hub
-        env:
-          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api
-          TAG: ${{ steps.ver.outputs.golden }}
+      - name: Build and Push (multi-arch)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.VERSION }}
+            ${{ env.IMAGE }}:${{ env.GOLDEN_TAG }}
+            ${{ env.IMAGE }}:latest
+          provenance: false
+
+      - name: Show digest
         run: |
-          echo "Waiting for $IMAGE:$TAG ..."
-          for i in {1..90}; do
+          echo "Image digest: ${{ steps.build.outputs.digest }}"
+
+  e2e:
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull golden image
+        run: docker pull ${{ env.IMAGE }}:${{ env.GOLDEN_TAG }}
+
+      - name: Run container
+        run: |
+          docker run -d --rm --name telemetry-api -p 80:80 \
+            -e TELEMETRY_SEED_KEYS="TEST_ADMIN_KEY,DEV_ADMIN_KEY_5a8f9ffdc3" \
+            ${{ env.IMAGE }}:${{ env.GOLDEN_TAG }}
+          sleep 4
+
+      - name: Smoke - health
+        run: curl -sf http://localhost/v1/health
+
+      - name: Smoke - version
+        run: |
+          v=$(curl -sf http://localhost/v1/version)
+          test "$v" = "0.8.9" || (echo "Expected 0.8.9, got $v" && exit 1)
+
+      - name: Smoke - metrics
+        run: |
+          curl -sf -H "Authorization: Bearer DEV_ADMIN_KEY_5a8f9ffdc3" http://localhost/v1/metrics | head
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f telemetry-api || true
+
+  create-release:
+    needs: [build-and-push, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo digest from build job
+        run: |
+          echo "Using image digest: ${{ needs.build-and-push.outputs.IMAGE_DIGEST }}"
+
+      # OPTIONAL: keep a disabled wait loop (for manual toggling if ever needed)
+      - name: (Optional) Wait for Docker Hub propagation
+        if: ${{ false }}
+        run: |
+          IMAGE="${{ env.IMAGE }}"
+          TAG="${{ env.GOLDEN_TAG }}"
+          MAX=120
+          i=0
+          echo "Waiting up to $MAX attempts for $IMAGE:$TAG to appear..."
+          while [ $i -lt $MAX ]; do
             if docker manifest inspect "$IMAGE:$TAG" >/dev/null 2>&1; then
               echo "Found $IMAGE:$TAG"
               exit 0
             fi
-            echo "Not yet... ($i)"; sleep 10
+            i=$((i+1))
+            echo "Not yet... ($i/$MAX)"; sleep 15
           done
-          echo "Timeout waiting for image $IMAGE:$TAG" >&2
+          echo "Timeout waiting for $IMAGE:$TAG"
           exit 1
 
-      - name: Pull image
-        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:${{ steps.ver.outputs.golden }}
-
-      - name: Generate SBOM with syft
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            anchore/syft:latest \
-            packages docker:${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:${{ steps.ver.outputs.golden }} -o cyclonedx-json > sbom.json
-
-      - name: Generate SBOM Table
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            anchore/syft:latest \
-            packages docker:${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:${{ steps.ver.outputs.golden }} -o table > sbom-table.txt
-
-      - name: Generate checksums
-        run: |
-          # Create checksums for SBOM files
-          sha256sum sbom.json > checksums.txt
-          sha256sum sbom-table.txt >> checksums.txt
-          
-          # Add checksums for sample files
-          if [ -f "docker-compose.yml" ]; then
-            sha256sum docker-compose.yml >> checksums.txt
-          fi
-          if [ -f "docker-compose.override.yml" ]; then
-            sha256sum docker-compose.override.yml >> checksums.txt
-          fi
-
-      - name: Extract changelog
-        run: |
-          # Extract the changelog for this version
-          awk '/^## \['${{ steps.ver.outputs.version }}'\]/,/^## \[/ {if (NR>1) print; if ($0 ~ /^## \[/ && NR>1) exit}' CHANGELOG.md > changelog.md
-
-      - name: Get Image Digest
-        run: |
-          # Get the image digest for the golden tag
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ secrets.DOCKERHUB_USERNAME }}/telemetry-api:${{ steps.ver.outputs.golden }})
-          echo "GOLDEN_DIGEST=$DIGEST" >> $GITHUB_ENV
-          echo "Golden image digest: $DIGEST"
-
-      - name: Create Release
-        uses: actions/create-release@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: Release ${{ env.VERSION }}
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.ver.outputs.version }}
-          release_name: Telemetry API ${{ steps.ver.outputs.version }}
-          body_path: changelog.md
-          draft: false
-          prerelease: false
-
-      - name: Upload Release Assets
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./sbom.json
-          asset_name: sbom-${{ steps.ver.outputs.version }}.json
-          asset_content_type: application/json
-
-      - name: Upload SBOM Table
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./sbom-table.txt
-          asset_name: sbom-${{ steps.ver.outputs.version }}.txt
-          asset_content_type: text/plain
-
-      - name: Upload Checksums
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./checksums.txt
-          asset_name: checksums-${{ steps.ver.outputs.version }}.txt
-          asset_content_type: text/plain
-
-      - name: Create Image Digest File
-        run: |
-          echo "${{ env.GOLDEN_DIGEST }}" > golden-digest.txt
-
-      - name: Upload Image Digest
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./golden-digest.txt
-          asset_name: golden-digest-${{ steps.ver.outputs.version }}.txt
-          asset_content_type: text/plain
