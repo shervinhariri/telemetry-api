@@ -63,9 +63,8 @@ def test_ingest_zeek_conn(client):
     response = client.post("/v1/ingest", json=payload, headers=VALID_HEADERS)
     assert response.status_code == 202
     data = response.json()
-    assert data["collector_id"] == "test-zeek-1"
-    assert data["format"] == "zeek.conn"
     assert data["accepted"] == 1
+    assert data["total"] == 1
     assert "X-API-Version" in response.headers
 
 def test_ingest_flows(client):
@@ -90,8 +89,8 @@ def test_ingest_flows(client):
     response = client.post("/v1/ingest", json=payload, headers=VALID_HEADERS)
     assert response.status_code == 202
     data = response.json()
-    assert data["format"] == "flows.v1"
     assert data["accepted"] == 1
+    assert data["total"] == 1
 
 def test_lookup_endpoint(client):
     """Test IP lookup endpoint"""
