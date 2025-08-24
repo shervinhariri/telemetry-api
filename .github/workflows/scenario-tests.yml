@@ -18,13 +18,17 @@ jobs:
           export $(grep -v '^#' .github/test.env | xargs)
           docker compose up -d --build
           echo "Waiting for API to become healthy (up to 80s)..."
+          ok=0
           for i in $(seq 1 40); do
-            code=$(docker exec telemetry-api curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:80/v1/health || true)
-            if [ "$code" = "200" ]; then echo "API healthy"; break; fi
+            if docker exec telemetry-api python -c "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:80/v1/health').status == 200 else 1)" 2>/dev/null
+            then
+              echo "API healthy"
+              ok=1
+              break
+            fi
             sleep 2
           done
-          # Final check or fail with logs
-          docker exec telemetry-api curl -sf http://127.0.0.1:80/v1/health || { docker compose ps; docker compose logs --no-color | tail -n 300; exit 1; }
+          [ "$ok" = "1" ] || { docker compose ps; docker compose logs --no-color | tail -n 300; exit 1; }
 
       # Run ALL tests inside the container to share the same DB/migrations
       - name: Run tests inside container
