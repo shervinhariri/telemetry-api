@@ -46,10 +46,11 @@ def test_ingest_zeek_conn(client):
         "records": [
             {
                 "ts": 1723351200.456,
-                "id_orig_h": "10.1.2.3",
-                "id_orig_p": 55342,
-                "id_resp_h": "8.8.8.8",
-                "id_resp_p": 53,
+                "uid": "C1234567890abcdef",
+                "id.orig_h": "10.1.2.3",
+                "id.orig_p": 55342,
+                "id.resp_h": "8.8.8.8",
+                "id.resp_p": 53,
                 "proto": "udp",
                 "service": "dns",
                 "duration": 0.025,
@@ -87,7 +88,7 @@ def test_ingest_flows(client):
                 "dst_ip": "1.1.1.1",
                 "src_port": 12345,
                 "dst_port": 80,
-                "protocol": "tcp",
+                "proto": "tcp",
                 "bytes": 1024,
                 "packets": 10
             }
@@ -151,7 +152,21 @@ def test_metrics_endpoint(client):
 # Error cases
 def test_ingest_no_auth(client):
     """Test ingest without authentication"""
-    payload = {"collector_id": "test", "format": "zeek.conn", "records": []}
+    payload = {
+        "collector_id": "test", 
+        "format": "zeek.conn", 
+        "records": [
+            {
+                "ts": 1723351200.456,
+                "uid": "C1234567890abcdef",
+                "id.orig_h": "10.1.2.3",
+                "id.orig_p": 55342,
+                "id.resp_h": "8.8.8.8",
+                "id.resp_p": 53,
+                "proto": "udp"
+            }
+        ]
+    }
     response = client.post("/v1/ingest", json=payload)
     assert response.status_code == 401
 
@@ -163,8 +178,8 @@ def test_ingest_invalid_format(client):
 
 def test_ingest_too_many_records(client):
     """Test ingest with too many records"""
-    records = [{"ts": 1723351200, "id_orig_h": "1.1.1.1", "id_orig_p": 80, 
-                "id_resp_h": "2.2.2.2", "id_resp_p": 443, "proto": "tcp"} for _ in range(10001)]
+    records = [{"ts": 1723351200, "uid": f"C{i:012x}", "id.orig_h": "1.1.1.1", "id.orig_p": 80, 
+                "id.resp_h": "2.2.2.2", "id.resp_p": 443, "proto": "tcp"} for i in range(10001)]
     payload = {"collector_id": "test", "format": "zeek.conn", "records": records}
     response = client.post("/v1/ingest", json=payload, headers=VALID_HEADERS)
     assert response.status_code == 413
