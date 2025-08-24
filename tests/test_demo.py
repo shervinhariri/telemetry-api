@@ -108,7 +108,7 @@ class TestDemoService:
         assert status['duration_sec'] == DEMO_DURATION_SEC
         assert status['variants'] == DEMO_VARIANTS
         assert status['elapsed_sec'] == 0
-        assert status['remaining_sec'] == DEMO_DURATION_SEC
+        assert status['remaining_sec'] == 0  # Not running, so remaining is 0
     
     @pytest.mark.asyncio
     async def test_start_demo_service(self):

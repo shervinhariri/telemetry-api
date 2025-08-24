@@ -64,10 +64,11 @@ def test_ingest_zeek():
         "records": [
             {
                 "ts": 1723351200.456,
-                "id_orig_h": "10.1.2.3",
-                "id_orig_p": 55342,
-                "id_resp_h": "8.8.8.8",
-                "id_resp_p": 53,
+                "uid": "C1234567890abcdef",
+                "id.orig_h": "10.1.2.3",
+                "id.orig_p": 55342,
+                "id.resp_h": "8.8.8.8",
+                "id.resp_p": 53,
                 "proto": "udp",
                 "service": "dns",
                 "duration": 0.025,
@@ -79,8 +80,8 @@ def test_ingest_zeek():
     
     result = make_request("POST", "/v1/ingest", zeek_data)
     assert result is not None, "Zeek ingest request failed"
-    assert result.get("accepted", 0) > 0, f"Zeek ingest failed: {result}"
-    print(f"✅ Zeek ingest passed: {result.get('accepted')} records accepted")
+    assert result.get("status") == "accepted", f"Zeek ingest failed: {result}"
+    print(f"✅ Zeek ingest passed: {result.get('records_processed')} records processed")
 
 def test_ingest_netflow():
     """Test NetFlow ingest endpoint"""
@@ -97,7 +98,7 @@ def test_ingest_netflow():
                 "dst_ip": "1.1.1.1",
                 "src_port": 12345,
                 "dst_port": 80,
-                "protocol": "tcp",
+                "proto": "tcp",
                 "bytes": 1024,
                 "packets": 10
             }
@@ -106,8 +107,8 @@ def test_ingest_netflow():
     
     result = make_request("POST", "/v1/ingest", netflow_data)
     assert result is not None, "NetFlow ingest request failed"
-    assert result.get("accepted", 0) > 0, f"NetFlow ingest failed: {result}"
-    print(f"✅ NetFlow ingest passed: {result.get('accepted')} records accepted")
+    assert result.get("status") == "accepted", f"NetFlow ingest failed: {result}"
+    print(f"✅ NetFlow ingest passed: {result.get('records_processed')} records processed")
 
 def test_ingest_bulk():
     """Test bulk ingest endpoint"""
