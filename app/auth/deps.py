@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import time
+import json
 from sqlalchemy.exc import OperationalError
 from sqlalchemy import text
 from app.db import SessionLocal
@@ -12,6 +13,26 @@ from app.utils.crypto import hash_token
 from app.db_init import init_schema_and_seed_if_needed
 
 log = logging.getLogger("telemetry")
+
+def _parse_scopes(scopes_str: str) -> list:
+    """Parse scopes from string, handling both JSON arrays and comma-separated values"""
+    if not scopes_str:
+        return []
+    
+    scopes_str = scopes_str.strip()
+    
+    # Try to parse as JSON first
+    try:
+        if scopes_str.startswith('[') and scopes_str.endswith(']'):
+            json_scopes = json.loads(scopes_str)
+            if isinstance(json_scopes, list):
+                return [str(s).strip().lower() for s in json_scopes if s]
+    except (json.JSONDecodeError, TypeError):
+        pass
+    
+    # Fallback to comma-separated parsing
+    parts = re.split(r"[\s,]+", scopes_str)
+    return [p.strip().lower() for p in parts if p.strip()]
 
 async def authenticate(request: Request):
     # Ensure schema exists + seed default keys if empty (idempotent, guarded)
@@ -49,8 +70,7 @@ async def authenticate(request: Request):
                     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key disabled")
                 
                 # Parse scopes properly
-                scopes_str = row.scopes or ""
-                scopes_list = [s.strip().lower() for s in scopes_str.split(",") if s.strip()]
+                scopes_list = _parse_scopes(row.scopes or "")
                 request.state.scopes = scopes_list
                 request.state.key_id = row.key_id
                 request.state.tenant_id = "default"  # For now, use default tenant
