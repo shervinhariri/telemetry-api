@@ -1,6 +1,6 @@
 services:
   api:
-    image: ${IMAGE_REPO:-shvin/telemetry-api}:${IMAGE_TAG:-v0.8.6-golden}
+    image: ${IMAGE_REPO:-shvin/telemetry-api}:${IMAGE_TAG:-v0.8.7-golden}
     environment:
       TELEMETRY_DLQ_DIR: ${TELEMETRY_DLQ_DIR:-/tmp/dlq}
   
