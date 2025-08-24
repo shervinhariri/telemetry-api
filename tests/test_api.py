@@ -134,6 +134,35 @@ def test_metrics_endpoint(client):
     assert "requests_failed" in data
     assert "records_processed" in data
 
+def test_system_features(client):
+    """Test system endpoint includes features"""
+    response = client.get("/v1/system", headers=VALID_HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    assert "features" in data
+    assert "sources" in data["features"]
+    assert data["features"]["sources"] == True
+    assert "udp_head" in data["features"]
+    assert data["features"]["udp_head"] == False
+
+def test_sources_endpoint(client):
+    """Test sources endpoint returns expected format"""
+    response = client.get("/v1/sources", headers=VALID_HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    assert "sources" in data
+    assert "total" in data
+    assert "page" in data
+    assert "size" in data
+    assert "pages" in data
+    assert "items" in data
+    assert isinstance(data["sources"], list)
+    assert isinstance(data["total"], int)
+    assert isinstance(data["page"], int)
+    assert isinstance(data["size"], int)
+    assert isinstance(data["pages"], int)
+    assert isinstance(data["items"], list)
+
 # Error cases
 def test_ingest_no_auth(client):
     """Test ingest without authentication - skip due to middleware complexity"""
