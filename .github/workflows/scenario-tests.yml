@@ -44,6 +44,18 @@ jobs:
           docker exec telemetry-api sqlite3 -version
           docker exec telemetry-api python -c "import pytest, sqlite3; print('pytest+sqlite3 OK')"
 
+      - name: DB check (verify scopes format)
+        run: |
+          docker exec telemetry-api sh -lc 'python - <<"PY"
+          from app.db import SessionLocal
+          from sqlalchemy import text
+          s = SessionLocal()
+          print("DB scopes check:")
+          for row in s.execute(text("select key_id, scopes from api_keys")).fetchmany(3):
+              print(f"  {row[0]}: {row[1]}")
+          s.close()
+          PY'
+
       # Run ALL tests inside the container to share the same DB/migrations
       - name: Run tests inside container
         run: |
