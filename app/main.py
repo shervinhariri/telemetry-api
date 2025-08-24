@@ -43,6 +43,7 @@ from .config import API_VERSION
 from .auth.deps import require_scopes
 from .auth.tenant import require_tenant
 from . import pipeline as pipeline_mod  # import the *module*, not the FastAPI instance
+from .db_init import init_schema_and_seed
 
 # Import configuration
 from .config import (
@@ -80,6 +81,9 @@ async def lifespan(application: FastAPI):
     
     # Bind async primitives to the *active* event loop
     application.state.event_queue = asyncio.Queue(maxsize=10000)
+
+    # Ensure DB schema + seed default API keys (idempotent)
+    init_schema_and_seed()
 
     # Back-compat: point pipeline module's queue at the new loop-bound queue
     pipeline_mod.ingest_queue = application.state.event_queue

@@ -29,3 +29,17 @@ def get_db():
         yield db
     finally:
         db.close()
+
+from contextlib import contextmanager
+
+@contextmanager
+def session_scope():
+    s = SessionLocal()
+    try:
+        yield s
+        s.commit()
+    except Exception:
+        s.rollback()
+        raise
+    finally:
+        s.close()
