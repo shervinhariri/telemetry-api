@@ -37,6 +37,22 @@ def test_db():
         session.add(api_key)
         session.commit()
     
+    # Check if test user API key exists, create if not
+    test_user_key = "user-key"
+    user_key_hash = hashlib.sha256(test_user_key.encode()).hexdigest()
+    
+    user_api_key = session.query(ApiKey).filter_by(hash=user_key_hash).first()
+    if not user_api_key:
+        # Create test user API key (no admin scope)
+        user_api_key = ApiKey(
+            key_id="test-user", 
+            tenant_id="default", 
+            hash=user_key_hash,
+            scopes=["ingest", "read_metrics"]  # No admin scope
+        )
+        session.add(user_api_key)
+        session.commit()
+    
     session.close()
     
     yield

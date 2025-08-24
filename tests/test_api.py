@@ -42,7 +42,7 @@ def test_ingest_zeek_conn(client):
     """Test Zeek connection ingest"""
     payload = {
         "collector_id": "test-zeek-1",
-        "format": "zeek.conn.v1",
+        "format": "zeek.conn",
         "records": [
             {
                 "ts": 1723351200.456,
@@ -63,7 +63,7 @@ def test_ingest_zeek_conn(client):
     assert response.status_code == 200
     data = response.json()
     assert data["collector_id"] == "test-zeek-1"
-    assert data["format"] == "zeek.conn.v1"
+    assert data["format"] == "zeek.conn"
     assert data["count"] == 1
     assert len(data["records"]) == 1
     
@@ -151,7 +151,7 @@ def test_metrics_endpoint(client):
 # Error cases
 def test_ingest_no_auth(client):
     """Test ingest without authentication"""
-    payload = {"collector_id": "test", "format": "zeek.conn.v1", "records": []}
+    payload = {"collector_id": "test", "format": "zeek.conn", "records": []}
     response = client.post("/v1/ingest", json=payload)
     assert response.status_code == 401
 
@@ -159,13 +159,13 @@ def test_ingest_invalid_format(client):
     """Test ingest with invalid format"""
     payload = {"collector_id": "test", "format": "invalid", "records": []}
     response = client.post("/v1/ingest", json=payload, headers=VALID_HEADERS)
-    assert response.status_code == 400
+    assert response.status_code == 422
 
 def test_ingest_too_many_records(client):
     """Test ingest with too many records"""
     records = [{"ts": 1723351200, "id_orig_h": "1.1.1.1", "id_orig_p": 80, 
                 "id_resp_h": "2.2.2.2", "id_resp_p": 443, "proto": "tcp"} for _ in range(10001)]
-    payload = {"collector_id": "test", "format": "zeek.conn.v1", "records": records}
+    payload = {"collector_id": "test", "format": "zeek.conn", "records": records}
     response = client.post("/v1/ingest", json=payload, headers=VALID_HEADERS)
     assert response.status_code == 413
 
