@@ -37,6 +37,7 @@ DOCKERHUB_TAG = os.getenv("DOCKERHUB_TAG", APP_VERSION)
 def get_version():
     image_version = (
         getattr(config, "APP_VERSION", None)
+        or getattr(config, "API_VERSION", None)
         or getattr(config, "IMAGE_VERSION", None)
         or os.getenv("IMAGE_VERSION")
         or "dev"
@@ -50,7 +51,7 @@ def get_version():
         "api_version": "v1",
         "image_version": image_version,
         # legacy keys many tests assert:
-        "version": image_version,
+        "version": f"v{image_version}" if not image_version.startswith("v") else image_version,
         "git_sha": (git_sha[:7] if isinstance(git_sha, str) else "unknown"),
         "image": image,
         "image_tag": image_tag,
