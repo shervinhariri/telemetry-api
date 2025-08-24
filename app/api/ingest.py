@@ -134,3 +134,8 @@ async def ingest(
             "component": "ingest"
         })
         raise HTTPException(status_code=500, detail="Internal server error")
+
+# Compatibility alias for tests expecting /v1/ingest/bulk
+@router.post("/ingest/bulk")
+async def ingest_bulk(*args, **kwargs):
+    return await ingest(*args, **kwargs)

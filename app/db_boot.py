@@ -36,7 +36,7 @@ def ensure_schema_and_seed_keys():
         for tok in tokens:
             h = _sha(tok)
             key_id = f"seed-{h[:8]}"
-            scopes = "admin,*"
+            scopes = '["admin","*"]'  # JSON array format
             
             db.execute(text("""
             INSERT INTO api_keys (key_id, tenant_id, hash, scopes, disabled, created_at)

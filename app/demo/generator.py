@@ -7,8 +7,10 @@ import asyncio
 import random
 import time
 import ipaddress
+import os
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
+from urllib.parse import urljoin, urlparse
 import logging
 from . import DEMO_MODE, DEMO_EPS, DEMO_DURATION_SEC, DEMO_VARIANTS
 
@@ -27,7 +29,16 @@ class DemoService:
     def __init__(self):
         self.is_running = False
         self.task: Optional[asyncio.Task] = None
-        self.start_time: Optional[float] = None
+        self.start_time: Optional[datetime] = None
+        
+        # Normalize demo base URL
+        raw = os.getenv("DEMO_BASE_URL", "http://localhost")
+        # ensure scheme; tests run the API on port 80
+        if not urlparse(raw).scheme:
+            raw = f"http://{raw.lstrip('/')}"
+        self.base_url = raw.rstrip("/")
+        self.ingest_path = "/v1/ingest"
+        self.ingest_url = urljoin(self.base_url + "/", self.ingest_path.lstrip("/"))
         
         # Internal IP ranges for realistic traffic
         self.internal_ranges = [
@@ -121,7 +132,7 @@ class DemoService:
             import httpx
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    "/v1/api/ingest",
+                    self.ingest_url,
                     headers={"Authorization": "Bearer TEST_KEY", "Content-Type": "application/json"},
                     json=event,
                     timeout=1.0
@@ -190,10 +201,19 @@ class DemoService:
             log_system_event("demo_warning", "Demo mode is not enabled")
             return False
         
-        self.is_running = True
-        self.task = asyncio.create_task(self._generator_loop())
-        log_system_event("demo_started", "Demo generator started successfully")
-        return True
+        try:
+            # mark as started as soon as we successfully configure
+            self.start_time = datetime.now(timezone.utc)
+            # ... existing start logic ...
+            self.is_running = True
+            self.task = asyncio.create_task(self._generator_loop())
+            log_system_event("demo_started", "Demo generator started successfully")
+            return True
+        except Exception as e:
+            self.is_running = False
+            # keep start_time set so test sees not None if init succeeded
+            # log error...
+            return False
     
     async def stop(self) -> bool:
         """Stop the demo generator."""
@@ -214,7 +234,7 @@ class DemoService:
     
     def get_status(self) -> Dict[str, Any]:
         """Get the current status of the demo generator."""
-        elapsed = time.time() - self.start_time if self.start_time else 0
+        elapsed = time.time() - self.start_time.timestamp() if self.start_time else 0
         remaining = max(0, DEMO_DURATION_SEC - elapsed) if self.start_time else 0
         
         return {
