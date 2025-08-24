@@ -144,4 +144,15 @@ async def ingest_bulk(
     content_encoding: Optional[str] = Header(None), 
     x_source_id: Optional[str] = Header(None)
 ):
-    return await ingest(request, response, Authorization, content_encoding, x_source_id)
+    # Forward to the same core handler; never 500 on decoding
+    try:
+        return await ingest(request, response, Authorization, content_encoding, x_source_id)
+    except HTTPException as he:
+        # bubble controlled errors
+        raise he
+    except Exception as e:
+        # harden: return actionable 400 with message instead of 500
+        return JSONResponse(
+            status_code=400,
+            content={"error": "bulk_ingest_failed", "detail": str(e)}
+        )

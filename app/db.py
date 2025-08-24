@@ -5,6 +5,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
+import json
+
+def _safe_json_deserializer(value):
+    # Tolerate legacy bad values like 'admin,*' so SELECTs don't crash
+    try:
+        return json.loads(value)
+    except Exception:
+        return value
 
 # Database URL from environment or default to SQLite
 sqlite_path = os.getenv("SQLITE_PATH", "./telemetry.db")
@@ -13,6 +21,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{sqlite_path}")
 # Create engine
 engine = create_engine(
     DATABASE_URL,
+    future=True,
+    json_deserializer=_safe_json_deserializer,
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 )
 

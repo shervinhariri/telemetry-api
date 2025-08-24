@@ -158,6 +158,7 @@ class DemoService:
             "duration_sec": DEMO_DURATION_SEC,
             "variants": DEMO_VARIANTS
         })
+        # Use timestamp for the generator loop
         self.start_time = time.time()
         
         # Calculate delay between events to achieve target EPS
@@ -202,17 +203,15 @@ class DemoService:
             return False
         
         try:
-            # mark as started as soon as we successfully configure
+            # mark service start as soon as init succeeds
             self.start_time = datetime.now(timezone.utc)
-            # ... existing start logic ...
+            # existing logic to spin producer...
             self.is_running = True
             self.task = asyncio.create_task(self._generator_loop())
             log_system_event("demo_started", "Demo generator started successfully")
             return True
-        except Exception as e:
+        except Exception:
             self.is_running = False
-            # keep start_time set so test sees not None if init succeeded
-            # log error...
             return False
     
     async def stop(self) -> bool:
