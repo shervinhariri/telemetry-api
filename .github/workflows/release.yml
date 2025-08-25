@@ -27,6 +27,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Ensure VERSION file exists
+        run: |
+          test -f VERSION || { echo "VERSION file missing at repo root"; exit 1; }
+          echo "VERSION file found: $(cat VERSION)"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -46,6 +51,8 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            VERSION=$(cat VERSION)
           tags: |
             ${{ env.IMAGE }}:${{ env.VERSION }}
             ${{ env.IMAGE }}:${{ env.GOLDEN_TAG }}
@@ -81,7 +88,7 @@ jobs:
 
       - name: Smoke - version
         run: |
-          expected="v$(cat VERSION)"
+          expected="$(cat VERSION)"
           v=$(curl -sf http://localhost/v1/version | jq -r '.version')
           test "$v" = "$expected" || (echo "Expected $expected, got '$v'"; exit 1)
 

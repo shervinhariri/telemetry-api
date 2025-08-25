@@ -10,9 +10,14 @@ router = APIRouter()
 APP_NAME = os.getenv("APP_NAME", "telemetry-api")
 
 def get_version_from_file():
-    """Read version from VERSION file, fallback to env APP_VERSION, then config"""
+    """Read version from TELEMETRY_VERSION env var, fallback to VERSION file, then config"""
+    # Primary: TELEMETRY_VERSION env var (set by Docker build)
+    version = os.getenv("TELEMETRY_VERSION")
+    if version:
+        return version
+    
+    # Secondary: VERSION file at repo root
     try:
-        # Try to read from VERSION file at repo root
         version_file = Path(__file__).parent.parent.parent / "VERSION"
         if version_file.exists():
             with open(version_file, 'r') as f:
@@ -51,7 +56,7 @@ def get_version():
         "api_version": "v1",
         "image_version": image_version,
         # legacy keys many tests assert:
-        "version": f"v{image_version}" if not image_version.startswith("v") else image_version,
+        "version": image_version,  # Return numeric version (no "v" prefix)
         "git_sha": (git_sha[:7] if isinstance(git_sha, str) else "unknown"),
         "image": image,
         "image_tag": image_tag,
