@@ -696,11 +696,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (logo) {
       logo.addEventListener('click', (e) => {
         e.preventDefault();
-        // Put cache-buster in the query string, and reset hash cleanly
-        const u = new URL(window.location.href);
-        u.hash = '#dashboard';
-        u.searchParams.set('r', String(Date.now()));
-        window.location.replace(u.toString());
+        // Professional behavior: reload current route without adding junk to URL.
+        // This preserves the current tab/hash and does a full reload.
+        window.location.reload(); // cache headers should handle freshness (see note below)
       }, { once: false, passive: false });
     }
     
@@ -1042,16 +1040,16 @@ window.submitEditSource = async function (evt) {
 class TelemetryDashboard {
     constructor(opts) {
         console.log('TelemetryDashboard constructor called');
-        // Normalize apiBase to exactly "/v1" (relative), callers may pass full paths; we sanitize in url()
-        this.apiBase = (opts?.apiBase || '/v1');
+        // Normalize API base to exactly '/v1' (no trailing slash, no duplication)
+        const base = (opts?.apiBase || '/v1').replace(/\/+$/,''); // remove trailing slashes
+        this.apiBase = base.endsWith('/v1') ? base : '/v1';
         this.apiKey = getApiKey();
         this.currentRequestsData = [];
         this.logsEventSource = null;
         this.logsInterval = null;
         this.autoRefreshInterval = null;
-        this.features = { sources: true, udp_head: false }; // default; overwritten by /system
-        this._initialized = false;           // guard against double init
-        this._boundHashHandler = null;       // keep a stable handler ref
+        this._initialized = false;
+        this.features = { sources: true, udp_head: false }; // sane defaults always present
         
         console.log('API Base URL:', this.apiBase);
         console.log('API Key:', this.apiKey);
@@ -1059,17 +1057,27 @@ class TelemetryDashboard {
         this.init();
     }
 
-    // Build a safe API URL without duplicating /v1 or origin
+    // --- Features normalization (prevents 'undefined' crashes everywhere) ---
+    normalizeFeatures(obj) {
+        const f = obj || {};
+        return {
+            sources:  !!f.sources,
+            udp_head: !!f.udp_head,
+        };
+    }
+    setFeatures(obj) {
+        this.features = this.normalizeFeatures(obj);
+        return this.features;
+    }
+
+    // Always build URLs safely; never allow /v1 to be duplicated.
     url(path) {
-        const base = String(this.apiBase || '/v1').replace(/\/+$/, ''); // strip trailing slashes
+        const base = this.apiBase.replace(/\/+$/,''); // '/v1'
         let p = String(path || '');
-        // strip origin if an absolute URL was accidentally passed
-        p = p.replace(/^https?:\/\/[^/]+/, '');
-        // ensure leading slash
-        if (!p.startsWith('/')) p = '/' + p;
-        // collapse a duplicated /v1 prefix
-        if (base.endsWith('/v1') && p.startsWith('/v1/')) p = p.slice(3);
-        return base + p; // '/v1' + '/metrics' => '/v1/metrics'
+        p = p.replace(/^https?:\/\/[^/]+/, '');       // strip origin if present
+        p = p.replace(/^\/+/, '/');                   // ensure leading slash
+        if (base.endsWith('/v1') && p.startsWith('/v1/')) p = p.slice(3); // '/v1/xxx' -> '/xxx'
+        return base + p;                              // '/v1' + '/metrics' => '/v1/metrics'
     }
 
     async init() {
@@ -1078,24 +1086,13 @@ class TelemetryDashboard {
             return;
         }
         this._initialized = true;
-        console.log('Initializing TelemetryDashboard...');
+        console.log('TelemetryDashboard initialized');
         
         this.setupEventListeners();
-        await this.loadInitialData();        // loads /system + /metrics
-        this.applyFeatureGates();
-
-        const defaultTab = (location.hash?.substring(1) || 'dashboard');
-        // ensure panels exist before switching
+        await this.loadInitialData();
+        this.applyFeatureGates(); // uses normalized defaults even if /system failed
+        const defaultTab = location.hash?.substring(1) || 'dashboard'; // preserve hash routing
         queueMicrotask(() => this.switchTab(defaultTab));
-
-        // Bind hashchange exactly once
-        if (!this._boundHashHandler) {
-            this._boundHashHandler = () => {
-                const tab = location.hash?.substring(1) || 'dashboard';
-                this.switchTab(tab);
-            };
-            window.addEventListener('hashchange', this._boundHashHandler, { passive: true });
-        }
         
         this.startAutoRefresh();
         console.log('TelemetryDashboard initialized');
@@ -1293,8 +1290,11 @@ class TelemetryDashboard {
         }
     }
 
-    applyFeatureGates() {
-        const gates = this.features || {};
+    applyFeatureGates(forced) {
+        // Accept a value (some callers pass undefined) but always normalize
+        const gates = this.normalizeFeatures(forced ?? this.features);
+        // Keep internal features consistent and never undefined
+        this.features = gates;
         console.log('Applying feature gates:', gates);
         const sourcesTab = document.getElementById('tab-sources');
         const sourcesPanel = document.getElementById('panel-sources');
@@ -1400,46 +1400,24 @@ class TelemetryDashboard {
             const k = getApiKey();
             if (!k) { this.showError('dashboard','API key required.'); promptForKey('no key found'); return; }
             
-            // Load system info first (with backoff for 503)
-            let system;
+            // Load /system first; keep defaults if it fails so UI stays usable.
             try {
-                system = await withBackoff(() => this.apiCall('/system'), {retries:5, base:1000});
+                const system = await this.apiCall('/system');
                 console.log('System info loaded:', system);
-            } catch (error) {
-                console.error('Failed to load system info:', error);
-                if (error.message.includes('HTTP 503')) {
-                    // Don't show error for 503, just keep retrying
-                    return;
-                }
-                system = { version: '0.8.9' }; // Set default version if API fails
+                this.setFeatures(system?.features);
+                this.updateSystemInfo?.(system); // MUST NOT overwrite this.features inside
+            } catch (e) {
+                console.error('Failed to load /system:', e);
             }
             
-            this.updateSystemInfo(system);
-            
-            // Apply feature gates based on system info
-            this.applyFeatureGates(system?.features || {});
-            
-            // Start UDP head status polling only if feature is enabled
-            if (this.features?.udp_head) {
-                this.loadUdpHeadStatus();
-                this.udpHeadInterval = setInterval(() => this.loadUdpHeadStatus(), 3000);
-                console.log('UDP head polling started (feature enabled)');
-            } else {
-                console.log('UDP head polling disabled (feature not enabled)');
-            }
-
-            // Load metrics (with backoff for 503)
+            // Load metrics (non-fatal)
             try {
-                const metrics = await withBackoff(() => this.apiCall('/metrics'), {retries:5, base:1000});
+                const metrics = await this.apiCall('/metrics');
                 console.log('Metrics loaded:', metrics);
-                this.updateDashboardMetrics(metrics);
-            } catch (error) {
-                console.error('Failed to load metrics:', error);
-                if (error.message.includes('HTTP 503')) {
-                    // Don't show error for 503, just keep retrying
-                    return;
-                }
-                this.showError('dashboard', error.message);
+                this.updateDashboardMetrics?.(metrics);
+            } catch (e) {
+                console.error('Failed to load metrics:', e);
+                this.showError?.('dashboard', e.message || String(e));
             }
             
         } catch (error) {
