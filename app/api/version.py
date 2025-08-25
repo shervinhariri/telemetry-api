@@ -34,7 +34,7 @@ GIT_SHA = os.getenv("GIT_SHA", "unknown")
 IMAGE = os.getenv("IMAGE", "shvin/telemetry-api")
 UPDATE_CHECK_ENABLED = os.getenv("UPDATE_CHECK_ENABLED", "true").lower() == "true"
 DOCKERHUB_REPO = os.getenv("DOCKERHUB_REPO", IMAGE)  # e.g. shvin/telemetry-api
-DOCKERHUB_TAG = os.getenv("DOCKERHUB_TAG", APP_VERSION)
+DOCKERHUB_TAG = os.getenv("DOCKERHUB_TAG", "dev")
 
 @router.get("/version")
 def get_version():
