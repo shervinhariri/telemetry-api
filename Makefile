@@ -4,7 +4,7 @@
 
 pull:
 	@echo "📥 Pulling Hub image..."
-	@IMAGE_REPO=$${IMAGE_REPO:-shvin/telemetry-api} IMAGE_TAG=$${IMAGE_TAG:-v0.8.9-golden} docker compose -f docker-compose.yml -f compose.override.yml pull
+	@IMAGE_REPO=$${IMAGE_REPO:-shvin/telemetry-api} IMAGE_TAG=$${IMAGE_TAG:-v0.8.10-golden} docker compose -f docker-compose.yml -f compose.override.yml pull
 
 down:
 	@echo "🛑 Stopping and cleaning containers..."
@@ -58,7 +58,7 @@ help:
 	@echo "  seed-admin - Seed admin keys in running container"
 	@echo ""
 	@echo "Usage examples:"
-	@echo "  make repro                    # Default: shvin/telemetry-api:v0.8.9-golden"
-	@echo "  make repro IMAGE_TAG=v0.8.9   # Specific tag"
+	@echo "  make repro                    # Default: shvin/telemetry-api:v0.8.10-golden"
+	@echo "  make repro IMAGE_TAG=v0.8.10   # Specific tag"
 	@echo "  make logs                     # View logs"
 	@echo "  make down                     # Stop & clean"

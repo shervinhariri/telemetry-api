@@ -2,11 +2,11 @@ version: "3.9"
 services:
   api:
     build: .
-    image: ghcr.io/netreex/telemetry-api:0.8.9
+    image: ghcr.io/netreex/telemetry-api:0.8.10
     container_name: telemetry-api
     environment:
       - APP_PORT=80
-      - APP_VERSION=0.8.9
+      - APP_VERSION=0.8.10
       - TELEMETRY_FEATURE_SOURCES=false
       - TELEMETRY_FEATURE_UDP=false
       - SQLITE_PATH=/data/telemetry.db
@@ -50,7 +50,7 @@ services:
   # keep disabled until UDP ingest exists in backend
   udp-ingestor:
     build: ./services/udp-head
-    image: ghcr.io/netreex/telemetry-api-udp:0.8.9
+    image: ghcr.io/netreex/telemetry-api-udp:0.8.10
     container_name: telemetry-udp-ingestor
     environment:
       - UDP_BIND=0.0.0.0

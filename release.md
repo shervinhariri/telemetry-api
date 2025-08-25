@@ -5,7 +5,7 @@
 - [ ] All tests passing
 - [ ] Documentation updated
 - [ ] CHANGELOG.md updated
-- [ ] VERSION file updated (e.g., `0.8.9`)
+- [ ] VERSION file updated (e.g., `0.8.10`)
 - [ ] Docker image builds successfully
 
 ## Release Commands

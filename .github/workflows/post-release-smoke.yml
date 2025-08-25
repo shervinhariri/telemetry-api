@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to test (e.g., 0.8.9)'
+        description: 'Version to test (e.g., 0.8.10)'
         required: true
-        default: '0.8.9'
+        default: '0.8.10'
       api_key:
         description: 'API key for testing'
         required: true
