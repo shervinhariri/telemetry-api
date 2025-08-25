@@ -30,8 +30,6 @@ def get_version_from_file():
     # Fallback to environment variable
     from ..config import API_VERSION
     return os.getenv("APP_VERSION", API_VERSION)
-
-APP_VERSION = get_version_from_file()
 GIT_SHA = os.getenv("GIT_SHA", "unknown")
 IMAGE = os.getenv("IMAGE", "shvin/telemetry-api")
 UPDATE_CHECK_ENABLED = os.getenv("UPDATE_CHECK_ENABLED", "true").lower() == "true"
@@ -40,13 +38,7 @@ DOCKERHUB_TAG = os.getenv("DOCKERHUB_TAG", APP_VERSION)
 
 @router.get("/version")
 def get_version():
-    image_version = (
-        getattr(config, "APP_VERSION", None)
-        or getattr(config, "API_VERSION", None)
-        or getattr(config, "IMAGE_VERSION", None)
-        or os.getenv("IMAGE_VERSION")
-        or "dev"
-    )
+    image_version = get_version_from_file()
     git_sha = os.getenv("GIT_SHA", getattr(config, "GIT_SHA", "unknown"))
     image_digest = os.getenv("IMAGE_DIGEST", getattr(config, "IMAGE_DIGEST", "unknown"))
     image = os.getenv("IMAGE", getattr(config, "IMAGE", "unknown"))
