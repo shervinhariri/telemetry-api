@@ -696,10 +696,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (logo) {
       logo.addEventListener('click', (e) => {
         e.preventDefault();
-        // force reload and bust cache for app.js when needed
-        const hash = location.hash || '#dashboard';
-        const base = location.origin + '/' + hash;
-        location.replace(base + (base.includes('?') ? '&' : '?') + 'r=' + Date.now());
+        // Put cache-buster in the query string, and reset hash cleanly
+        const u = new URL(window.location.href);
+        u.hash = '#dashboard';
+        u.searchParams.set('r', String(Date.now()));
+        window.location.replace(u.toString());
       }, { once: false, passive: false });
     }
     
@@ -1041,7 +1042,8 @@ window.submitEditSource = async function (evt) {
 class TelemetryDashboard {
     constructor(opts) {
         console.log('TelemetryDashboard constructor called');
-        this.apiBase = opts?.apiBase || window.location.origin; // Use the current domain
+        // Normalize apiBase to exactly "/v1" (relative), callers may pass full paths; we sanitize in url()
+        this.apiBase = (opts?.apiBase || '/v1');
         this.apiKey = getApiKey();
         this.currentRequestsData = [];
         this.logsEventSource = null;
@@ -1055,6 +1057,19 @@ class TelemetryDashboard {
         console.log('API Key:', this.apiKey);
         
         this.init();
+    }
+
+    // Build a safe API URL without duplicating /v1 or origin
+    url(path) {
+        const base = String(this.apiBase || '/v1').replace(/\/+$/, ''); // strip trailing slashes
+        let p = String(path || '');
+        // strip origin if an absolute URL was accidentally passed
+        p = p.replace(/^https?:\/\/[^/]+/, '');
+        // ensure leading slash
+        if (!p.startsWith('/')) p = '/' + p;
+        // collapse a duplicated /v1 prefix
+        if (base.endsWith('/v1') && p.startsWith('/v1/')) p = p.slice(3);
+        return base + p; // '/v1' + '/metrics' => '/v1/metrics'
     }
 
     async init() {
@@ -1317,7 +1332,7 @@ class TelemetryDashboard {
 
     async apiCall(endpoint, options = {}) {
         try {
-            const url = `${this.apiBase}/v1${endpoint}`;
+            const url = this.url(endpoint);
             const headers = {
                 ...this.getAuthHeaders(),
                 ...options.headers
@@ -2021,7 +2036,7 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
             // Try SSE first, fallback to polling
             if (window.EventSource) {
                 try {
-                    this.logsEventSource = new EventSource(`${this.apiBase}/v1/logs/stream`);
+                    this.logsEventSource = new EventSource(this.url('/logs/stream'));
                     this.logsEventSource.onmessage = (event) => {
                         try {
                             const logEntry = JSON.parse(event.data);
@@ -2066,7 +2081,7 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
     startLogsPolling() {
         this.logsInterval = setInterval(async () => {
             try {
-                const response = await fetch(`${this.apiBase}/v1/logs/tail?max_bytes=50000&format=text`, {
+                const response = await fetch(this.url('/logs/tail?max_bytes=50000&format=text'), {
                     headers: { 'Authorization': `Bearer ${this.apiKey}` }
                 });
                 
@@ -2096,7 +2111,7 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
             if (!logsContent) return;
             
             // Try the new JSON endpoint first
-            const response = await fetch(`${this.apiBase}/v1/logs?limit=50`, {
+            const response = await fetch(this.url('/logs?limit=50'), {
                 headers: { 'Authorization': `Bearer ${this.apiKey}` }
             });
             
@@ -2113,7 +2128,7 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
                     logsContent.textContent = lines.join('\n');
                 } else {
                     // Fallback to tail endpoint
-                    const tailResponse = await fetch(`${this.apiBase}/v1/logs/tail?max_bytes=50000&format=text`, {
+                    const tailResponse = await fetch(this.url('/logs/tail?max_bytes=50000&format=text'), {
                         headers: { 'Authorization': `Bearer ${this.apiKey}` }
                     });
                     
@@ -2160,7 +2175,7 @@ ${(function(){ try { return JSON.stringify(request, null, 2).slice(0,20000); } c
 
     async downloadLogs() {
         try {
-            const response = await fetch(`${this.apiBase}/v1/logs/download?max_bytes=2000000`, {
+            const response = await fetch(this.url('/logs/download?max_bytes=2000000'), {
                 headers: { 'Authorization': `Bearer ${this.apiKey}` }
             });
             
