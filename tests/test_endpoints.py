@@ -115,23 +115,25 @@ def test_ingest_bulk():
     print("🔍 Testing /v1/ingest/bulk...")
     
     # Create sample data instead of loading from file
-    zeek_data = [
-        {
-            "ts": 1723351200.456,
-            "id_orig_h": "10.1.2.3",
-            "id_orig_p": 55342,
-            "id_resp_h": "8.8.8.8",
-            "id_resp_p": 53,
-            "proto": "udp",
-            "service": "dns",
-            "duration": 0.025,
-            "orig_bytes": 78,
-            "resp_bytes": 256
-        }
-    ]
+            zeek_data = [
+            {
+                "ts": 1723351200.456,
+                "uid": "C1234567890",
+                "id_orig_h": "10.1.2.3",
+                "id_orig_p": 55342,
+                "id_resp_h": "8.8.8.8",
+                "id_resp_p": 53,
+                "proto": "udp",
+                "service": "dns",
+                "duration": 0.025,
+                "orig_bytes": 78,
+                "resp_bytes": 256
+            }
+        ]
     
     bulk_data = {
-        "type": "zeek",
+        "collector_id": "test-collector",
+        "format": "zeek",
         "records": zeek_data
     }
     
