@@ -37,7 +37,8 @@ from .api.utils import router as utils_router
 from .api.ingest import router as ingest_router
 from .api.uploads import router as uploads_router
 from .api.enrichment_geoip import router as geoip_cfg_router
-from .pipeline import ingest_queue, record_batch_accepted, enqueue
+from .api.health import router as health_router
+from .queue_manager import queue_manager
 from .logging_config import setup_logging
 from .config import API_VERSION
 from .auth.deps import require_scopes
@@ -45,6 +46,7 @@ from .auth.tenant import require_tenant
 from . import pipeline as pipeline_mod  # import the *module*, not the FastAPI instance
 from .db_init import init_schema_and_seed_if_needed
 from .db_boot import ensure_schema_and_seed_keys
+from sqlalchemy import text
 
 # Import configuration
 from .config import (
@@ -80,8 +82,8 @@ async def lifespan(application: FastAPI):
         "component": "api"
     })
     
-    # Bind async primitives to the *active* event loop
-    application.state.event_queue = asyncio.Queue(maxsize=10000)
+    # Initialize queue manager
+    queue_manager.initialize()
 
     # DB bootstrap
     try:
@@ -107,14 +109,8 @@ async def lifespan(application: FastAPI):
     # Ensure DB schema + seed default API keys (idempotent)
     init_schema_and_seed_if_needed()
 
-    # Back-compat: point pipeline module's queue at the new loop-bound queue
-    pipeline_mod.ingest_queue = application.state.event_queue
-
-    # Start workers and keep handles for clean shutdown
-    application.state.worker_tasks = [
-        asyncio.create_task(pipeline_mod.worker_loop()),
-        asyncio.create_task(pipeline_mod.worker_loop()),
-    ]
+    # Start queue manager workers
+    await queue_manager.start_workers()
     
     # Start metrics ticker
     async def metrics_ticker():
@@ -123,6 +119,10 @@ async def lifespan(application: FastAPI):
             await asyncio.sleep(1)
     
     asyncio.create_task(metrics_ticker())
+    
+    # Start UDP head if feature flag is enabled
+    from .udp_head import start_udp_head
+    start_udp_head()
     
     # DB persistence self-check
     try:
@@ -153,14 +153,14 @@ async def lifespan(application: FastAPI):
         yield
     finally:
         # Graceful shutdown
-        for t in application.state.worker_tasks:
-            t.cancel()
-        for t in application.state.worker_tasks:
-            with suppress(asyncio.CancelledError):
-                await t
+        await queue_manager.stop_workers()
+        
+        # Stop UDP head
+        from .udp_head import stop_udp_head
+        stop_udp_head()
         
         logger.info("Telemetry API shutting down", extra={
-            "details": "Stopping pipeline workers",
+            "details": "Stopping queue workers and UDP head",
             "component": "api"
         })
 
@@ -198,6 +198,30 @@ class ApiVersionHeaderMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(ApiVersionHeaderMiddleware)
+
+# Add top-level exception handler for authentication errors
+from fastapi import HTTPException
+from .api.response_builders import build_auth_error_response
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Convert HTTPExceptions to proper JSON responses"""
+    if exc.status_code in [401, 403]:
+        return build_auth_error_response(exc.status_code, exc.detail)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": "http_error", "detail": exc.detail}
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Catch any unhandled exceptions and return 500"""
+    logger = logging.getLogger("app")
+    logger.error("Unhandled exception: %s", exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"error": "internal_server_error", "detail": "An unexpected error occurred"}
+    )
 
 # ------------------------------------------------------------
 # Public endpoint allowlist and middleware helpers
@@ -267,9 +291,9 @@ async def tenancy_middleware(request: Request, call_next):
     try:
         from .auth.deps import authenticate
         await authenticate(request)
-    except HTTPException:
-        # Let FastAPI return proper 401/403
-        raise
+    except HTTPException as exc:
+        # Return proper 401/403 response instead of raising
+        return build_auth_error_response(exc.status_code, exc.detail)
     except Exception:
         # Only unexpected errors should become 500
         log.exception("Unhandled error in middleware for %s", path)
@@ -295,6 +319,7 @@ app.include_router(utils_router, prefix=API_PREFIX)
 app.include_router(ingest_router, prefix=API_PREFIX)
 app.include_router(uploads_router, prefix=API_PREFIX)
 app.include_router(geoip_cfg_router, prefix=API_PREFIX)
+app.include_router(health_router, prefix=API_PREFIX)
 
 # UDP Metrics endpoint for mapper reporting
 @app.post(f"{API_PREFIX}/admin/metrics/udp")

@@ -11,6 +11,7 @@ from ..api.version import GIT_SHA, IMAGE, DOCKERHUB_TAG
 from ..metrics import metrics
 from ..pipeline import STATS
 from ..config import FEATURES
+from ..queue_manager import queue_manager
 
 from app.auth.deps import require_scopes
 
@@ -23,7 +24,10 @@ async def get_system_info() -> Dict[str, Any]:
         # Get application metrics
         with metrics.lock:
             events_per_second = len(metrics.eps_window) if metrics.eps_window else 0
-            queue_depth = metrics.totals.get("queue_depth", 0)
+        
+        # Get queue statistics from queue manager
+        queue_stats = queue_manager.get_queue_stats()
+        queue_depth = queue_stats["depth"]
         
         # Get recent errors (last 10)
         recent_errors = []
@@ -41,28 +45,34 @@ async def get_system_info() -> Dict[str, Any]:
         idempotency_stats = get_idempotency_stats()
         
         # Check for backpressure conditions
-        backpressure = False
-        if queue_depth > 5000:  # High queue depth
-            backpressure = True
+        backpressure = queue_stats["saturation"] > 0.8  # 80% saturation threshold
         if dlq_stats["total_events"] > 10000:  # High DLQ size
             backpressure = True
         
         from ..api.version import get_version_from_file
         version = get_version_from_file()
         
+        # Get UDP head status
+        from ..udp_head import get_udp_head_status
+        udp_head_status = get_udp_head_status()
+        
+        # Build features dict with UDP head status
+        features = FEATURES.copy()
+        features["udp_head"] = udp_head_status
+        
         return {
             "status": "ok",
             "version": version,
             "git_sha": GIT_SHA,
             "image": f"{IMAGE}:{version}",
-            "features": FEATURES,
+            "features": features,
             "uptime_s": uptime_seconds,
-            "workers": 1,  # Single worker for now
+            "workers": queue_manager.worker_pool_size,
             "mem_mb": 0,  # TODO: Implement without psutil
             "mem_pct": 0,  # TODO: Implement without psutil
             "cpu_pct": 0,  # TODO: Implement without psutil
             "eps": events_per_second,
-            "queue_depth": queue_depth,
+            "queue": queue_stats,
             "backpressure": backpressure,
             "dlq": dlq_stats,
             "idempotency": idempotency_stats,
@@ -80,7 +90,7 @@ async def get_system_info() -> Dict[str, Any]:
             "uptime_s": 0,
             "workers": 0,
             "eps": 0,
-            "queue_depth": 0,
+            "queue": {"depth": 0, "max": 0, "saturation": 0.0},
             "backpressure": False,
             "dlq": {"total_events": 0, "files": 0},
             "idempotency": {"keys": 0, "hits": 0},
