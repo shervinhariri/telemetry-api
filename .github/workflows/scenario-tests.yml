@@ -1,6 +1,9 @@
 name: scenario-tests
 on:
-  push: { branches: [ main ] }
+  push:
+    branches: [ main, 'fix/**' ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch: {}
 
 jobs:
