@@ -2,6 +2,17 @@
 
 All notable changes to the Telemetry API project will be documented in this file.
 
+## [0.8.10] - 2025-08-25
+
+### Fixed
+- **Feature Gates Stability**: Prevent crashes when `/system` endpoint is slow or fails by normalizing features and guarding `applyFeatureGates()` against undefined values.
+- **API Base Join**: Fix URL construction to prevent `/v1/v1/*` requests by implementing safe URL joining with proper base normalization.
+- **Hard-Refresh UX**: Logo click now preserves current tab/hash and performs clean full reload without adding `?r=` query parameters.
+
+### Changed
+- **UI Cache Bust**: Updated `app.js` cache-bust parameter to `vefix53` for development.
+- **Feature Normalization**: Added `normalizeFeatures()` and `setFeatures()` methods to ensure consistent feature state.
+
 ## [0.8.9] - 2025-08-25
 
 ### Changed
