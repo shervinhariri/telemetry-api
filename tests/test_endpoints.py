@@ -137,8 +137,8 @@ def test_ingest_bulk():
         "records": zeek_data
     }
     
-            # Debug: print the payload being sent
-        print(f"📤 Sending payload: {json.dumps(bulk_data, indent=2)}")
+    # Debug: print the payload being sent
+    print(f"📤 Sending payload: {json.dumps(bulk_data, indent=2)}")
         
         # Make request with better error handling
         url = f"{BASE_URL}/v1/ingest/bulk"
