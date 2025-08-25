@@ -1,11 +1,12 @@
 """
 Database configuration and session management
 """
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 import json
+import logging
 
 def _safe_json_deserializer(value):
     # Tolerate legacy bad values like 'admin,*' so SELECTs don't crash
@@ -17,6 +18,7 @@ def _safe_json_deserializer(value):
 # Database URL from environment or default to SQLite
 sqlite_path = os.getenv("SQLITE_PATH", "./telemetry.db")
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{sqlite_path}")
+logger = logging.getLogger(__name__)
 
 # Create engine
 engine = create_engine(
@@ -25,6 +27,20 @@ engine = create_engine(
     json_deserializer=_safe_json_deserializer,
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 )
+
+# Sanitize any legacy non-JSON scopes at import time so ORM row fetches never crash
+try:
+    with engine.begin() as conn:
+        conn.execute(text(
+            """
+            UPDATE api_keys
+            SET scopes='["admin","*"]'
+            WHERE scopes NOT LIKE '[%' AND scopes NOT LIKE '{%}'
+            """
+        ))
+except Exception as e:
+    # best-effort; schema may not exist on first startup
+    logger.warning("scope sanitize skipped: %s", e)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
