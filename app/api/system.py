@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any, List
 
-from ..api.version import APP_VERSION, GIT_SHA, IMAGE, DOCKERHUB_TAG
+from ..api.version import GIT_SHA, IMAGE, DOCKERHUB_TAG
 from ..metrics import metrics
 from ..pipeline import STATS
 from ..config import FEATURES
@@ -47,11 +47,14 @@ async def get_system_info() -> Dict[str, Any]:
         if dlq_stats["total_events"] > 10000:  # High DLQ size
             backpressure = True
         
+        from ..api.version import get_version_from_file
+        version = get_version_from_file()
+        
         return {
             "status": "ok",
-            "version": APP_VERSION,
+            "version": version,
             "git_sha": GIT_SHA,
-            "image": f"{IMAGE}:{APP_VERSION}",
+            "image": f"{IMAGE}:{version}",
             "features": FEATURES,
             "uptime_s": uptime_seconds,
             "workers": 1,  # Single worker for now
@@ -71,9 +74,9 @@ async def get_system_info() -> Dict[str, Any]:
         return {
             "status": "degraded",
             "warn": "System information unavailable",
-            "version": APP_VERSION,
+            "version": version,
             "git_sha": GIT_SHA,
-            "image": f"{IMAGE}:{APP_VERSION}",
+            "image": f"{IMAGE}:{version}",
             "uptime_s": 0,
             "workers": 0,
             "eps": 0,
