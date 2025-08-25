@@ -6,10 +6,11 @@ Unit tests for bulk ingest endpoint formats
 import pytest
 import requests
 import json
+import os
 from typing import Dict, Any
 
 BASE_URL = "http://localhost"
-API_KEY = "DEV_ADMIN_KEY_5a8f9ffdc3"
+API_KEY = os.environ.get("TEST_API_KEY", "DEV_ADMIN_KEY_5a8f9ffdc3")
 
 def get_metrics_before():
     """Get metrics before test"""

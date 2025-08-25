@@ -7,10 +7,11 @@ import requests
 import json
 import time
 import random
+import os
 from typing import Dict, Any
 
 BASE_URL = "http://localhost"
-API_KEY = "DEV_ADMIN_KEY_5a8f9ffdc3"
+API_KEY = os.environ.get("TEST_API_KEY", "DEV_ADMIN_KEY_5a8f9ffdc3")
 
 def make_request(method: str, endpoint: str, data: Dict[str, Any] = None, headers: Dict[str, str] = None) -> Dict[str, Any]:
     """Make a request to the API"""
@@ -183,7 +184,7 @@ def test_download():
     # For streaming endpoints, we need to handle the response differently
     try:
         response = requests.get(
-            "http://localhost/v1/download/json?limit=10",
+            f"{BASE_URL}/v1/download/json?limit=10",
             headers={"Authorization": f"Bearer {API_KEY}"},
             stream=True
         )
