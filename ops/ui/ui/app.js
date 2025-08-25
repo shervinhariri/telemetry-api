@@ -640,6 +640,12 @@ async function addMyIpToAllowlist() {
 
 // Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', function() {
+    if (window.__NETREEX_APP_BOOTED__) {
+        console.warn('App already booted – skipping DOMContentLoaded init.');
+        return;
+    }
+    window.__NETREEX_APP_BOOTED__ = true;
+    
     console.log('DOM ready, initializing dashboard...');
     
     refreshKeyChips();
@@ -658,8 +664,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (backdrop) backdrop.addEventListener('click', closeKeyModal);
     if (btnTest) btnTest.addEventListener('click', testEnteredKey);
     if (btnSave) btnSave.addEventListener('click', saveEnteredKey);
-
-
 
     // Wire Add My IP button
     const addMyIpBtn = document.getElementById('btn-add-my-ip');
@@ -684,37 +688,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Create dashboard instance and make it globally accessible
-    window.telemetryDashboard = new TelemetryDashboard();
+    const dash = new TelemetryDashboard({ apiBase: '/v1' });
+    window.telemetryDashboard = dash;
     
-    // Ensure switchTab always syncs the hash + localStorage
-    const _origSwitchTab = window.telemetryDashboard.switchTab.bind(window.telemetryDashboard);
-    window.telemetryDashboard.switchTab = function(tab) {
-      _origSwitchTab(tab);
-      setTabHash(tab);
-    };
-    
-    // On load: prefer hash; else lastTab; else 'dashboard'
-    let initial = getTabFromHash() || getLastTab() || 'dashboard';
-    window.telemetryDashboard.switchTab(initial);
-
-    // Back/forward support
-    window.addEventListener('hashchange', () => {
-      const t = getTabFromHash() || 'dashboard';
-      _origSwitchTab(t);        // Don't re-set hash here to avoid loops
-      try { localStorage.setItem('lastTab', t); } catch {}
-    });
-
-    // Brand click: keep current tab, then hard reload
+    // Reliable "hard refresh" on the logo – avoids stacking listeners
     const logo = document.getElementById('logoLink');
     if (logo) {
       logo.addEventListener('click', (e) => {
         e.preventDefault();
-        const current = getTabFromHash() || getLastTab() || 'dashboard';
-        // Ensure URL has the tab BEFORE reload
-        setTabHash(current);
-        // Force reload (preserves hash)
-        window.location.reload();
-      });
+        // force reload and bust cache for app.js when needed
+        const hash = location.hash || '#dashboard';
+        const base = location.origin + '/' + hash;
+        location.replace(base + (base.includes('?') ? '&' : '?') + 'r=' + Date.now());
+      }, { once: false, passive: false });
     }
     
     // === VEFIX: event delegation so re-renders don't break clicks ===
@@ -1053,20 +1039,17 @@ window.submitEditSource = async function (evt) {
 });
 
 class TelemetryDashboard {
-    constructor() {
+    constructor(opts) {
         console.log('TelemetryDashboard constructor called');
-        this.apiBase = window.location.origin; // Use the current domain
+        this.apiBase = opts?.apiBase || window.location.origin; // Use the current domain
         this.apiKey = getApiKey();
         this.currentRequestsData = [];
         this.logsEventSource = null;
         this.logsInterval = null;
         this.autoRefreshInterval = null;
         this.features = { sources: true, udp_head: false }; // default; overwritten by /system
-        
-        // Bind loaders early to guarantee presence on `this`
-        this.loadRequestsData = this.loadRequestsData?.bind?.(this) || (() => Promise.resolve());
-        this.loadLogsData = this.loadLogsData?.bind?.(this) || (() => Promise.resolve());
-        this.loadSourcesData = this.loadSourcesData?.bind?.(this) || (() => Promise.resolve());
+        this._initialized = false;           // guard against double init
+        this._boundHashHandler = null;       // keep a stable handler ref
         
         console.log('API Base URL:', this.apiBase);
         console.log('API Key:', this.apiKey);
@@ -1074,10 +1057,31 @@ class TelemetryDashboard {
         this.init();
     }
 
-    init() {
+    async init() {
+        if (this._initialized) {
+            console.warn('TelemetryDashboard already initialized – skipping.');
+            return;
+        }
+        this._initialized = true;
         console.log('Initializing TelemetryDashboard...');
+        
         this.setupEventListeners();
-        this.loadInitialData();
+        await this.loadInitialData();        // loads /system + /metrics
+        this.applyFeatureGates();
+
+        const defaultTab = (location.hash?.substring(1) || 'dashboard');
+        // ensure panels exist before switching
+        queueMicrotask(() => this.switchTab(defaultTab));
+
+        // Bind hashchange exactly once
+        if (!this._boundHashHandler) {
+            this._boundHashHandler = () => {
+                const tab = location.hash?.substring(1) || 'dashboard';
+                this.switchTab(tab);
+            };
+            window.addEventListener('hashchange', this._boundHashHandler, { passive: true });
+        }
+        
         this.startAutoRefresh();
         console.log('TelemetryDashboard initialized');
     }
@@ -1216,7 +1220,7 @@ class TelemetryDashboard {
         });
     }
 
-    switchTab(tabName) {
+    async switchTab(tabName) {
         console.log('Switching to tab:', tabName);
         
         // Update tab buttons - reset all to inactive state
@@ -1252,47 +1256,52 @@ class TelemetryDashboard {
 
         // Load data for the selected tab using a mapping
         const loaders = {
-            dashboard: () => this.loadInitialData(),
-            requests: () => this.loadRequestsData(),
-            logs: () => this.loadInitialLogs(),
-            sources: () => this.loadSourcesData(),
-            toolbox: () => Promise.resolve(), // Toolbox doesn't need special data loading
+            dashboard: this.loadRequestsData,  // or a dedicated dashboard loader
+            requests: this.loadRequestsData,
+            logs: this.loadLogsData,
+            sources: this.loadSourcesData,
+            toolbox: async () => {}          // no-op for now
         };
         
-        const loader = loaders[tabName.toLowerCase()];
-        if (typeof loader === 'function') {
-            try {
-                loader.call(this);
-            } catch (e) {
-                console.error('Tab load failed:', e);
+        const fn = loaders[tabName.toLowerCase()];
+        if (typeof fn === 'function') {
+            try { 
+                await fn.call(this); 
+            } catch (e) { 
+                console.error('Tab load failed:', e); 
             }
         } else if (tabName.toLowerCase() === 'api') {
             // API tab removed, redirect to toolbox
             this.switchTab('toolbox');
         } else {
-            console.warn(`No loader for tab ${tabName}`);
+            console.warn(`No loader mapped for tab: ${tabName}`);
         }
+    }
+
+    applyFeatureGates() {
+        const gates = this.features || {};
+        console.log('Applying feature gates:', gates);
+        const sourcesTab = document.getElementById('tab-sources');
+        const sourcesPanel = document.getElementById('panel-sources');
+        if (sourcesTab && sourcesPanel) {
+            const on = !!gates.sources;
+            sourcesTab.style.display = on ? '' : 'none';
+            sourcesPanel.style.display = on ? '' : 'none';
+        }
+        if (!gates.udp_head) console.log('UDP head polling disabled (feature not enabled)');
     }
 
     // --- Ensure loaders always exist (no-ops if feature off) ---
     async loadRequestsData() {
-        // existing implementation or leave as no-op for safety
-        console.log('loadRequestsData called');
+        console.log('Loading requests data...'); /* existing impl */
     }
     
     async loadLogsData() {
-        // existing implementation or leave as no-op for safety
-        console.log('loadLogsData called');
+        /* existing impl or no-op */
     }
     
     async loadSourcesData() {
-        // If feature disabled, do nothing gracefully
-        if (!this.features?.sources) {
-            console.log('Sources feature disabled, skipping load');
-            return;
-        }
-        console.log('loadSourcesData called');
-        // existing implementation that populates Sources table/forms
+        if (!this.features?.sources) return; /* existing impl */
     }
 
     getAuthHeaders() {
