@@ -139,27 +139,27 @@ def test_ingest_bulk():
     
     # Debug: print the payload being sent
     print(f"📤 Sending payload: {json.dumps(bulk_data, indent=2)}")
+    
+    # Make request with better error handling
+    url = f"{BASE_URL}/v1/ingest/bulk"
+    headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+    
+    try:
+        response = requests.post(url, json=bulk_data, headers=headers)
+        print(f"📥 Response status: {response.status_code}")
+        print(f"📥 Response headers: {dict(response.headers)}")
+        print(f"📥 Response body: {response.text}")
         
-        # Make request with better error handling
-        url = f"{BASE_URL}/v1/ingest/bulk"
-        headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
-        
-        try:
-            response = requests.post(url, json=bulk_data, headers=headers)
-            print(f"📥 Response status: {response.status_code}")
-            print(f"📥 Response headers: {dict(response.headers)}")
-            print(f"📥 Response body: {response.text}")
-            
-            response.raise_for_status()
-            result = response.json()
-            assert result.get("status") == "accepted", f"Bulk ingest failed: {result}"
-            print(f"✅ Bulk ingest passed: {result.get('records_processed')} records processed")
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Bulk ingest failed: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                print(f"❌ Response status: {e.response.status_code}")
-                print(f"❌ Response body: {e.response.text}")
-            assert False, f"Bulk ingest request failed: {e}"
+        response.raise_for_status()
+        result = response.json()
+        assert result.get("status") == "accepted", f"Bulk ingest failed: {result}"
+        print(f"✅ Bulk ingest passed: {result.get('records_processed')} records processed")
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Bulk ingest failed: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"❌ Response status: {e.response.status_code}")
+            print(f"❌ Response body: {e.response.text}")
+        assert False, f"Bulk ingest request failed: {e}"
 
 def test_indicators():
     """Test threat intelligence endpoints"""
