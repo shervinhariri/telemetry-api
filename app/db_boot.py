@@ -59,3 +59,12 @@ def ensure_schema_and_seed_keys():
         log.info("DB_BOOT: ensured schema; total_keys=%d (seeded=%d)", len(keys), len(tokens))
         for key in keys[:2]:  # Show first 2 keys with their scopes
             log.info("DB_BOOT: key_id=%s scopes=%s disabled=%s", key[0], key[1], key[2])
+        
+        # 4) Auth hardening: assert admin keys exist
+        admin_keys = [k for k in keys if '"admin"' in k[1] and k[2] == 0]
+        if not admin_keys:
+            raise RuntimeError("No active admin API keys found - system cannot start")
+        
+        # Log seeded key IDs (masked for security)
+        seeded_key_ids = [f"{k[0][:4]}...{k[0][-4:]}" for k in admin_keys[:3]]
+        log.info("DB_BOOT: admin keys available: %s", ", ".join(seeded_key_ids))

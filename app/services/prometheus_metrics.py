@@ -83,6 +83,93 @@ UDP_DROPPED_TOTAL = Counter(
     ['reason']
 )
 
+# UDP head specific metrics
+UDP_HEAD_READY = Gauge(
+    'telemetry_udp_head_ready',
+    'UDP head readiness status (1=ready, 0=not ready)'
+)
+
+UDP_HEAD_DATAGRAMS_TOTAL = Counter(
+    'telemetry_udp_head_datagrams_total',
+    'Total number of UDP datagrams received by UDP head'
+)
+
+UDP_HEAD_BIND_ERRORS_TOTAL = Counter(
+    'telemetry_udp_head_bind_errors_total',
+    'Total number of UDP head bind errors'
+)
+
+# Ingest metrics
+INGEST_BATCHES_TOTAL = Counter(
+    'telemetry_ingest_batches_total',
+    'Total number of ingest batch requests'
+)
+
+INGEST_REJECT_TOTAL = Counter(
+    'telemetry_ingest_reject_total',
+    'Total number of ingest batch rejections',
+    ['reason']
+)
+
+INGEST_BATCH_BYTES = Histogram(
+    'telemetry_ingest_batch_bytes',
+    'Compressed batch size in bytes',
+    buckets=[1024, 10240, 102400, 512000, 1024000, 2097152, 4194304, 5242880]
+)
+
+INGEST_RECORDS_PER_BATCH = Histogram(
+    'telemetry_ingest_records_per_batch',
+    'Number of records per accepted batch',
+    buckets=[1, 10, 50, 100, 500, 1000, 5000, 10000]
+)
+
+# Queue metrics
+QUEUE_DEPTH = Gauge(
+    'telemetry_queue_depth',
+    'Current number of items in the processing queue'
+)
+
+QUEUE_SATURATION = Gauge(
+    'telemetry_queue_saturation',
+    'Queue saturation ratio (depth / max_depth)'
+)
+
+QUEUE_ENQUEUES_TOTAL = Counter(
+    'telemetry_queue_enqueues_total',
+    'Total number of records enqueued for processing'
+)
+
+QUEUE_DROPS_TOTAL = Counter(
+    'telemetry_queue_drops_total',
+    'Total number of records dropped due to queue full'
+)
+
+# Worker metrics
+WORKER_PROCESSED_TOTAL = Counter(
+    'telemetry_worker_processed_total',
+    'Total number of records processed by workers'
+)
+
+WORKER_ERRORS_TOTAL = Counter(
+    'telemetry_worker_errors_total',
+    'Total number of worker processing errors',
+    ['stage', 'kind']
+)
+
+# Processing latency metrics
+EVENT_PROCESSING_SECONDS = Histogram(
+    'telemetry_event_processing_seconds',
+    'End-to-end event processing latency in seconds',
+    buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+)
+
+STAGE_SECONDS = Histogram(
+    'telemetry_stage_seconds',
+    'Per-stage processing latency in seconds',
+    ['stage'],
+    buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0]
+)
+
 # HTTP IP allow-list blocks
 HTTP_BLOCKED_IP_TOTAL = Counter(
     'telemetry_http_blocked_ip_total',
@@ -255,6 +342,66 @@ class PrometheusMetrics:
     def increment_udp_dropped(self, reason: str, count: int = 1):
         """Increment UDP dropped counter with reason."""
         UDP_DROPPED_TOTAL.labels(reason=reason).inc(count)
+
+    def set_udp_head_ready(self, ready: bool):
+        """Set UDP head readiness gauge."""
+        UDP_HEAD_READY.set(1 if ready else 0)
+
+    def increment_udp_head_datagrams(self, count: int = 1):
+        """Increment UDP head datagrams counter."""
+        UDP_HEAD_DATAGRAMS_TOTAL.inc(count)
+
+    def increment_udp_head_bind_errors(self, count: int = 1):
+        """Increment UDP head bind errors counter."""
+        UDP_HEAD_BIND_ERRORS_TOTAL.inc(count)
+
+    def increment_ingest_batches(self, count: int = 1):
+        """Increment ingest batches counter."""
+        INGEST_BATCHES_TOTAL.inc(count)
+
+    def increment_ingest_reject(self, reason: str, count: int = 1):
+        """Increment ingest reject counter with reason."""
+        INGEST_REJECT_TOTAL.labels(reason=reason).inc(count)
+
+    def observe_ingest_batch_bytes(self, bytes_count: int):
+        """Observe ingest batch size in bytes."""
+        INGEST_BATCH_BYTES.observe(bytes_count)
+
+    def observe_ingest_records_per_batch(self, record_count: int):
+        """Observe number of records per batch."""
+        INGEST_RECORDS_PER_BATCH.observe(record_count)
+
+    def set_queue_depth(self, depth: int):
+        """Set queue depth gauge."""
+        QUEUE_DEPTH.set(depth)
+
+    def set_queue_saturation(self, saturation: float):
+        """Set queue saturation gauge."""
+        QUEUE_SATURATION.set(saturation)
+
+    def increment_queue_enqueues(self, count: int = 1):
+        """Increment queue enqueues counter."""
+        QUEUE_ENQUEUES_TOTAL.inc(count)
+
+    def increment_queue_drops(self, count: int = 1):
+        """Increment queue drops counter."""
+        QUEUE_DROPS_TOTAL.inc(count)
+
+    def increment_worker_processed(self, count: int = 1):
+        """Increment worker processed counter."""
+        WORKER_PROCESSED_TOTAL.inc(count)
+
+    def increment_worker_errors(self, stage: str, kind: str, count: int = 1):
+        """Increment worker errors counter with stage and kind."""
+        WORKER_ERRORS_TOTAL.labels(stage=stage, kind=kind).inc(count)
+
+    def observe_event_processing_seconds(self, seconds: float):
+        """Observe event processing latency."""
+        EVENT_PROCESSING_SECONDS.observe(seconds)
+
+    def observe_stage_seconds(self, stage: str, seconds: float):
+        """Observe stage processing latency."""
+        STAGE_SECONDS.labels(stage=stage).observe(seconds)
 
     def increment_export_test(self, dest: str, code: str):
         """Increment export test counter."""

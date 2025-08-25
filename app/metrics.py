@@ -225,6 +225,25 @@ class MetricsAggregator:
             if source_id not in self.source_error_buffers or not self.source_error_buffers[source_id]:
                 return 0.0
             return sum(self.source_error_buffers[source_id]) / len(self.source_error_buffers[source_id])
+    
+    def _get_udp_head_metrics(self) -> Dict[str, Any]:
+        """Get UDP head metrics"""
+        try:
+            from .udp_head import get_udp_stats
+            stats = get_udp_stats()
+            return {
+                "ready": stats["ready"],
+                "bind_errors": stats["bind_errors"],
+                "datagrams_total": stats["datagrams_total"],
+                "port": stats["port"]
+            }
+        except Exception:
+            return {
+                "ready": False,
+                "bind_errors": 0,
+                "datagrams_total": 0,
+                "port": None
+            }
             
     def tick(self):
         """Background tick to roll windows and update time series"""
@@ -337,7 +356,8 @@ class MetricsAggregator:
                     "test_total": self.export_test_total.copy()
                 },
                 "source_admitted_total": self.source_admitted_total.copy(),
-                "source_dropped_total": self.source_dropped_total.copy()
+                "source_dropped_total": self.source_dropped_total.copy(),
+                "udp_head": self._get_udp_head_metrics()
             }
             
     def record_event(self, risk_score: int, threat_matches: int):
