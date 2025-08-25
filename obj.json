@@ -1,0 +1,1 @@
+{"collector_id":"test-collector","format":"zeek","records":[{"src_ip":"1.1.1.1","dst_ip":"8.8.8.8"}]}

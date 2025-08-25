@@ -77,6 +77,10 @@ def _validate_batch_shape(content: str) -> tuple[bool, str]:
     if content.startswith('['):
         return True, "json"
     
+    # Check for JSON object (for compatibility with object wrapper format)
+    if content.startswith('{'):
+        return True, "json"
+    
     # Check for JSONL (contains newlines and starts with {)
     if '\n' in content and content.lstrip().startswith('{'):
         return True, "jsonl"
