@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import GeoSettings from "../components/GeoSettings";
 
 interface Source {
   id: string;
@@ -368,6 +369,9 @@ export default function Sources({ api }: SourcesProps) {
           {error}
         </div>
       )}
+
+      {/* Geo Settings */}
+      <GeoSettings api={api} />
 
       {/* Table */}
       <div className="bg-[#14151B] rounded-xl border border-white/5 overflow-hidden">
