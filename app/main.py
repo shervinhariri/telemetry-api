@@ -312,15 +312,12 @@ async def tenancy_middleware(request: Request, call_next):
 app_dir = os.path.dirname(__file__)
 _ui_candidates = [
     os.path.abspath(os.path.join(app_dir, "..", "ui")),             # container path (/app/ui)
-    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui", "ui")) # local path (repo ops/ui/ui)
+    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui"))       # local path (repo ops/ui)
 ]
 ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0])
 
-# Mount static files under /ui
+# Mount static files under /ui (for NETREEX UI)
 app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
-
-# Mount assets directory for React app
-app.mount("/assets", StaticFiles(directory=os.path.join(ui_dir, "assets")), name="assets")
 
 # Include API routers
 app.include_router(version_router, prefix=API_PREFIX)

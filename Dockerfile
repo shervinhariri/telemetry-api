@@ -6,29 +6,7 @@ RUN git clone --depth 1 --branch ${GOFLOW_VERSION} https://github.com/netsampler
 # Build the main binary
 RUN CGO_ENABLED=0 go build -o /out/goflow2 ./cmd/goflow2
 
-# ---- Stage 2: build UI ----
-FROM node:20-alpine as build-ui
-# Add cache-busting ARG to force rebuild
-ARG CACHEBUST=1
-WORKDIR /ui
-
-# 1) Install deps
-COPY ops/ui/ui/package*.json ./
-# If lock is missing, fallback to install
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
-# 2) Copy full UI source
-COPY ops/ui/ui/ ./
-
-# 3) Guard: assert the new string exists in source; fail if missing
-RUN grep -Rni 'Download GeoLite2 @ MaxMind Open Source' src || (echo 'Geo link string missing in source' && exit 1)
-
-# 4) Hard cache clear and forced build
-RUN rm -rf node_modules .vite dist ~/.npm ~/.cache \
- && npm install --force \
- && npm run build -- --force
-
-# ---- Stage 3: base image (shared dependencies) ----
+# ---- Stage 2: base image (shared dependencies) ----
 FROM python:3.11-slim@sha256:1d6131b5d479888b43200645e03a78443c7157efbdb730e6b48129740727c312 as base
 
 ARG APP_VERSION=dev
@@ -67,8 +45,8 @@ COPY VERSION /app/VERSION
 # Copy logging configuration
 COPY LOGGING.yaml /app/LOGGING.yaml
 
-# Copy built UI from build stage
-COPY --from=build-ui /ui/dist /app/ui
+# Copy NETREEX UI (not React UI)
+COPY ops/ui/index.html /app/ui/index.html
 
 # Copy OpenAPI spec and docs
 COPY openapi.yaml /app/openapi.yaml
