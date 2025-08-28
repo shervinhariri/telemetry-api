@@ -6,7 +6,15 @@ RUN git clone --depth 1 --branch ${GOFLOW_VERSION} https://github.com/netsampler
 # Build the main binary
 RUN CGO_ENABLED=0 go build -o /out/goflow2 ./cmd/goflow2
 
-# ---- Stage 2: base image (shared dependencies) ----
+# ---- Stage 2: build UI ----
+FROM node:18-alpine as build-ui
+WORKDIR /app/ui
+COPY ops/ui/ui/package*.json ./
+RUN npm ci
+COPY ops/ui/ui/ ./
+RUN npm run build
+
+# ---- Stage 3: base image (shared dependencies) ----
 FROM python:3.11-slim@sha256:1d6131b5d479888b43200645e03a78443c7157efbdb730e6b48129740727c312 as base
 
 ARG APP_VERSION=dev
@@ -45,8 +53,8 @@ COPY VERSION /app/VERSION
 # Copy logging configuration
 COPY LOGGING.yaml /app/LOGGING.yaml
 
-# Copy UI files
-COPY ops/ui/ui /app/ui
+# Copy built UI from build stage
+COPY --from=build-ui /app/ui/dist /app/ui
 
 # Copy OpenAPI spec and docs
 COPY openapi.yaml /app/openapi.yaml
@@ -94,14 +102,14 @@ LABEL org.opencontainers.image.title="telemetry-api" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.description="Live Network Threat Telemetry API (MVP)"
 
-# ---- Stage 3: runtime (prod) ----
+# ---- Stage 4: runtime (prod) ----
 FROM base AS runtime
 ARG VERSION=0.0.0-dev
 ENV TELEMETRY_VERSION=${VERSION}
 ENV APP_ENV=prod
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-# ---- Stage 4: test (CI/e2e) ----
+# ---- Stage 5: test (CI/e2e) ----
 FROM base AS test
 # tools only for tests
 RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 && rm -rf /var/lib/apt/lists/*
