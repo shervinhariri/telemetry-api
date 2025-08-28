@@ -308,6 +308,20 @@ async def tenancy_middleware(request: Request, call_next):
 
     return await call_next(request)
 
+# Mount static files BEFORE API routers to ensure they take precedence
+app_dir = os.path.dirname(__file__)
+_ui_candidates = [
+    os.path.abspath(os.path.join(app_dir, "..", "ui")),             # container path (/app/ui)
+    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui", "ui")) # local path (repo ops/ui/ui)
+]
+ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0])
+
+# Mount static files under /ui
+app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
+
+# Mount assets directory for React app
+app.mount("/assets", StaticFiles(directory=os.path.join(ui_dir, "assets")), name="assets")
+
 # Include API routers
 app.include_router(version_router, prefix=API_PREFIX)
 app.include_router(admin_update_router, prefix=API_PREFIX)
@@ -373,20 +387,6 @@ async def get_requests_api_compat(
     # Call the actual function
     from .api.requests import get_requests_api
     return await get_requests_api(limit, window)
-
-# Mount static files for UI (support both container and local dev paths)
-app_dir = os.path.dirname(__file__)
-_ui_candidates = [
-    os.path.abspath(os.path.join(app_dir, "..", "ui")),             # container path (/app/ui)
-    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui", "ui")) # local path (repo ops/ui/ui)
-]
-ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0])
-
-# Mount static files under /ui
-app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
-
-# Mount assets directory for React app
-app.mount("/assets", StaticFiles(directory=os.path.join(ui_dir, "assets")), name="assets")
 
 # Serve OpenAPI spec and Swagger UI
 @app.get("/openapi.yaml")
