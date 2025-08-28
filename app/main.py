@@ -124,6 +124,12 @@ async def lifespan(application: FastAPI):
     from .udp_head import start_udp_head
     start_udp_head()
     
+    # Initialize enrichment loaders
+    from .enrich.geo import initialize_enrichment
+    from .enrich.ti import initialize_threatintel
+    initialize_enrichment()
+    initialize_threatintel()
+    
     # DB persistence self-check
     try:
         db = SessionLocal()
@@ -241,6 +247,7 @@ BASE_PUBLIC = (
     "/favicon.ico",
     "/ui/",
     "/static/",
+    "/assets/",
 )
 
 PUBLIC_ALLOWLIST = BASE_PUBLIC + ((f"{API_PREFIX}/metrics/prometheus",) if PUBLIC_PROMETHEUS else ())
@@ -377,6 +384,9 @@ ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0]
 
 # Mount static files under /ui
 app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
+
+# Mount assets directory for React app
+app.mount("/assets", StaticFiles(directory=os.path.join(ui_dir, "assets")), name="assets")
 
 # Serve OpenAPI spec and Swagger UI
 @app.get("/openapi.yaml")

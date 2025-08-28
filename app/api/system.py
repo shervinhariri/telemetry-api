@@ -54,7 +54,22 @@ async def get_system_info() -> Dict[str, Any]:
         
         # Build features dict with UDP head status
         features = FEATURES.copy()
-        features["udp_head"] = "ready" if FEATURES.get("udp_head", False) else "disabled"
+        from ..udp_head import get_udp_head_status
+        features["udp_head"] = get_udp_head_status()
+        
+        # Get queue information
+        queue_info = {
+            "max_depth": queue_stats["max"],
+            "current_depth": queue_stats["depth"]
+        }
+        
+        # Get enrichment status
+        from ..enrich.geo import geoip_loader, asn_loader
+        from ..enrich.ti import ti_loader
+        
+        geoip_status = geoip_loader.get_status()
+        asn_status = asn_loader.get_status()
+        ti_status = ti_loader.get_status()
         
         return {
             "status": "ok",
@@ -62,13 +77,17 @@ async def get_system_info() -> Dict[str, Any]:
             "git_sha": GIT_SHA,
             "image": f"{IMAGE}:{version}",
             "features": features,
+            "queue": queue_info,
+            "geoip": geoip_status,
+            "asn": asn_status,
+            "threatintel": ti_status,
             "uptime_s": uptime_seconds,
             "workers": queue_manager.worker_pool_size,
             "mem_mb": 0,  # TODO: Implement without psutil
             "mem_pct": 0,  # TODO: Implement without psutil
             "cpu_pct": 0,  # TODO: Implement without psutil
             "eps": events_per_second,
-            "queue": queue_stats,
+            "queue_stats": queue_stats,
             "backpressure": backpressure,
             "dlq": dlq_stats,
             "idempotency": idempotency_stats,
