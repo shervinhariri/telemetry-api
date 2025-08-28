@@ -208,32 +208,17 @@ async def ingest(
             prometheus_metrics.increment_ingest_reject("shape", 1)
             return build_shape_error_response()
         
-        # Step 3: Record count guard (10,000)
-        format_detected, record_count = _detect_batch_format(content)
-        if format_detected == "invalid":
-            logger.warning("Ingest batch rejected - invalid format", extra={
+        # Step 3: Basic format validation
+        is_valid_shape, format_type = _validate_batch_shape(content)
+        if not is_valid_shape:
+            logger.warning("Ingest batch rejected - invalid shape", extra={
                 "trace_id": trace_id,
                 "component": "ingest",
                 "event": "reject",
-                "reason": "format_error"
+                "reason": "shape"
             })
-            prometheus_metrics.increment_ingest_reject("format_error", 1)
-            return JSONResponse(
-                status_code=422,
-                content={"error": "invalid_format", "detail": "Invalid JSON array or JSONL format"}
-            )
-        
-        if record_count > MAX_RECORDS_PER_BATCH:
-            logger.warning("Ingest batch rejected - too many records", extra={
-                "trace_id": trace_id,
-                "component": "ingest",
-                "event": "reject",
-                "reason": "count",
-                "observed": record_count,
-                "kind": format_detected
-            })
-            prometheus_metrics.increment_ingest_reject("count", 1)
-            return build_count_limit_response(record_count)
+            prometheus_metrics.increment_ingest_reject("shape", 1)
+            return build_shape_error_response()
         
         # Step 4: Parse and validate payload
         try:
@@ -284,6 +269,19 @@ async def ingest(
                 status_code=400,
                 content={"error": "invalid_format", "detail": "Payload must be JSON array or object with records"}
             )
+        
+        # Step 4.5: Record count guard (10,000) - after parsing
+        if len(records_to_process) > MAX_RECORDS_PER_BATCH:
+            logger.warning("Ingest batch rejected - too many records", extra={
+                "trace_id": trace_id,
+                "component": "ingest",
+                "event": "reject",
+                "reason": "count",
+                "observed": len(records_to_process),
+                "format": format_type
+            })
+            prometheus_metrics.increment_ingest_reject("count", 1)
+            return build_count_limit_response(len(records_to_process))
         
         # Step 5: Process records through queue manager
         enqueued_count = 0

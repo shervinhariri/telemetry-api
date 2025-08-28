@@ -11,6 +11,5 @@ router = APIRouter()
 async def health_check():
     """Health check endpoint - no authentication required"""
     return {
-        "status": "healthy",
-        "version": get_version_from_file()
+        "status": "ok"
     }

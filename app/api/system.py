@@ -52,13 +52,9 @@ async def get_system_info() -> Dict[str, Any]:
         from ..api.version import get_version_from_file
         version = get_version_from_file()
         
-        # Get UDP head status
-        from ..udp_head import get_udp_head_status
-        udp_head_status = get_udp_head_status()
-        
         # Build features dict with UDP head status
         features = FEATURES.copy()
-        features["udp_head"] = udp_head_status
+        features["udp_head"] = "ready" if FEATURES.get("udp_head", False) else "disabled"
         
         return {
             "status": "ok",

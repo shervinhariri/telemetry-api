@@ -15,8 +15,6 @@ def test_health_endpoint(client):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["service"] == "telemetry-api"
-    assert data["version"] == "v1"
     assert "X-API-Version" in response.headers
 
 def test_version_endpoint(client):
@@ -143,7 +141,7 @@ def test_system_features(client):
     assert "sources" in data["features"]
     assert data["features"]["sources"] == True
     assert "udp_head" in data["features"]
-    assert data["features"]["udp_head"] == False
+    assert data["features"]["udp_head"] == "disabled"
 
 def test_sources_endpoint(client):
     """Test sources endpoint returns expected format"""
@@ -191,12 +189,18 @@ def test_ingest_too_many_records(client):
                 "id.resp_h": "2.2.2.2", "id.resp_p": 443, "proto": "tcp"} for i in range(10001)]
     payload = {"collector_id": "test", "format": "zeek.conn", "records": records}
     response = client.post("/v1/ingest", json=payload, headers=VALID_HEADERS)
-    assert response.status_code == 202  # API accepts large batches
+    assert response.status_code == 413  # Too many records should return 413
 
 def test_lookup_invalid_ip(client):
     """Test lookup with invalid IP"""
     payload = {"ip": "invalid-ip"}
     response = client.post("/v1/lookup", json=payload, headers=VALID_HEADERS)
+    assert response.status_code == 400
+
+def test_ingest_invalid_format(client):
+    """Test ingest with invalid format"""
+    payload = "invalid-json-string"
+    response = client.post("/v1/ingest", data=payload, headers=VALID_HEADERS)
     assert response.status_code == 400
 
 def test_lookup_missing_ip(client):

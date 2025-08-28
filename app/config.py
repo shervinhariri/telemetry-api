@@ -145,7 +145,7 @@ class RuntimeConfig:
 runtime_config = RuntimeConfig()
 
 # Queue and worker configuration
-QUEUE_MAX_DEPTH = int(os.getenv("QUEUE_MAX_DEPTH", "10000"))
+QUEUE_MAX_DEPTH = int(os.getenv("QUEUE_MAX_DEPTH", "5000"))
 WORKER_POOL_SIZE = int(os.getenv("WORKER_POOL_SIZE", "4"))
 QUEUE_RETRY_AFTER_SECONDS = int(os.getenv("QUEUE_RETRY_AFTER_SECONDS", "2"))
 ENRICH_TIMEOUT_MS = int(os.getenv("ENRICH_TIMEOUT_MS", "500"))

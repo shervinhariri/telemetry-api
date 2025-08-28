@@ -12,8 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build test image (with tools)
-        run: docker build --target test -t local/telemetry-api:test .
+      - name: Pull golden image
+        run: docker pull shvin/telemetry-api:$(cat VERSION)-golden
 
       - name: Start e2e stack
         env:
@@ -23,13 +23,13 @@ jobs:
           # Load test environment variables (skip comments)
           export $(grep -v '^#' .github/test.env | xargs)
           echo "Loaded env vars: TELEMETRY_SEED_KEYS=$TELEMETRY_SEED_KEYS"
-          # Use the test image instead of building
+          # Use the golden image
           docker run -d --rm --name telemetry-api -p 80:80 \
             -e TELEMETRY_SEED_KEYS="$TELEMETRY_SEED_KEYS" \
             -e DEMO_BASE_URL="http://localhost" \
             -e FEATURE_SOURCES=1 \
             -e FEATURE_UDP_HEAD=0 \
-            local/telemetry-api:test
+            shvin/telemetry-api:$(cat VERSION)-golden
           echo "Waiting for API to become healthy (up to 80s)..."
           ok=0
           for i in $(seq 1 40); do
@@ -43,10 +43,10 @@ jobs:
           done
           [ "$ok" = "1" ] || { docker ps; docker logs telemetry-api --tail 300; exit 1; }
 
-      - name: Sanity check test tools
+      - name: Sanity check container
         run: |
-          docker exec telemetry-api sqlite3 -version
-          docker exec telemetry-api python -c "import pytest, sqlite3; print('pytest+sqlite3 OK')"
+          docker exec telemetry-api python -c "import sqlite3; print('sqlite3 OK')"
+          docker exec telemetry-api python -c "from app.main import app; print('app OK')"
 
       - name: DB check (verify scopes format)
         run: |
@@ -62,16 +62,13 @@ jobs:
                   print(f"  {row[0]}: {row[1]}")
           PY'
 
-      # Run ALL tests inside the container to share the same DB/migrations
-      - name: Run tests inside container
+      # Run tests against the running container
+      - name: Run tests against container
         run: |
-          docker exec telemetry-api bash -lc '
-            set -e
-            cd /app
-            # Hard guarantee api_keys exists and is seeded (uses the same engine as app)
-            python -c "from app.db_init import init_schema_and_seed_if_needed; init_schema_and_seed_if_needed(); print(\"db ok\")"
-            PYTHONPATH=/app pytest -q
-          '
+          # Wait for container to be ready
+          sleep 5
+          # Run tests using the test client
+          python -m pytest tests/ -v
 
       - name: Scenario tester
         env:

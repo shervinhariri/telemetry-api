@@ -471,7 +471,7 @@ def write_deadletter(payload: Dict[str, Any], reason: str):
 @app.get(f"{API_PREFIX}/health")
 async def health(response: Response):
     add_version_header(response)
-    return {"status": "ok", "service": "telemetry-api", "version": "v1"}
+    return {"status": "ok"}
 
 @app.get(f"{API_PREFIX}/version")
 async def version(response: Response):
@@ -560,7 +560,21 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
             })
             raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
 
-        records = _parse_records(payload)
+        # Validate payload format
+        if not isinstance(payload, (list, dict)):
+            try:
+                prometheus_metrics.increment_http_dropped("invalid_format")
+            except Exception:
+                pass
+            raise HTTPException(status_code=400, detail="Invalid JSON type - expected array or object")
+        
+        # Parse records
+        try:
+            records = _parse_records(payload)
+        except HTTPException:
+            # _parse_records already raises HTTPException with 400
+            raise
+        
         if not records:
             try:
                 prometheus_metrics.increment_http_dropped("no_records")
@@ -701,7 +715,16 @@ async def ingest(request: Request, response: Response, Authorization: Optional[s
         accepted = enqueue_batch(records)
         
         if accepted < len(records):
-            raise HTTPException(status_code=429, detail="Ingest temporarily overloaded, please retry.")
+            # Graceful backpressure - return 202 with delayed hint
+            try:
+                prometheus_metrics.increment_http_dropped("backpressure")
+            except Exception:
+                pass
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                {"status": "accepted", "delayed": True, "accepted": accepted, "total": len(records)},
+                status_code=202
+            )
         
         # Record parsed records metric
         from .metrics import record_records_parsed

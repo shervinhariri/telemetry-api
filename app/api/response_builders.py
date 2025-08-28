@@ -20,9 +20,9 @@ def build_size_limit_response(content_encoding: str, actual_bytes: int) -> JSONR
     )
 
 def build_count_limit_response(observed: int) -> JSONResponse:
-    """Build 422 Unprocessable Entity response for record count exceeded"""
+    """Build 413 Payload Too Large response for record count exceeded"""
     return JSONResponse(
-        status_code=422,
+        status_code=413,
         content={
             "error": "too_many_records",
             "limit": 10000,
@@ -31,9 +31,9 @@ def build_count_limit_response(observed: int) -> JSONResponse:
     )
 
 def build_shape_error_response() -> JSONResponse:
-    """Build 422 Unprocessable Entity response for bad batch shape"""
+    """Build 400 Bad Request response for bad batch shape"""
     return JSONResponse(
-        status_code=422,
+        status_code=400,
         content={
             "error": "bad_batch_shape",
             "hint": "expected JSON array or JSONL"
