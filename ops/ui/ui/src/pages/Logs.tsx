@@ -97,15 +97,6 @@ export default function Logs({ api }: { api: any }) {
     setStatus("Live logs stopped.");
   };
 
-  const stopStreaming = () => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    setRunning(false);
-    setStatus("Live logs stopped.");
-  };
-
   const download = async () => {
     try {
       setStatus("Downloading logs...");
