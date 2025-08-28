@@ -469,6 +469,12 @@ window.addEventListener('api-key-changed', (e) => {
   const k = e.detail?.key || getApiKey();
   // Update your API client (if using a wrapper)
   window.API_KEY = k; // if your apiCall() reads from this variable/localStorage
+  
+  // Update dashboard's apiKey property
+  if (window.telemetryDashboard) {
+    window.telemetryDashboard.apiKey = k;
+  }
+  
   refreshKeyChips();
   
   // Refresh requests data when API key changes
@@ -1320,7 +1326,7 @@ class TelemetryDashboard {
     }
 
     getAuthHeaders() {
-        const token = this.state?.apiKey || localStorage.getItem("telemetry_api_key") || "";
+        const token = this.apiKey || localStorage.getItem("telemetry_api_key") || "";
         const headers = { "Content-Type": "application/json" };
         if (token) {
             headers["Authorization"] = `Bearer ${token}`;
