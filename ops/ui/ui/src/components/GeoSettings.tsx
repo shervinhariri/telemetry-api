@@ -188,11 +188,19 @@ const GeoSettings: React.FC<GeoSettingsProps> = ({ api }) => {
           <div>
             <h4 className="text-white font-medium">Download GeoLite2 Database</h4>
             <p className="text-zinc-400 text-sm">
-              Get the latest GeoIP database from MaxMind
+              Download GeoLite2 @ MaxMind Open Source → 
+              <a
+                href="https://dev.maxmind.com/geoip/geolite2-free-geolocation-data"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-300 hover:text-blue-200 ml-1 underline"
+              >
+                https://dev.maxmind.com/geoip/geolite2-free-geolocation-data
+              </a>
             </p>
           </div>
           <a
-            href="https://dev.maxmind.com/geoip/geoip2/geolite2/"
+            href="https://dev.maxmind.com/geoip/geolite2-free-geolocation-data"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-lg bg-blue-500/15 text-blue-300 hover:bg-blue-500/25 px-4 py-2 border border-blue-400/20"
