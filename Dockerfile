@@ -46,7 +46,7 @@ COPY VERSION /app/VERSION
 COPY LOGGING.yaml /app/LOGGING.yaml
 
 # Copy NETREEX UI (not React UI)
-COPY ops/ui/index.html /app/ui/index.html
+COPY ops/ui/ui/ /app/ui/
 
 # Copy OpenAPI spec and docs
 COPY openapi.yaml /app/openapi.yaml

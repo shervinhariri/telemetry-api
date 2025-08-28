@@ -316,8 +316,9 @@ _ui_candidates = [
 ]
 ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0])
 
-# Mount static files under /ui (for NETREEX UI)
+# Mount static files for NETREEX UI
 app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
+app.mount("/assets", StaticFiles(directory=os.path.join(ui_dir, "assets")), name="assets")
 
 # Include API routers
 app.include_router(version_router, prefix=API_PREFIX)
@@ -401,7 +402,7 @@ async def docs():
 # Serve index.html at root
 @app.get("/", include_in_schema=False)
 async def root():
-    return FileResponse(os.path.join(ui_dir, "index.html"))
+    return FileResponse(os.path.join(ui_dir, "index-old.html"))
 
 # ---------- Stage 5 Helper Functions ----------
 def _maybe_gunzip(body: bytes, content_encoding: Optional[str]) -> bytes:
