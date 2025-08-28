@@ -1,142 +1,200 @@
-import os
-import ipaddress
-from typing import List, Dict, Any
-from pathlib import Path
+"""
+Threat Intelligence enrichment module
+Loads IP and domain threat lists from local files and HTTP sources
+"""
 
-class ThreatIntel:
+import os
+import time
+import logging
+import json
+import csv
+from typing import Dict, Any, Optional, List
+from .base import EnrichmentLoader
+
+logger = logging.getLogger("enrich.ti")
+
+class ThreatIntelLoader(EnrichmentLoader):
+    """Threat Intelligence loader"""
+    
     def __init__(self):
-        self.ti_path = os.getenv("TI_PATH", "/data/ti/indicators.txt")
-        self.enable_ti = os.getenv("ENRICH_ENABLE_TI", "true").lower() == "true"
-        self.cidr_networks = []
-        self.domains = set()
-        self._load_indicators()
+        super().__init__("threatintel")
+        self.data_dir = os.getenv("TI_DATA_DIR", "/app/data/ti")
+        self.sources = []
+        self.ip_lists = {}
+        self.domain_lists = {}
         
-    def _load_indicators(self):
-        """Load threat indicators from plain text file"""
-        if not self.enable_ti:
-            return
-            
+    def load(self) -> bool:
+        """Load threat intelligence data"""
         try:
-            path = Path(self.ti_path)
-            if not path.exists():
-                print(f"Warning: Threat intelligence file not found: {self.ti_path}")
-                return
-                
-            with open(path, 'r') as f:
-                for line_num, line in enumerate(f, 1):
-                    line = line.strip()
-                    if not line or line.startswith('#'):
-                        continue
-                        
-                    # Handle domain indicators
-                    if line.startswith('domain:'):
-                        domain = line[7:].strip()
-                        if domain:
-                            self.domains.add(domain)
-                        continue
-                        
-                    # Handle CIDR indicators
-                    try:
-                        network = ipaddress.ip_network(line, strict=False)
-                        self.cidr_networks.append(network)
-                    except ValueError:
-                        # Try as single IP
-                        try:
-                            ip = ipaddress.ip_address(line)
-                            network = ipaddress.ip_network(f"{ip}/32", strict=False)
-                            self.cidr_networks.append(network)
-                        except ValueError:
-                            print(f"Warning: Invalid indicator on line {line_num}: {line}")
-                            
-            print(f"Loaded {len(self.cidr_networks)} CIDR networks and {len(self.domains)} domains")
+            # Load from local files
+            self._load_local_files()
+            
+            # Load from HTTP sources (placeholder)
+            self._load_http_sources()
+            
+            self.loaded = True
+            self.last_refresh = time.time()
+            
+            # Update metrics
+            from ..services.prometheus_metrics import prometheus_metrics
+            prometheus_metrics.set_threatintel_loaded(True)
+            prometheus_metrics.set_threatintel_sources(len(self.sources))
+            
+            logger.info(f"Threat intelligence loaded: {len(self.sources)} sources")
+            return True
             
         except Exception as e:
-            print(f"Error loading threat indicators: {e}")
-            
-    def match_ip(self, ip: str) -> List[str]:
-        """Match IP against threat indicators"""
-        if not ip or not self.enable_ti:
-            return []
-            
-        matches = []
-        try:
-            ip_addr = ipaddress.ip_address(ip)
-            for network in self.cidr_networks:
-                if ip_addr in network:
-                    matches.append(str(network))
-        except ValueError:
-            pass
-            
-        return matches
+            logger.error(f"Failed to load threat intelligence: {e}")
+            self.loaded = False
+            return False
+    
+    def _load_local_files(self):
+        """Load threat lists from local files"""
+        if not os.path.exists(self.data_dir):
+            logger.warning(f"Threat intelligence data directory not found: {self.data_dir}")
+            return
         
-    def match_domain(self, domain: str) -> List[str]:
-        """Match domain against threat indicators"""
-        if not domain or not self.enable_ti:
+        # Load IP lists
+        ip_dir = os.path.join(self.data_dir, "ips")
+        if os.path.exists(ip_dir):
+            for filename in os.listdir(ip_dir):
+                if filename.endswith(('.csv', '.txt', '.json')):
+                    self._load_ip_list(os.path.join(ip_dir, filename))
+        
+        # Load domain lists
+        domain_dir = os.path.join(self.data_dir, "domains")
+        if os.path.exists(domain_dir):
+            for filename in os.listdir(domain_dir):
+                if filename.endswith(('.csv', '.txt', '.json')):
+                    self._load_domain_list(os.path.join(domain_dir, filename))
+    
+    def _load_ip_list(self, filepath: str):
+        """Load IP list from file"""
+        try:
+            filename = os.path.basename(filepath)
+            ips = set()
+            
+            if filepath.endswith('.json'):
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+                    # Handle various JSON formats
+                    if isinstance(data, list):
+                        ips.update(data)
+                    elif isinstance(data, dict):
+                        ips.update(data.get('ips', []))
+                        ips.update(data.get('addresses', []))
+            else:
+                # CSV or TXT format
+                with open(filepath, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            ips.add(line)
+            
+            self.ip_lists[filename] = ips
+            self.sources.append(f"local:{filename}")
+            
+            logger.info(f"Loaded IP list {filename}: {len(ips)} entries")
+            
+        except Exception as e:
+            logger.error(f"Failed to load IP list {filepath}: {e}")
+    
+    def _load_domain_list(self, filepath: str):
+        """Load domain list from file"""
+        try:
+            filename = os.path.basename(filepath)
+            domains = set()
+            
+            if filepath.endswith('.json'):
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        domains.update(data)
+                    elif isinstance(data, dict):
+                        domains.update(data.get('domains', []))
+            else:
+                with open(filepath, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            domains.add(line)
+            
+            self.domain_lists[filename] = domains
+            self.sources.append(f"local:{filename}")
+            
+            logger.info(f"Loaded domain list {filename}: {len(domains)} entries")
+            
+        except Exception as e:
+            logger.error(f"Failed to load domain list {filepath}: {e}")
+    
+    def _load_http_sources(self):
+        """Load threat lists from HTTP sources (placeholder)"""
+        # This is a placeholder - in production, you'd implement HTTP fetching
+        # with proper caching and error handling
+        logger.info("HTTP threat intelligence sources not implemented yet")
+    
+    def match_ip(self, ip: str) -> List[Dict[str, Any]]:
+        """Match IP against threat lists"""
+        if not self.loaded:
             return []
-            
+        
         matches = []
-        if domain in self.domains:
-            matches.append(domain)
-            
+        
+        for source, ip_list in self.ip_lists.items():
+            if ip in ip_list:
+                matches.append({
+                    "type": "ip",
+                    "source": source,
+                    "value": ip,
+                    "category": "malicious"  # Default category
+                })
+        
         return matches
+    
+    def match_domain(self, domain: str) -> List[Dict[str, Any]]:
+        """Match domain against threat lists"""
+        if not self.loaded:
+            return []
+        
+        matches = []
+        
+        for source, domain_list in self.domain_lists.items():
+            if domain in domain_list:
+                matches.append({
+                    "type": "domain",
+                    "source": source,
+                    "value": domain,
+                    "category": "malicious"  # Default category
+                })
+        
+        return matches
+    
+    def lookup(self, key: str) -> Optional[Dict[str, Any]]:
+        """Lookup enrichment data for a key (alias for match_ip)"""
+        matches = self.match_ip(key)
+        return matches[0] if matches else None
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get threat intelligence status"""
+        status = super().get_status()
+        status.update({
+            "sources": self.sources,
+            "ip_lists": len(self.ip_lists),
+            "domain_lists": len(self.domain_lists)
+        })
+        return status
 
-# Global instance
-threat_intel = ThreatIntel()
+# Global loader instance
+ti_loader = ThreatIntelLoader()
 
-def match_ip(ip: str) -> List[str]:
-    """Convenience function to match IP against threat indicators"""
-    return threat_intel.match_ip(ip)
+def match_ip(ip: str) -> List[Dict[str, Any]]:
+    """Match IP against threat intelligence"""
+    return ti_loader.match_ip(ip)
 
-def match_domain(domain: str) -> List[str]:
-    """Convenience function to match domain against threat indicators"""
-    return threat_intel.match_domain(domain)
+def match_domain(domain: str) -> List[Dict[str, Any]]:
+    """Match domain against threat intelligence"""
+    return ti_loader.match_domain(domain)
 
-def add_indicator(ip_or_cidr: str, category: str = "unknown", confidence: int = 50) -> str:
-    """Add a new threat intelligence indicator"""
-    import hashlib
-    import time
-    
-    # Generate unique ID
-    indicator_id = hashlib.md5(f"{ip_or_cidr}:{category}:{time.time()}".encode()).hexdigest()[:8]
-    
-    # Add to in-memory storage (for now)
-    # In a production system, this would persist to database
-    if not hasattr(threat_intel, 'dynamic_indicators'):
-        threat_intel.dynamic_indicators = {}
-    
-    threat_intel.dynamic_indicators[indicator_id] = {
-        'ip_or_cidr': ip_or_cidr,
-        'category': category,
-        'confidence': confidence,
-        'added_at': time.time()
-    }
-    
-    # Also add to CIDR networks for matching
-    try:
-        network = ipaddress.ip_network(ip_or_cidr, strict=False)
-        threat_intel.cidr_networks.append(network)
-    except ValueError:
-        pass
-    
-    return indicator_id
-
-def remove_indicator(indicator_id: str) -> bool:
-    """Remove a threat intelligence indicator by ID"""
-    if not hasattr(threat_intel, 'dynamic_indicators'):
-        return False
-    
-    if indicator_id not in threat_intel.dynamic_indicators:
-        return False
-    
-    # Remove from dynamic indicators
-    indicator = threat_intel.dynamic_indicators.pop(indicator_id)
-    
-    # Remove from CIDR networks (this is simplified - in production you'd want better tracking)
-    try:
-        network = ipaddress.ip_network(indicator['ip_or_cidr'], strict=False)
-        if network in threat_intel.cidr_networks:
-            threat_intel.cidr_networks.remove(network)
-    except ValueError:
-        pass
-    
-    return True
+def initialize_threatintel():
+    """Initialize threat intelligence loader"""
+    ti_loader.load()

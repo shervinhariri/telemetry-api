@@ -198,6 +198,43 @@ EXPORT_SENT_TOTAL = Counter(
     ['dest']
 )
 
+# Enrichment metrics
+GEOIP_LOADED = Gauge(
+    'telemetry_geoip_loaded',
+    'GeoIP database loaded status (1=loaded, 0=not loaded)'
+)
+
+GEOIP_LAST_REFRESH = Gauge(
+    'telemetry_geoip_last_refresh_timestamp',
+    'Timestamp of last GeoIP database refresh'
+)
+
+ASN_LOADED = Gauge(
+    'telemetry_asn_loaded',
+    'ASN database loaded status (1=loaded, 0=not loaded)'
+)
+
+ASN_LAST_REFRESH = Gauge(
+    'telemetry_asn_last_refresh_timestamp',
+    'Timestamp of last ASN database refresh'
+)
+
+THREATINTEL_LOADED = Gauge(
+    'telemetry_threatintel_loaded',
+    'Threat intelligence loaded status (1=loaded, 0=not loaded)'
+)
+
+THREATINTEL_SOURCES = Gauge(
+    'telemetry_threatintel_sources',
+    'Number of threat intelligence sources loaded'
+)
+
+THREATINTEL_MATCHES_TOTAL = Counter(
+    'telemetry_threatintel_matches_total',
+    'Total number of threat intelligence matches',
+    ['type', 'source']
+)
+
 EXPORT_FAILED_TOTAL = Counter(
     'telemetry_export_failed_total',
     'Total number of export failures',
@@ -438,6 +475,35 @@ class PrometheusMetrics:
     def observe_processing_latency(self, latency_ms: float):
         """Observe processing latency."""
         PROCESSING_LATENCY.observe(latency_ms)
+    
+    # Enrichment metrics
+    def set_geoip_loaded(self, loaded: bool):
+        """Set GeoIP loaded status."""
+        GEOIP_LOADED.set(1 if loaded else 0)
+    
+    def set_geoip_last_refresh(self, timestamp: float):
+        """Set GeoIP last refresh timestamp."""
+        GEOIP_LAST_REFRESH.set(timestamp)
+    
+    def set_asn_loaded(self, loaded: bool):
+        """Set ASN loaded status."""
+        ASN_LOADED.set(1 if loaded else 0)
+    
+    def set_asn_last_refresh(self, timestamp: float):
+        """Set ASN last refresh timestamp."""
+        ASN_LAST_REFRESH.set(timestamp)
+    
+    def set_threatintel_loaded(self, loaded: bool):
+        """Set threat intelligence loaded status."""
+        THREATINTEL_LOADED.set(1 if loaded else 0)
+    
+    def set_threatintel_sources(self, count: int):
+        """Set number of threat intelligence sources."""
+        THREATINTEL_SOURCES.set(count)
+    
+    def increment_threatintel_matches(self, match_type: str, source: str, count: int = 1):
+        """Increment threat intelligence matches counter."""
+        THREATINTEL_MATCHES_TOTAL.labels(type=match_type, source=source).inc(count)
     
     def get_metrics(self) -> bytes:
         """Get Prometheus metrics in text format."""
