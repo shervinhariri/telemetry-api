@@ -9,10 +9,14 @@ _JOBS: Dict[str, Dict[str, Any]] = {}
 @router.post("/geo/download")
 def geo_download() -> Dict[str, Any]:
     job_id = f"geo-{int(time.time())}-{uuid.uuid4().hex[:8]}"
-    _JOBS[job_id] = {"id": job_id, "type": "geo-download", "status": "queued", "created_at": time.time()}
+    _JOBS[job_id] = {
+        "id": job_id,
+        "type": "geo_download",      # <- underscore, not hyphen
+        "status": "queued",
+        "created_at": time.time(),
+    }
     return {"status": "ok", "job_id": job_id}
 
 @router.get("/jobs")
 def list_jobs() -> List[Dict[str, Any]]:
-    # e2e expects a list (not wrapped)
-    return list(_JOBS.values())
+    return list(_JOBS.values())      # <- bare list, not wrapped

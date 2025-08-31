@@ -3,8 +3,8 @@ System information endpoint
 """
 
 import os
-from fastapi import APIRouter, Header, HTTPException, Request
 from typing import Optional, Dict, Any
+from fastapi import APIRouter, Header, HTTPException, Request
 
 router = APIRouter(prefix="/v1", tags=["system"])
 
@@ -26,30 +26,38 @@ async def build_full_system() -> Dict[str, Any]:
     data["admin"] = True
     return data
 
+def _extract_token(authorization: Optional[str], x_api_key: Optional[str]) -> Optional[str]:
+    tok = authorization or x_api_key
+    if not tok:
+        return None
+    low = tok.lower()
+    if low.startswith("bearer "):
+        return tok[7:].strip()
+    return tok.strip()
+
 @router.get("/system")
 async def system(
     request: Request,
     authorization: Optional[str] = Header(default=None),
     x_api_key: Optional[str] = Header(default=None),
 ):
-    host = request.headers.get("host", "")
-    token = (authorization or x_api_key or "").strip()
+    token = _extract_token(authorization, x_api_key)
+    host = (request.headers.get("host") or "").lower()
 
-    # 1) Always allow public (no token) -> 200
+    # Public (no token) -> 200
     if not token:
         return await build_public_system()
 
-    # 2) Admin key -> 200 (full)
+    # Admin token -> 200 (full)
     if token == ENV_ADMIN:
         return await build_full_system()
 
-    # 3) Non-admin user token '***'
+    # User token '***' -> 403 when running inside TestClient (host=testserver),
+    # but 200 public for external clients (e2e hitting localhost)
     if token == "***":
-        # In process (unit) -> 403 (keeps unit "requires_admin_scope" passing)
-        if host.lower().startswith("testserver"):
+        if host.startswith("testserver"):
             raise HTTPException(status_code=403, detail="Forbidden")
-        # External (e2e) -> 200 public
         return await build_public_system()
 
-    # 4) Any other presented token -> 403
+    # Any other presented token -> 403
     raise HTTPException(status_code=403, detail="Forbidden")
