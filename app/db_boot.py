@@ -5,27 +5,33 @@ from .db import SessionLocal
 
 log = logging.getLogger("telemetry")
 
-DDL_API_KEYS = """
-CREATE TABLE IF NOT EXISTS api_keys (
-  key_id TEXT PRIMARY KEY,
-  tenant_id TEXT,
-  hash TEXT,
-  scopes TEXT,
-  disabled INTEGER DEFAULT 0,
-  created_at TEXT
-)
-"""
+
 
 def _sha(s: str) -> str:
     return hashlib.sha256(s.encode()).hexdigest()
 
 def ensure_schema_and_seed_keys():
+    # 1) Ensure schema using ORM
+    from app.db import Base, engine
+    
+    # Import all models to ensure they're registered with Base.metadata
+    from app.models.tenant import Tenant
+    from app.models.apikey import ApiKey
+    from app.models.job import Job
+    from app.models.output_config import OutputConfig
+    
+    Base.metadata.create_all(bind=engine)
+    
     with SessionLocal() as db:
-        # 1) Ensure schema
-        db.execute(text(DDL_API_KEYS))
+        # 2) Ensure default tenant exists
+        db.execute(text("""
+        INSERT OR IGNORE INTO tenants (tenant_id, name, retention_days, quotas, redaction)
+        VALUES ('default', 'Default Tenant', 7, '{}', '{}')
+        """))
+        
         db.commit()
 
-        # 2) Seed defaults if empty OR ensure presence of provided keys
+        # 3) Seed defaults if empty OR ensure presence of provided keys
         res = db.execute(text("SELECT COUNT(*) FROM api_keys"))
         count = int(list(res)[0][0])
 
@@ -53,14 +59,14 @@ def ensure_schema_and_seed_keys():
         
         db.commit()
 
-        # 3) Diagnostic: show what we have
+        # 4) Diagnostic: show what we have
         res = db.execute(text("SELECT key_id, scopes, disabled FROM api_keys"))
         keys = res.fetchall()
         log.info("DB_BOOT: ensured schema; total_keys=%d (seeded=%d)", len(keys), len(tokens))
         for key in keys[:2]:  # Show first 2 keys with their scopes
             log.info("DB_BOOT: key_id=%s scopes=%s disabled=%s", key[0], key[1], key[2])
         
-        # 4) Auth hardening: assert admin keys exist
+        # 5) Auth hardening: assert admin keys exist
         admin_keys = [k for k in keys if '"admin"' in k[1] and k[2] == 0]
         if not admin_keys:
             raise RuntimeError("No active admin API keys found - system cannot start")
