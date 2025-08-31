@@ -16,6 +16,10 @@ services:
       timeout: 1s
       retries: 90
       start_period: 10s
+    networks:
+      default:
+        aliases:
+          - api   # keep old hostname working
 
   # keep disabled until UDP ingest exists in backend
   udp-ingestor:
@@ -33,7 +37,8 @@ services:
     ports:
       - "2055:2055/udp"
     depends_on:
-      - api
+      telemetry-api:
+        condition: service_healthy
     restart: unless-stopped
     deploy:
       replicas: 0
@@ -50,7 +55,7 @@ services:
       - "8081:8081"
     restart: unless-stopped
     depends_on:
-      api:
+      telemetry-api:
         condition: service_healthy
 
 volumes:

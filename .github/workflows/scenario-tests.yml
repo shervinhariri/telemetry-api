@@ -27,6 +27,9 @@ jobs:
       - name: Build image (no cache)
         run: docker build --pull --no-cache -t telemetry-api:build .
 
+      - name: Validate docker-compose configuration
+        run: docker compose -f docker-compose.yml config
+
       - name: Start stack and wait for container health
         run: |
           set -euo pipefail
