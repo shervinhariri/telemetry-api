@@ -94,6 +94,13 @@ async def lifespan(application: FastAPI):
     except Exception as e:
         logger.error("DB_BOOTSTRAP failed (non-fatal): %s", e)
     
+    # Initialize database tables
+    try:
+        from .db import init_db
+        init_db()
+    except Exception as e:
+        logger.warning("Database initialization failed (non-fatal): %s", e)
+    
     # Rewrite any legacy non-JSON scopes to a valid JSON array
     try:
         with SessionLocal() as s:

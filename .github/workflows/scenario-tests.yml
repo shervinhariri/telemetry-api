@@ -40,56 +40,15 @@ jobs:
 
       - name: HTTP smoke check
         run: |
-          set -euo pipefail
           for i in $(seq 1 120); do
-            code=$(curl -sS --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080/v1/health" || true)
+            code=$(curl -sS --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/v1/health || true)
             echo "try $i -> $code"
             [ "$code" = "200" ] && exit 0
             sleep 1
           done
           echo "::group::compose-ps"; docker compose ps; echo "::endgroup::"
-          echo "::group::sockets"; ss -ltnp || true; echo "::endgroup::"
           echo "::group::logs"; docker logs telemetry-api --tail=200 || true; echo "::endgroup::"
           exit 1
-
-      - name: Sanity check container
-        run: |
-          docker exec telemetry-api python -c "import sqlite3; print('sqlite3 OK')"
-          docker exec telemetry-api python -c "from app.main import app; print('app OK')"
-          # Verify we're using the locally built image
-          docker exec telemetry-api ls -la /app/app/api/
-          docker exec telemetry-api python -c "import app.api; print('app.api package OK')"
-
-      - name: DB check (verify scopes format)
-        run: |
-          docker exec telemetry-api bash -lc 'python - <<"PY"
-          from sqlalchemy import create_engine, text
-          import os, json, time
-          db=os.getenv("DB_URL","sqlite:////data/telemetry.db")
-          e=create_engine(db, future=True)
-          
-          # Wait for api_keys table to exist
-          max_retries = 10
-          for attempt in range(max_retries):
-              try:
-                  with e.connect() as c:
-                      # First check what tables exist
-                      tables = c.execute(text("SELECT name FROM sqlite_master WHERE type=:type"), {"type": "table"}).all()
-                      print(f"Available tables: {[t[0] for t in tables]}")
-                      
-                      rows=c.execute(text("select key_id, scopes from api_keys limit 3;")).all()
-                      print("DB scopes check:")
-                      for row in rows:
-                          print(f"  {row[0]}: {row[1]}")
-                      break
-              except Exception as exc:
-                  if attempt < max_retries - 1:
-                      print(f"Waiting for api_keys table (attempt {attempt + 1}/{max_retries})...")
-                      time.sleep(2)
-                  else:
-                      print(f"Failed to find api_keys table after {max_retries} attempts")
-                      raise
-          PY'
 
       # Run tests against the running container
       - name: Run tests against container

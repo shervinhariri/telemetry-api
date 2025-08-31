@@ -6,6 +6,7 @@ services:
     environment:
       PORT: "8080"           # app listens on 8080 in the container
       PYTHONUNBUFFERED: "1"
+      API_KEY: "${API_KEY:-TEST_ADMIN_KEY}"  # <-- add this
     ports:
       - "127.0.0.1:8080:8080"  # tests hit localhost:8080
       - "127.0.0.1:80:8080"    # some tests/fixtures still use port 80
