@@ -56,7 +56,7 @@ jobs:
           docker exec telemetry-api bash -lc 'python - <<"PY"
           from sqlalchemy import create_engine, text
           import os, json, time
-          db=os.getenv("DB_URL","sqlite:////app/telemetry.db")
+          db=os.getenv("DB_URL","sqlite:////data/telemetry.db")
           e=create_engine(db, future=True)
           
           # Wait for api_keys table to exist
@@ -64,6 +64,10 @@ jobs:
           for attempt in range(max_retries):
               try:
                   with e.connect() as c:
+                      # First check what tables exist
+                      tables = c.execute(text("SELECT name FROM sqlite_master WHERE type='table';")).all()
+                      print(f"Available tables: {[t[0] for t in tables]}")
+                      
                       rows=c.execute(text("select key_id, scopes from api_keys limit 3;")).all()
                       print("DB scopes check:")
                       for row in rows:
@@ -104,7 +108,7 @@ jobs:
           docker exec telemetry-api bash -lc 'python - <<"PY"
           from sqlalchemy import create_engine, text
           import os
-          db=os.getenv("DB_URL","sqlite:////app/telemetry.db")
+          db=os.getenv("DB_URL","sqlite:////data/telemetry.db")
           e=create_engine(db, future=True)
           try:
               with e.connect() as c:
@@ -116,7 +120,7 @@ jobs:
               # Show available tables
               try:
                   with e.connect() as c:
-                      tables=c.execute(text("SELECT name FROM sqlite_master WHERE type='table';")).all()
+                      tables=c.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).all()
                       print(f"Available tables: {[t[0] for t in tables]}")
               except Exception as table_exc:
                   print(f"Error querying available tables: {table_exc}")
