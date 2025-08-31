@@ -99,6 +99,22 @@ UDP_HEAD_BIND_ERRORS_TOTAL = Counter(
     'Total number of UDP head bind errors'
 )
 
+# P1: Additional UDP head metrics
+UDP_HEAD_PACKETS_TOTAL = Counter(
+    'telemetry_udp_head_packets_total',
+    'Total number of UDP packets received by UDP head'
+)
+
+UDP_HEAD_BYTES_TOTAL = Counter(
+    'telemetry_udp_head_bytes_total',
+    'Total bytes received by UDP head'
+)
+
+UDP_HEAD_LAST_PACKET_TS = Gauge(
+    'telemetry_udp_head_last_packet_ts',
+    'Timestamp of last UDP packet received'
+)
+
 # Ingest metrics
 INGEST_BATCHES_TOTAL = Counter(
     'telemetry_ingest_batches_total',
@@ -189,6 +205,19 @@ EXPORT_TEST_TOTAL = Counter(
     'telemetry_export_test_total',
     'Total number of export test attempts',
     ['dest', 'code']
+)
+
+# Output test counters (P1 T4)
+OUTPUTS_TEST_SUCCESS_TOTAL = Counter(
+    'telemetry_outputs_test_success_total',
+    'Total number of successful output test attempts',
+    ['target']
+)
+
+OUTPUTS_TEST_FAIL_TOTAL = Counter(
+    'telemetry_outputs_test_fail_total',
+    'Total number of failed output test attempts',
+    ['target']
 )
 
 # Export operation counters
@@ -294,7 +323,7 @@ class PrometheusMetrics:
     
     def _setup_build_info(self):
         """Set up build information gauge."""
-        version = os.getenv("APP_VERSION", "0.9.0")
+        version = os.getenv("APP_VERSION", "0.8.10")
         image = os.getenv("IMAGE", "shvin/telemetry-api")
         image_tag = os.getenv("IMAGE_TAG", "latest")
         
@@ -392,6 +421,42 @@ class PrometheusMetrics:
         """Increment UDP head bind errors counter."""
         UDP_HEAD_BIND_ERRORS_TOTAL.inc(count)
 
+    def increment_udp_head_packets(self, count: int = 1):
+        """Increment UDP head packets counter."""
+        UDP_HEAD_PACKETS_TOTAL.inc(count)
+
+    def increment_udp_head_bytes(self, bytes_count: int):
+        """Increment UDP head bytes counter."""
+        UDP_HEAD_BYTES_TOTAL.inc(bytes_count)
+
+    def set_udp_head_last_packet_ts(self, timestamp: float):
+        """Set UDP head last packet timestamp."""
+        UDP_HEAD_LAST_PACKET_TS.set(timestamp)
+
+    def get_udp_head_packets_total(self) -> int:
+        """Get UDP head packets total."""
+        try:
+            # Use the Prometheus client's sample method
+            return int(next(UDP_HEAD_PACKETS_TOTAL._metrics.values())._value.get())
+        except:
+            return 0
+
+    def get_udp_head_bytes_total(self) -> int:
+        """Get UDP head bytes total."""
+        try:
+            # Use the Prometheus client's sample method
+            return int(next(UDP_HEAD_BYTES_TOTAL._metrics.values())._value.get())
+        except:
+            return 0
+
+    def get_udp_head_last_packet_ts(self) -> float:
+        """Get UDP head last packet timestamp."""
+        try:
+            # Use the Prometheus client's sample method
+            return float(next(UDP_HEAD_LAST_PACKET_TS._metrics.values())._value.get())
+        except:
+            return 0.0
+
     def increment_ingest_batches(self, count: int = 1):
         """Increment ingest batches counter."""
         INGEST_BATCHES_TOTAL.inc(count)
@@ -443,6 +508,14 @@ class PrometheusMetrics:
     def increment_export_test(self, dest: str, code: str):
         """Increment export test counter."""
         EXPORT_TEST_TOTAL.labels(dest=dest, code=code).inc()
+
+    def increment_outputs_test_success(self, target: str):
+        """Increment successful output test counter."""
+        OUTPUTS_TEST_SUCCESS_TOTAL.labels(target=target).inc()
+
+    def increment_outputs_test_fail(self, target: str):
+        """Increment failed output test counter."""
+        OUTPUTS_TEST_FAIL_TOTAL.labels(target=target).inc()
 
     def increment_export_sent(self, dest: str, count: int = 1):
         """Increment export sent counter."""

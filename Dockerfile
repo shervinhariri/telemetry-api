@@ -9,8 +9,8 @@ RUN CGO_ENABLED=0 go build -o /out/goflow2 ./cmd/goflow2
 # ---- Stage 2: base image (shared dependencies) ----
 FROM python:3.11-slim@sha256:1d6131b5d479888b43200645e03a78443c7157efbdb730e6b48129740727c312 as base
 
-ARG APP_VERSION=dev
-ARG VERSION=0.0.0-dev
+ARG APP_VERSION=0.8.10
+ARG VERSION=0.8.10
 ARG GIT_SHA=dev
 ARG IMAGE=shvin/telemetry-api
 
@@ -96,7 +96,7 @@ LABEL org.opencontainers.image.title="telemetry-api" \
 
 # ---- Stage 4: runtime (prod) ----
 FROM base AS runtime
-ARG VERSION=0.0.0-dev
+ARG VERSION=0.8.10
 ENV TELEMETRY_VERSION=${VERSION}
 ENV APP_ENV=prod
 ENTRYPOINT ["/app/entrypoint.sh"]
