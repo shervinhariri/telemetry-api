@@ -44,11 +44,13 @@ async def authenticate(request: Request):
     # Try X-API-Key or X-Api-Key headers first
     token = request.headers.get("X-API-Key") or request.headers.get("X-Api-Key")
     
-    # Fallback to Authorization Bearer header
+    # Fallback to Authorization header (Bearer or raw token)
     if not token:
         auth = request.headers.get("authorization", "") or request.headers.get("Authorization", "")
         if auth.lower().startswith("bearer "):
             token = auth.split(" ", 1)[1].strip()
+        elif auth.strip():  # Also allow raw "Authorization: <token>"
+            token = auth.strip()
     
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
@@ -128,4 +130,8 @@ def require_scopes(*allowed: str):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden: missing scope")
 
     return dep
+
+def require_admin():
+    """Require admin scope specifically"""
+    return require_scopes("admin")
 

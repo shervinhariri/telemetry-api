@@ -55,25 +55,22 @@ def clamp(n: int, lo=0, hi=100) -> int:
     return max(lo, min(hi, n))
 
 def score(record: Dict[str, Any], ti_matches: List[Any]) -> int:
-    """Risk score model (kept intentionally simple to satisfy tests):
-    base 10
-    +60 if src or dst matches any TI indicator (IP or CIDR)
-    +10 if dst_port in RISKY_PORTS
-    +10 if bytes >= BYTES_THRESHOLD (and src port looks ephemeral is ignored in tests except they set 5000)
+    """
+    Contract: if ti_matches is non-empty, the event ALREADY matched threat intel.
+    Do not try to re-evaluate CIDRs here.
     """
     r = _normalize(record)
+    s = 10  # base
 
-    s = 10  # base score
-
-    # TI boost
-    if _ip_in_list(r["src_ip"], ti_matches) or _ip_in_list(r["dst_ip"], ti_matches):
+    # TI boost: any non-empty match list means matched
+    if ti_matches:
         s += 60
 
-    # risky server-side port
+    # risky destination ports
     if r["dst_port"] in RISKY_PORTS:
         s += 10
 
-    # bytes threshold
+    # large transfer bytes
     if isinstance(r["bytes"], (int, float)) and r["bytes"] >= BYTES_THRESHOLD:
         s += 10
 

@@ -13,11 +13,11 @@ from ..pipeline import STATS
 from ..config import FEATURES
 from ..queue_manager import queue_manager
 
-from app.auth.deps import require_scopes
+from app.auth.deps import require_admin
 
 router = APIRouter()
 
-@router.get("/system", dependencies=[Depends(require_scopes("admin"))])
+@router.get("/system", dependencies=[Depends(require_admin())])
 async def get_system_info() -> Dict[str, Any]:
     """Get structured system information"""
     try:
@@ -57,6 +57,9 @@ async def get_system_info() -> Dict[str, Any]:
         from ..udp_head import get_udp_head_status
         features["udp_head"] = get_udp_head_status()
         
+        # P1: Add UDP head status to system response
+        udp_head_status = get_udp_head_status()
+        
         # Get queue information
         queue_info = {
             "max_depth": queue_stats["max"],
@@ -71,6 +74,16 @@ async def get_system_info() -> Dict[str, Any]:
         asn_status = asn_loader.get_status()
         ti_status = ti_loader.get_status()
         
+        # Build Geo metadata for P0
+        geo_metadata = {
+            "enabled": geoip_status["status"] == "loaded",
+            "vendor": "maxmind",
+            "database": "GeoLite2-City",
+            "db_path": geoip_loader.db_path,
+            "build_ymd": "2024-01-15",  # TODO: Extract from database metadata
+            "status": geoip_status["status"]
+        }
+        
         return {
             "status": "ok",
             "version": version,
@@ -81,6 +94,8 @@ async def get_system_info() -> Dict[str, Any]:
             "geoip": geoip_status,
             "asn": asn_status,
             "threatintel": ti_status,
+            "geo": geo_metadata,  # P0: New Geo metadata
+            "udp_head": udp_head_status,  # P1: UDP head status
             "uptime_s": uptime_seconds,
             "workers": queue_manager.worker_pool_size,
             "mem_mb": 0,  # TODO: Implement without psutil
