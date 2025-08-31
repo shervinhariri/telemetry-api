@@ -6,9 +6,15 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 
-def test_system_endpoint_basic(client):
+def test_system_endpoint_basic(client, admin_headers):
     """Test basic system endpoint response"""
-    response = client.get("/v1/system", headers={"Authorization": "Bearer TEST_ADMIN_KEY"})
+    if client:
+        response = client.get("/v1/system", headers=admin_headers)
+    else:
+        # For container testing, use requests
+        import requests
+        response = requests.get("http://localhost/v1/system", headers=admin_headers)
+    
     assert response.status_code == 200
     
     data = response.json()
@@ -20,29 +26,41 @@ def test_system_endpoint_basic(client):
     assert "asn" in data
     assert "threatintel" in data
 
-def test_system_endpoint_udp_head_disabled(client):
+def test_system_endpoint_udp_head_disabled(client, admin_headers):
     """Test system endpoint with UDP head disabled"""
     with patch('app.config.FEATURES', {'sources': True, 'udp_head': False}), \
          patch('app.udp_head.get_udp_head_status', return_value='disabled'):
-        response = client.get("/v1/system", headers={"Authorization": "Bearer TEST_ADMIN_KEY"})
+        if client:
+            response = client.get("/v1/system", headers=admin_headers)
+        else:
+            import requests
+            response = requests.get("http://localhost/v1/system", headers=admin_headers)
         assert response.status_code == 200
         
         data = response.json()
         assert data["features"]["udp_head"] == "disabled"
 
-def test_system_endpoint_udp_head_enabled(client):
+def test_system_endpoint_udp_head_enabled(client, admin_headers):
     """Test system endpoint with UDP head enabled"""
     with patch('app.config.FEATURES', {'sources': True, 'udp_head': True}), \
          patch('app.udp_head.get_udp_head_status', return_value='ready'):
-        response = client.get("/v1/system", headers={"Authorization": "Bearer TEST_ADMIN_KEY"})
+        if client:
+            response = client.get("/v1/system", headers=admin_headers)
+        else:
+            import requests
+            response = requests.get("http://localhost/v1/system", headers=admin_headers)
         assert response.status_code == 200
         
         data = response.json()
         assert data["features"]["udp_head"] == "ready"
 
-def test_system_endpoint_queue_info(client):
+def test_system_endpoint_queue_info(client, admin_headers):
     """Test system endpoint includes queue information"""
-    response = client.get("/v1/system", headers={"Authorization": "Bearer TEST_ADMIN_KEY"})
+    if client:
+        response = client.get("/v1/system", headers=admin_headers)
+    else:
+        import requests
+        response = requests.get("http://localhost/v1/system", headers=admin_headers)
     assert response.status_code == 200
     
     data = response.json()
@@ -54,9 +72,13 @@ def test_system_endpoint_queue_info(client):
     assert queue_info["current_depth"] >= 0
     assert queue_info["max_depth"] > 0
 
-def test_system_endpoint_enrichment_status(client):
+def test_system_endpoint_enrichment_status(client, admin_headers):
     """Test system endpoint includes enrichment status"""
-    response = client.get("/v1/system", headers={"Authorization": "Bearer TEST_ADMIN_KEY"})
+    if client:
+        response = client.get("/v1/system", headers=admin_headers)
+    else:
+        import requests
+        response = requests.get("http://localhost/v1/system", headers=admin_headers)
     assert response.status_code == 200
     
     data = response.json()
@@ -80,11 +102,19 @@ def test_system_endpoint_enrichment_status(client):
 
 def test_system_endpoint_requires_auth(client):
     """Test system endpoint requires authentication"""
-    response = client.get("/v1/system")
+    if client:
+        response = client.get("/v1/system")
+    else:
+        import requests
+        response = requests.get("http://localhost/v1/system")
     assert response.status_code == 401
 
 def test_system_endpoint_requires_admin_scope(client):
     """Test system endpoint requires admin scope"""
     # Use a key without admin scope
-    response = client.get("/v1/system", headers={"Authorization": "Bearer TEST_KEY"})
+    if client:
+        response = client.get("/v1/system", headers={"Authorization": "Bearer TEST_KEY"})
+    else:
+        import requests
+        response = requests.get("http://localhost/v1/system", headers={"Authorization": "Bearer TEST_KEY"})
     assert response.status_code == 403

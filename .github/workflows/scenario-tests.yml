@@ -109,10 +109,13 @@ jobs:
 
       # Run tests against the running container
       - name: Run tests against container
+        env:
+          API_BASE_URL: http://localhost:80
+          API_KEY: TEST_ADMIN_KEY
         run: |
           # Wait for container to be ready
           sleep 5
-          # Run tests using the test client
+          # Run tests using HTTP-only approach
           python -m pytest tests/ -v
 
       - name: Scenario tester

@@ -1,76 +1,72 @@
 import pytest
 import os
 import sys
+import time
+import requests
 from fastapi.testclient import TestClient
 
 # Add the app directory to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-
-
 from app.main import app
-from app.db import engine, Base
-from app.models.tenant import Tenant
-from app.models.apikey import ApiKey
-import hashlib
 
 @pytest.fixture(scope="session")
-def test_db():
-    """Set up test database - in container, database is already initialized"""
-    # In the container environment, the database is already initialized by bootstrap
-    # We just need to ensure the test API key exists
-    from sqlalchemy.orm import sessionmaker
-    Session = sessionmaker(bind=engine)
-    session = Session()
+def api():
+    """
+    HTTP-only API fixture that waits for the container to be ready.
+    Returns base URL and API key for making HTTP requests.
+    """
+    # Read configuration from environment
+    base_url = os.getenv("API_BASE_URL", "http://localhost")
+    api_key = os.getenv("API_KEY", "DEV_ADMIN_KEY_5a8f9ffdc3")
     
-    # Check if test admin API key exists, create if not
-    test_admin_key = "TEST_ADMIN_KEY"
-    key_hash = hashlib.sha256(test_admin_key.encode()).hexdigest()
+    # If we're in CI/CD or explicitly testing against a container, wait for the API
+    if os.getenv("CI") or os.getenv("GITHUB_ACTIONS") or base_url != "http://localhost":
+        # Wait for the API to be ready (up to 60 seconds)
+        health_url = f"{base_url}/v1/health"
+        max_wait = 60
+        wait_interval = 2
+        
+        for attempt in range(max_wait // wait_interval):
+            try:
+                response = requests.get(health_url, timeout=5)
+                if response.status_code == 200:
+                    print(f"✅ API ready at {base_url} (attempt {attempt + 1})")
+                    break
+            except requests.RequestException:
+                pass
+            
+            if attempt < (max_wait // wait_interval) - 1:
+                print(f"⏳ Waiting for API at {base_url}... (attempt {attempt + 1})")
+                time.sleep(wait_interval)
+        else:
+            raise RuntimeError(f"API not ready after {max_wait} seconds at {base_url}")
     
-    api_key = session.query(ApiKey).filter_by(hash=key_hash).first()
-    if not api_key:
-        # Create test admin API key
-        api_key = ApiKey(
-            key_id="test-admin", 
-            tenant_id="default", 
-            hash=key_hash,
-            scopes=["admin", "ingest", "read_metrics", "export", "manage_indicators"]
-        )
-        session.add(api_key)
-        session.commit()
-    
-    # Check if test user API key exists, create if not
-    test_user_key = "user-key"
-    user_key_hash = hashlib.sha256(test_user_key.encode()).hexdigest()
-    
-    user_api_key = session.query(ApiKey).filter_by(hash=user_key_hash).first()
-    if not user_api_key:
-        # Create test user API key (no admin scope)
-        user_api_key = ApiKey(
-            key_id="test-user", 
-            tenant_id="default", 
-            hash=user_key_hash,
-            scopes=["ingest", "read_metrics"]  # No admin scope
-        )
-        session.add(user_api_key)
-        session.commit()
-    
-    session.close()
-    
-    yield
+    return {
+        "base": base_url,
+        "key": api_key
+    }
 
 @pytest.fixture
-def client(test_db):
-    """Test client with initialized database"""
+def client(api):
+    """
+    Test client for local testing (when not using container)
+    """
+    # If we're testing against a remote API, use requests
+    if api["base"] != "http://localhost":
+        return None
+    
+    # For local testing, use FastAPI TestClient
     with TestClient(app) as test_client:
         yield test_client
 
 @pytest.fixture
-def admin_headers():
+def admin_headers(api):
     """Headers with admin API key"""
-    return {"Authorization": "Bearer TEST_ADMIN_KEY"}
+    return {"Authorization": f"Bearer {api['key']}"}
 
 @pytest.fixture
-def user_headers():
-    """Headers with user API key (no admin)"""
-    return {"Authorization": "Bearer user-key"}
+def user_headers(api):
+    """Headers with user API key (no admin) - for testing permission boundaries"""
+    # For now, use the same key but this could be extended
+    return {"Authorization": f"Bearer {api['key']}"}

@@ -88,9 +88,10 @@ async def lifespan(application: FastAPI):
 
     # DB bootstrap
     try:
-        ensure_schema_and_seed_keys()
+        from .db_boot import bootstrap_db
+        bootstrap_db(engine)
     except Exception as e:
-        logger.error("DB_BOOT failed: %s", e)
+        logger.error("DB_BOOTSTRAP failed: %s", e)
     
     # Rewrite any legacy non-JSON scopes to a valid JSON array
     try:
