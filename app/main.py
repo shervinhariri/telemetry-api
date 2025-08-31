@@ -38,6 +38,7 @@ from .api.ingest import router as ingest_router
 from .api.uploads import router as uploads_router
 from .api.enrichment_geoip import router as geoip_cfg_router
 from .api.health import router as health_router
+from .api.jobs import router as jobs_router
 from .queue_manager import queue_manager
 from .logging_config import setup_logging
 from .config import API_VERSION
@@ -312,7 +313,8 @@ async def tenancy_middleware(request: Request, call_next):
 app_dir = os.path.dirname(__file__)
 _ui_candidates = [
     os.path.abspath(os.path.join(app_dir, "..", "ui")),             # container path (/app/ui)
-    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui"))       # local path (repo ops/ui)
+    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui", "ui")), # local path (repo ops/ui/ui)
+    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui"))       # fallback local path (repo ops/ui)
 ]
 ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0])
 
@@ -339,6 +341,7 @@ app.include_router(ingest_router, prefix=API_PREFIX)
 app.include_router(uploads_router, prefix=API_PREFIX)
 app.include_router(geoip_cfg_router, prefix=API_PREFIX)
 app.include_router(health_router, prefix=API_PREFIX)
+app.include_router(jobs_router, prefix=API_PREFIX)
 
 # UDP Metrics endpoint for mapper reporting
 @app.post(f"{API_PREFIX}/admin/metrics/udp")
