@@ -1,7 +1,6 @@
 from fastapi import APIRouter
-from typing import Dict, Any
-import time
-import uuid
+from typing import Dict, Any, List
+import time, uuid
 
 router = APIRouter(prefix="/v1", tags=["geo"])
 
@@ -14,5 +13,6 @@ def geo_download() -> Dict[str, Any]:
     return {"status": "ok", "job_id": job_id}
 
 @router.get("/jobs")
-def list_jobs() -> Dict[str, Any]:
-    return {"status": "ok", "jobs": list(_JOBS.values())}
+def list_jobs() -> List[Dict[str, Any]]:
+    # e2e expects a list (not wrapped)
+    return list(_JOBS.values())
