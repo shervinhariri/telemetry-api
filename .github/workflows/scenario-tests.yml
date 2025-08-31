@@ -37,16 +37,25 @@ jobs:
             -e TELEMETRY_SEED_KEYS="" \
             telemetry-api:build
 
-      - name: Wait for health
+      - name: Wait for API to be healthy (authenticated)
         run: |
-          for i in {1..60}; do
-            if curl -fsS http://localhost:8080/health >/dev/null; then
-              echo "API is up"; exit 0
+          # Give it up to 90s to come up
+          for i in {1..90}; do
+            # Capture HTTP status without failing on non-2xx
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              -H "x-api-key: TEST_ADMIN_KEY" \
+              http://localhost:8080/health || true)
+
+            if [ "$code" = "200" ]; then
+              echo "API is healthy"
+              exit 0
             fi
+
             sleep 1
           done
-          echo "API never became healthy"
-          docker logs telemetry-api
+
+          echo "API never became healthy (last status: $code)"
+          docker logs --tail=300 telemetry-api
           exit 1
 
       - name: Sanity check container
@@ -115,7 +124,7 @@ jobs:
         run: |
           docker ps -a
           docker logs --tail=200 telemetry-api || true
-          curl -v http://localhost:8080/health || true
+          curl -v -H "x-api-key: TEST_ADMIN_KEY" http://localhost:8080/health || true
 
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
