@@ -1,63 +1,21 @@
 
 services:
-  api:
+  telemetry-api:
     build: .
     container_name: telemetry-api
     environment:
-      - PORT=8080
-      - HOST=0.0.0.0
-      - APP_VERSION=0.8.10
-      - TELEMETRY_FEATURE_SOURCES=false
-      - TELEMETRY_FEATURE_UDP=false
-      - SQLITE_PATH=/data/telemetry.db
-      - GEOIP_CITY_DB=/data/geo/GeoLite2-City.mmdb
-      - GEOIP_ASN_DB=/data/geo/GeoLite2-ASN.mmdb
-      - THREATLIST_CSV=/data/ti/indicators.txt
-      - ENVIRONMENT=development
-      - LOG_LEVEL=INFO
-      - LOG_FORMAT=json
-      - HTTP_LOG_ENABLED=true
-      - HTTP_LOG_SAMPLE_RATE=0.1
-      - HTTP_LOG_EXCLUDE_PATHS=/v1/metrics,/v1/system,/v1/logs/tail,/v1/admin/requests
-      - REDACT_HEADERS=authorization,x-api-key
-      - REDACT_FIELDS=password,token
-      - ADMISSION_HTTP_ENABLED=true
-      - HTTP_IP_ALLOWLIST_ENABLED=true
-      - HTTP_TRUST_XFF=true
-      - TRUST_PROXY=false
-      - MAX_BATCH_BYTES=5242880
-      - MAX_RECORDS=10000
-      - RATE_LIMIT_PER_MIN=600
-      - BOOTSTRAP_TENANT_ID=default
-      - BOOTSTRAP_ADMIN_API_KEY=${BOOTSTRAP_ADMIN_API_KEY:-TEST_ADMIN_KEY}
-      - API_KEY=${API_KEY:-TEST_ADMIN_KEY}
-      - TELEMETRY_SEED_KEYS=${TELEMETRY_SEED_KEYS:-TEST_ADMIN_KEY,DEV_ADMIN_KEY_5a8f9ffdc3}
-      - FEATURE_SOURCES=${FEATURE_SOURCES:-1}
-      - FEATURE_UDP_HEAD=${FEATURE_UDP_HEAD:-0}
+      PORT: "8080"           # app listens on 8080 in the container
+      PYTHONUNBUFFERED: "1"
     ports:
-      - "127.0.0.1:80:8080"
-      - "127.0.0.1:8080:8080"
-    volumes:
-      - dbdata:/data
-      - ./geo:/data/geo:ro
-      - ./ti:/data/ti:ro
-    restart: unless-stopped
+      - "127.0.0.1:8080:8080"  # tests hit localhost:8080
+      - "127.0.0.1:80:8080"    # some tests/fixtures still use port 80
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >
-          curl -fsS "http://127.0.0.1:${PORT:-8080}/v1/health" >/dev/null ||
-          (python - <<'PY'
-import os,sys,socket
-s=socket.socket(); s.settimeout(1)
-s.connect(("127.0.0.1", int(os.environ.get("PORT","8080"))))
-s.close(); sys.exit(0)
-PY
-          )
+      # Keep it dead simple: no curl, no heredocs — just a Python one-liner.
+      test: ["CMD-SHELL", "python -c 'import socket,sys; s=socket.socket(); s.settimeout(1); s.connect((\"127.0.0.1\", 8080)); s.close(); sys.exit(0)'"]
       interval: 2s
       timeout: 1s
-      retries: 120
-      start_period: 5s
+      retries: 90
+      start_period: 10s
 
   # keep disabled until UDP ingest exists in backend
   udp-ingestor:

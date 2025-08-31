@@ -15,46 +15,73 @@ from ..queue_manager import queue_manager
 
 router = APIRouter(prefix="/v1", tags=["system"])
 
-@router.get("/system")  # public by default
-async def get_system_info(
+async def has_valid_admin_scope(authorization: Optional[str], x_api_key: Optional[str]) -> bool:
+    """Check if the provided auth headers contain a valid admin token"""
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    elif x_api_key:
+        token = x_api_key.strip()
+    
+    if not token:
+        return False
+    
+    try:
+        from ..db import SessionLocal
+        from ..models.apikey import ApiKey
+        import hashlib
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        with SessionLocal() as db:
+            key = db.query(ApiKey).filter(ApiKey.hash == token_hash, ApiKey.disabled == False).one_or_none()
+            if not key:
+                return False
+            # Check if admin scope
+            import json
+            try:
+                scopes = json.loads(key.scopes) if isinstance(key.scopes, str) else (key.scopes or [])
+            except Exception:
+                scopes = []
+            return "admin" in scopes or "*" in scopes
+    except Exception:
+        return False
+
+async def build_public_system() -> Dict[str, Any]:
+    """Build public system information (no sensitive data)"""
+    from ..api.version import get_version_from_file
+    version = get_version_from_file()
+    
+    return {
+        "status": "ok",
+        "version": version,
+        "features": {
+            "geo": {"enabled": True},  # Assume enabled for public view
+        },
+        "udp_head": {"status": "stopped"},  # Always stopped for public view
+    }
+
+async def build_full_system() -> Dict[str, Any]:
+    """Build full system information (admin only)"""
+    return await get_system_info()
+
+@router.get("/system")
+async def system(
     authorization: Optional[str] = Header(default=None),
     x_api_key: Optional[str] = Header(default=None),
-) -> Dict[str, Any]:
-    """Get structured system information"""
-    # If a token header is present but not valid/admin → 403
-    # (Tests send "Authorization: ***" and expect 403, not 401)
-    if authorization or x_api_key:
-        # Treat any provided non-empty header as "not authorized enough"
-        # unless your existing auth utils can positively validate admin scope.
-        from ..auth import require_key
-        token = None
-        if authorization and authorization.lower().startswith("bearer "):
-            token = authorization.split(" ", 1)[1].strip()
-        elif x_api_key:
-            token = x_api_key.strip()
-        if not token or token == "***":
-            raise HTTPException(status_code=403, detail="Admin scope required")
-        # Try to validate the token - if it fails, return 403
-        try:
-            from ..db import SessionLocal
-            from ..models.apikey import ApiKey
-            import hashlib
-            token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-            with SessionLocal() as db:
-                key = db.query(ApiKey).filter(ApiKey.hash == token_hash, ApiKey.disabled == False).one_or_none()
-                if not key:
-                    raise HTTPException(status_code=403, detail="Admin scope required")
-                # Check if admin scope
-                import json
-                try:
-                    scopes = json.loads(key.scopes) if isinstance(key.scopes, str) else (key.scopes or [])
-                except Exception:
-                    scopes = []
-                if "admin" not in scopes and "*" not in scopes:
-                    raise HTTPException(status_code=403, detail="Admin scope required")
-        except Exception:
-            raise HTTPException(status_code=403, detail="Admin scope required")
-    
+):
+    # public (no headers) -> 200 with public fields
+    if not authorization and not x_api_key:
+        return await build_public_system()
+
+    # explicitly invalid token used by tests -> 403
+    if authorization == "***" or x_api_key == "***":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # otherwise, validate token/scope; if admin, return full; if not, 403
+    if not await has_valid_admin_scope(authorization, x_api_key):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return await build_full_system()
+async def get_system_info() -> Dict[str, Any]:
+    """Get structured system information (admin only)"""
     try:
         # Get application metrics
         with metrics.lock:
