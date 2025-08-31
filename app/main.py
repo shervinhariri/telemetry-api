@@ -46,7 +46,7 @@ from .auth.deps import require_scopes
 from .auth.tenant import require_tenant
 from . import pipeline as pipeline_mod  # import the *module*, not the FastAPI instance
 from .db_init import init_schema_and_seed_if_needed
-from .db_boot import ensure_schema_and_seed_keys
+
 from sqlalchemy import text
 
 # Import configuration
@@ -89,6 +89,7 @@ async def lifespan(application: FastAPI):
     # DB bootstrap
     try:
         from .db_boot import bootstrap_db
+        from .db import engine
         bootstrap_db(engine)
     except Exception as e:
         logger.error("DB_BOOTSTRAP failed: %s", e)

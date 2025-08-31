@@ -10,31 +10,33 @@ import random
 import os
 from typing import Dict, Any
 
-BASE_URL = "http://localhost"
-API_KEY = os.environ.get("TEST_API_KEY", "DEV_ADMIN_KEY_5a8f9ffdc3")
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:80")
+API_KEY = os.getenv("API_KEY", "TEST_ADMIN_KEY")
 
 def make_request(method: str, endpoint: str, data: Dict[str, Any] = None, headers: Dict[str, str] = None) -> Dict[str, Any]:
     """Make a request to the API"""
     url = f"{BASE_URL}{endpoint}"
-    auth_headers = {"Authorization": f"Bearer {API_KEY}"}
+    real_headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+    log_headers = {**real_headers, "Authorization": "***"}  # mask logs only
     
     if headers:
-        auth_headers.update(headers)
+        real_headers.update(headers)
+        log_headers.update(headers)
     
     try:
         if method == "GET":
-            response = requests.get(url, headers=auth_headers)
+            response = requests.get(url, headers=real_headers)
         elif method == "POST":
-            response = requests.post(url, json=data, headers=auth_headers)
+            response = requests.post(url, json=data, headers=real_headers)
         elif method == "PUT":
-            response = requests.put(url, json=data, headers=auth_headers)
+            response = requests.put(url, json=data, headers=real_headers)
         elif method == "DELETE":
-            response = requests.delete(url, headers=auth_headers)
+            response = requests.delete(url, headers=real_headers)
         else:
             raise ValueError(f"Unsupported method: {method}")
         
         response.raise_for_status()
-        return response.json()
+        return response.json() if response.content else {}
     except requests.exceptions.RequestException as e:
         print(f"❌ {method} {endpoint} failed: {e}")
         return None

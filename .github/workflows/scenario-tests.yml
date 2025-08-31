@@ -9,6 +9,8 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    env:
+      API_KEY: TEST_ADMIN_KEY
     steps:
       - uses: actions/checkout@v4
 
@@ -33,6 +35,8 @@ jobs:
           # Load test environment variables (skip comments)
           export $(grep -v '^#' .github/test.env | xargs)
           echo "Loaded env vars: TELEMETRY_SEED_KEYS=$TELEMETRY_SEED_KEYS"
+          # Export API_KEY for docker compose
+          export API_KEY=${API_KEY}
           # Start using docker compose (builds from source) - ignore override file
           docker compose -f docker-compose.yml up -d
           echo "Waiting for API to become healthy (up to 80s)..."
@@ -113,8 +117,13 @@ jobs:
           API_BASE_URL: http://localhost:80
           API_KEY: TEST_ADMIN_KEY
         run: |
-          # Wait for container to be ready
-          sleep 5
+          # Set environment variables for tests
+          export API_BASE_URL="http://localhost:80"
+          export API_KEY="${API_KEY}"
+          # Wait for API to be ready
+          for i in $(seq 1 60); do
+            curl -sf "${API_BASE_URL}/v1/health" && break || sleep 1
+          done
           # Run tests using HTTP-only approach
           python -m pytest tests/ -v
 
