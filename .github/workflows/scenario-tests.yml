@@ -23,7 +23,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Build image from source
-        run: docker compose build
+        run: docker compose -f docker-compose.yml build
 
       - name: Start e2e stack
         env:
@@ -72,6 +72,9 @@ jobs:
         run: |
           docker exec telemetry-api python -c "import sqlite3; print('sqlite3 OK')"
           docker exec telemetry-api python -c "from app.main import app; print('app OK')"
+          # Verify we're using the locally built image
+          docker exec telemetry-api ls -la /app/app/api/
+          docker exec telemetry-api python -c "import app.api; print('app.api package OK')"
 
       - name: DB check (verify scopes format)
         run: |
