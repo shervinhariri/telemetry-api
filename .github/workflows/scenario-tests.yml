@@ -45,6 +45,18 @@ jobs:
           # Ensure database migration runs
           echo "Running database migration..."
           docker exec telemetry-api python scripts/migrate_sqlite.py
+          
+          # Wait for API to be fully ready and database to be populated
+          echo "Waiting for API to be fully ready..."
+          max_wait=30
+          for i in $(seq 1 $max_wait); do
+              if docker exec telemetry-api python -c "import sqlite3; conn = sqlite3.connect('./telemetry.db'); cursor = conn.cursor(); cursor.execute('SELECT COUNT(*) FROM api_keys'); count = cursor.fetchone()[0]; conn.close(); print(f'Found {count} api_keys'); exit(0 if count > 0 else 1)" 2>/dev/null; then
+                  echo "API is ready with api_keys table populated"
+                  break
+              fi
+              echo "Waiting for API to be ready... (attempt $i/$max_wait)"
+              sleep 2
+          done
 
       - name: Sanity check container
         run: |
