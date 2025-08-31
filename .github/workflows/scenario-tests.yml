@@ -27,144 +27,33 @@ jobs:
       - name: Build image (no cache)
         run: docker build --pull --no-cache -t telemetry-api:build .
 
-      - name: Start stack (all services)
+      - name: Start stack and wait for container health
         run: |
           set -euo pipefail
-          docker compose -f docker-compose.yml up -d --build
-          echo "==== docker compose services ===="
-          docker compose config --services
+          docker compose -f docker-compose.yml up -d --build --wait
           echo "==== docker ps ===="
-          docker ps -a
-
-      - name: Diagnostics (ports & logs snapshot)
-        run: |
-          set -euo pipefail
-          echo "==== docker ps (ports) ===="
-          docker ps --format 'table {{.ID}}\t{{.Names}}\t{{.Ports}}'
-          echo "==== ss -ltn on host ===="
-          ss -ltn || true
-
-      - name: Discover API base and health endpoint (host ports, container IP fallback)
-        env:
-          API_KEY: TEST_ADMIN_KEY
-        run: |
-          set -euo pipefail
-
-          # Candidate paths (unauth first, then auth)
-          CANDIDATES=(/v1/healthz /healthz /v1/health /health /readyz /livez /ready /live /)
-
-          # 1) Build list of published host ports from docker ps
-          mapfile -t LINES < <(docker ps --format '{{.ID}} {{.Ports}}')
-          declare -A CONTAINER_NAME
+          docker ps --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}'
+          echo "==== health statuses ===="
           for id in $(docker ps -q); do
-            name=$(docker inspect -f '{{.Name}}' "$id" | sed 's#^/##')
-            CONTAINER_NAME["$id"]="$name"
+            docker inspect -f '{{.Name}} -> {{if .State.Health}}{{.State.Health.Status}}{{else}}(no health){{end}}' "$id" || true
           done
+          # We expose 8080 explicitly above; set env for later steps
+          echo "API_BASE=http://127.0.0.1:8080" >> "$GITHUB_ENV"
+          echo "HEALTH_PATH=/v1/healthz" >> "$GITHUB_ENV"
 
-          HOST_PORTS=() # items like "127.0.0.1:PORT::<containerID>"
-          for line in "${LINES[@]}"; do
-            id="${line%% *}"
-            ports="${line#* }"
-            # Extract host mapped ports like 0.0.0.0:49155->8080/tcp or :::8080->8080/tcp
-            while read -r host side; do
-              [ -z "$host" ] && continue
-              # host could be "0.0.0.0:49155->8080/tcp," or ":::8080->8080/tcp,"
-              hp=$(printf '%s' "$host" | sed -E 's/.*\[(::|0\.0\.0\.0)\]?:([0-9]+)->.*/\2/; s/.*0\.0\.0\.0:([0-9]+)->.*/\1/; s/.*:::([0-9]+)->.*/\1/')
-              if [[ "$hp" =~ ^[0-9]+$ ]]; then
-                HOST_PORTS+=("127.0.0.1:${hp}::${id}")
-              fi
-            done < <(printf '%s\n' "$ports" | tr ',' '\n')
-          done
-
-          # 2) Probe host ports first
-          found_base=""
-          found_path=""
-          for item in "${HOST_PORTS[@]}"; do
-            host="${item%%::*}"
-            id="${item##*::}"
-            for p in "${CANDIDATES[@]}"; do
-              # Try unauth first, then auth
-              code=$(curl -s -o /dev/null -w '%{http_code}' "http://${host}${p}" || true)
-              echo "[host:${host}] ${p} -> ${code} (container ${CONTAINER_NAME[$id]})"
-              if [ "$code" = "200" ]; then
-                found_base="http://${host}"
-                found_path="$p"
-                break
-              fi
-              code=$(curl -s -o /dev/null -w '%{http_code}' -H "x-api-key: ${API_KEY}" "http://${host}${p}" || true)
-              echo "[host:${host}] ${p} (auth) -> ${code} (container ${CONTAINER_NAME[$id]})"
-              if [ "$code" = "200" ]; then
-                found_base="http://${host}"
-                found_path="$p"
-                break
-              fi
-            done
-            [ -n "$found_base" ] && break
-          done
-
-          # 3) If nothing published, fallback to container IPs on the bridge (host can reach 172.x by default)
-          if [ -z "$found_base" ]; then
-            echo "No working host port; trying container IP fallback..."
-            # Try common internal ports
-            PORTS=(8080 8000 5000 3000 80)
-            for id in $(docker ps -q); do
-              ip=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$id")
-              [ -z "$ip" ] && continue
-              for port in "${PORTS[@]}"; do
-                base="http://${ip}:${port}"
-                # quick TCP check using curl to the base URL root
-                curl -s --connect-timeout 1 "${base}/" >/dev/null || true
-                for p in "${CANDIDATES[@]}"; do
-                  code=$(curl -s -o /dev/null -w '%{http_code}' "${base}${p}" || true)
-                  echo "[container:${CONTAINER_NAME[$id]} ${base}] ${p} -> ${code}"
-                  if [ "$code" = "200" ]; then
-                    found_base="${base}"
-                    found_path="$p"
-                    break 3
-                  fi
-                  code=$(curl -s -o /dev/null -w '%{http_code}' -H "x-api-key: ${API_KEY}" "${base}${p}" || true)
-                  echo "[container:${CONTAINER_NAME[$id]} ${base}] ${p} (auth) -> ${code}"
-                  if [ "$code" = "200" ]; then
-                    found_base="${base}"
-                    found_path="$p"
-                    break 3
-                  fi
-                done
-              done
-            done
-          fi
-
-          if [ -z "$found_base" ] || [ -z "$found_path" ]; then
-            echo "==== docker ps (ports) ===="
-            docker ps --format 'table {{.ID}}\t{{.Names}}\t{{.Ports}}'
-            echo "==== Tops of each container logs (last 120 lines) ===="
-            for id in $(docker ps -q); do
-              echo "----- ${CONTAINER_NAME[$id]} ($id) -----"
-              docker logs --tail=120 "$id" || true
-            done
-            echo "Error: Could not find a working health endpoint"
-            exit 1
-          fi
-
-          echo "API_BASE=$found_base" >> "$GITHUB_ENV"
-          echo "HEALTH_PATH=$found_path" >> "$GITHUB_ENV"
-          echo "Discovered API_BASE=$found_base"
-          echo "Discovered HEALTH_PATH=$found_path"
-
-      - name: Wait for API to be healthy
+      - name: HTTP smoke check (authenticated & unauth)
         env:
           API_KEY: TEST_ADMIN_KEY
         run: |
           set -euo pipefail
-          : "${API_BASE:?API_BASE missing}"
-          : "${HEALTH_PATH:?HEALTH_PATH missing}"
-          for i in {1..120}; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "${API_BASE}${HEALTH_PATH}" || true)
+          : "${API_BASE:?missing}"; : "${HEALTH_PATH:?missing}"
+          for i in $(seq 1 60); do
+            code=$(curl -sS --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "${API_BASE}${HEALTH_PATH}" || true)
             if [ "$code" = "200" ]; then
               echo "Healthy (unauth) at ${API_BASE}${HEALTH_PATH}"
               exit 0
             fi
-            code=$(curl -s -o /dev/null -w '%{http_code}' -H "x-api-key: ${API_KEY}" "${API_BASE}${HEALTH_PATH}" || true)
+            code=$(curl -sS --connect-timeout 1 --max-time 2 -H "x-api-key: ${API_KEY}" -o /dev/null -w '%{http_code}' "${API_BASE}${HEALTH_PATH}" || true)
             if [ "$code" = "200" ]; then
               echo "Healthy (auth) at ${API_BASE}${HEALTH_PATH}"
               exit 0
@@ -172,7 +61,6 @@ jobs:
             sleep 1
           done
           echo "API never became healthy (last status: $code)"
-          # show logs of all containers
           for id in $(docker ps -q); do
             name=$(docker inspect -f '{{.Name}}' "$id" | sed 's#^/##')
             echo "----- $name ($id) logs tail -----"

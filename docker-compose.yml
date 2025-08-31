@@ -35,17 +35,18 @@ services:
       - FEATURE_SOURCES=${FEATURE_SOURCES:-1}
       - FEATURE_UDP_HEAD=${FEATURE_UDP_HEAD:-0}
     ports:
-      - "${PORT:-8080}:${PORT:-8080}"
+      - "8080:8080"             # publish 8080 to host
     volumes:
       - dbdata:/data
       - ./geo:/data/geo:ro
       - ./ti:/data/ti:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${PORT:-8080}/v1/healthz || exit 1"]
-      interval: 5s
-      timeout: 2s
-      retries: 30
+      test: ["CMD-SHELL", "python -c \"import socket,os,sys; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1', int(os.environ.get('PORT','8080')))); s.close(); sys.exit(0)\""]
+      interval: 2s
+      timeout: 1s
+      retries: 90
+      start_period: 10s
 
   # keep disabled until UDP ingest exists in backend
   udp-ingestor:
