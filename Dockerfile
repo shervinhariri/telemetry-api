@@ -99,7 +99,8 @@ FROM base AS runtime
 ARG VERSION=0.8.10
 ENV TELEMETRY_VERSION=${VERSION}
 ENV APP_ENV=prod
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENV PORT=80 HOST=0.0.0.0
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "info"]
 
 # ---- Stage 5: test (CI/e2e) ----
 FROM base AS test
@@ -108,4 +109,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 && rm -
 COPY requirements-dev.txt .
 RUN pip install --no-cache-dir -r requirements-dev.txt
 ENV APP_ENV=test
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENV PORT=80 HOST=0.0.0.0
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "info"]

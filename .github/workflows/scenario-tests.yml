@@ -24,53 +24,30 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
-      - name: Build image from source
-        run: docker compose -f docker-compose.yml build
+      - name: Build image (no cache)
+        run: docker build --pull --no-cache -t telemetry-api:build .
 
-      - name: Start e2e stack
-        env:
-          TELEMETRY_DLQ_DIR: /tmp/dlq
+      - name: Run API container (map host 8080 → container 80)
         run: |
-          docker compose down || true
-          # Load test environment variables (skip comments)
-          export $(grep -v '^#' .github/test.env | xargs)
-          echo "Loaded env vars: TELEMETRY_SEED_KEYS=$TELEMETRY_SEED_KEYS"
-          # Export API_KEY for docker compose
-          export API_KEY=${API_KEY}
-          # Start using docker compose (builds from source) - ignore override file
-          docker compose -f docker-compose.yml up -d
-          echo "Waiting for API to become healthy (up to 80s)..."
-          ok=0
-          for i in $(seq 1 40); do
-            if docker exec telemetry-api python -c "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:80/v1/health').status == 200 else 1)" 2>/dev/null
-            then
-              echo "API healthy"
-              ok=1
-              break
+          docker rm -f telemetry-api 2>/dev/null || true
+          docker run -d --name telemetry-api \
+            -p 8080:80 \
+            -e API_KEY=TEST_ADMIN_KEY \
+            -e USER_API_KEY="***" \
+            -e TELEMETRY_SEED_KEYS="" \
+            telemetry-api:build
+
+      - name: Wait for health
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://localhost:8080/health >/dev/null; then
+              echo "API is up"; exit 0
             fi
-            sleep 2
+            sleep 1
           done
-          [ "$ok" = "1" ] || { docker compose ps; docker compose logs --tail 300; exit 1; }
-          
-          # Wait additional time for database initialization to complete
-          echo "Waiting for database initialization to complete..."
-          sleep 10
-          
-          # Ensure database migration runs
-          echo "Running database migration..."
-          docker exec telemetry-api python scripts/migrate_sqlite.py
-          
-          # Wait for API to be fully ready and database to be populated
-          echo "Waiting for API to be fully ready..."
-          max_wait=30
-          for i in $(seq 1 $max_wait); do
-              if docker exec telemetry-api python -c "import sqlite3; conn = sqlite3.connect('/data/telemetry.db'); cursor = conn.cursor(); cursor.execute('SELECT COUNT(*) FROM api_keys'); count = cursor.fetchone()[0]; conn.close(); print(f'Found {count} api_keys'); exit(0 if count > 0 else 1)" 2>/dev/null; then
-                  echo "API is ready with api_keys table populated"
-                  break
-              fi
-              echo "Waiting for API to be ready... (attempt $i/$max_wait)"
-              sleep 2
-          done
+          echo "API never became healthy"
+          docker logs telemetry-api
+          exit 1
 
       - name: Sanity check container
         run: |
@@ -114,12 +91,9 @@ jobs:
       # Run tests against the running container
       - name: Run tests against container
         env:
-          API_BASE_URL: http://localhost:80
+          API_BASE_URL: http://localhost:8080
           API_KEY: TEST_ADMIN_KEY
         run: |
-          # Set environment variables for tests
-          export API_BASE_URL="http://localhost:80"
-          export API_KEY="${API_KEY}"
           # Wait for API to be ready
           for i in $(seq 1 60); do
             curl -sf "${API_BASE_URL}/v1/health" && break || sleep 1
@@ -129,39 +103,19 @@ jobs:
 
       - name: Scenario tester
         env:
-          API_BASE_URL: http://localhost:80
+          API_BASE_URL: http://localhost:8080
           API_KEY: TEST_ADMIN_KEY
         run: |
           python tools/scenario_tester.py | tee scenario_report.json
           echo "---- Summary ----"
           jq '.results[] | {scenario, status, ok}' scenario_report.json
 
-      - name: Dump logs on failure
+      - name: Show logs on failure
         if: failure()
         run: |
-          docker compose ps
-          docker compose logs --no-color | tail -n 500
-          echo "=== Database contents ==="
-          docker exec telemetry-api bash -lc 'python - <<"PY"
-          from sqlalchemy import create_engine, text
-          import os
-          db=os.getenv("DB_URL","sqlite:////data/telemetry.db")
-          e=create_engine(db, future=True)
-          try:
-              with e.connect() as c:
-                  rows=c.execute(text("SELECT key_id, scopes, disabled FROM api_keys;")).all()
-                  for row in rows:
-                      print(f"  {row[0]}: {row[1]} (disabled={row[2]})")
-          except Exception as exc:
-              print(f"Error querying api_keys table: {exc}")
-              # Show available tables
-              try:
-                  with e.connect() as c:
-                      tables=c.execute(text("SELECT name FROM sqlite_master WHERE type=:type"), {"type": "table"}).all()
-                      print(f"Available tables: {[t[0] for t in tables]}")
-              except Exception as table_exc:
-                  print(f"Error querying available tables: {table_exc}")
-          PY'
+          docker ps -a
+          docker logs --tail=200 telemetry-api || true
+          curl -v http://localhost:8080/health || true
 
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
