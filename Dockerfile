@@ -80,6 +80,9 @@ EXPOSE 2055/udp
 
 # Remove default API key; keys must be provided at runtime via env/secrets
 ENV APP_PORT=80
+ENV PORT=8080 HOST=0.0.0.0
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Default MMDB/CSV mount points (read-only)
 ENV GEOIP_DB_CITY=/data/GeoLite2-City.mmdb
@@ -99,8 +102,8 @@ FROM base AS runtime
 ARG VERSION=0.8.10
 ENV TELEMETRY_VERSION=${VERSION}
 ENV APP_ENV=prod
-ENV PORT=80 HOST=0.0.0.0
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "info"]
+ENV PORT=8080 HOST=0.0.0.0
+ENTRYPOINT ["/entrypoint.sh"]
 
 # ---- Stage 5: test (CI/e2e) ----
 FROM base AS test
@@ -109,5 +112,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 && rm -
 COPY requirements-dev.txt .
 RUN pip install --no-cache-dir -r requirements-dev.txt
 ENV APP_ENV=test
-ENV PORT=80 HOST=0.0.0.0
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "info"]
+ENV PORT=8080 HOST=0.0.0.0
+ENTRYPOINT ["/entrypoint.sh"]

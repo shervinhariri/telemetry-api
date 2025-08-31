@@ -27,77 +27,97 @@ jobs:
       - name: Build image (no cache)
         run: docker build --pull --no-cache -t telemetry-api:build .
 
-      - name: Run API container (map host 8080 → container 80)
+      - name: Start stack
         run: |
-          docker rm -f telemetry-api 2>/dev/null || true
-          docker run -d --name telemetry-api \
-            -p 8080:80 \
-            -e API_KEY=TEST_ADMIN_KEY \
-            -e USER_API_KEY="***" \
-            -e TELEMETRY_SEED_KEYS="" \
-            telemetry-api:build
+          docker compose -f docker-compose.yml up -d --build telemetry-api
+          docker ps -a
+          docker compose ps
 
-      # Discover a working health endpoint (prefers authenticated /api/health)
+      - name: Diagnostics (ports & logs)
+        run: |
+          echo "==== docker ps (ports) ===="
+          docker ps --format 'table {{.Names}}\t{{.Ports}}'
+          echo "==== ss -ltn on host ===="
+          ss -ltn || true
+          echo "==== last 200 lines of API logs ===="
+          docker logs --tail=200 telemetry-api || true
+
       - name: Discover health endpoint
-        shell: bash
         env:
           API_KEY: TEST_ADMIN_KEY
+          PORT: 8080
         run: |
           set -euo pipefail
-          API="http://localhost:8080"
-          AUTH=(-H "x-api-key: ${API_KEY}")
+          API="${API:-http://127.0.0.1:${PORT:-8080}}"
+          echo "Probing base URL: $API"
           CANDIDATES=(/api/health /api/healthz /health /healthz /v1/health /v1/healthz /readyz /livez /ready /live /)
-          # Try OpenAPI first, if available
-          HPATH=""
-          if curl -sf "${AUTH[@]}" "$API/openapi.json" -o openapi.json; then
-            HPATH=$(python - <<'PY'
-          import json,sys,re
-          d=json.load(open("openapi.json"))
-          for p in d.get("paths",{}).keys():
-              if re.search(r"/(api/)?healthz?$", p):
-                  print(p); break
-          PY
-          )
-            if [ -n "${HPATH}" ]; then
-              echo "Discovered health path via OpenAPI: ${HPATH}"
-              echo "HEALTH_PATH=${HPATH}" >> "$GITHUB_ENV"
-              exit 0
+          found=""
+
+          # First, quick socket check to fail fast if port closed
+          if ! (command -v nc >/dev/null 2>&1); then sudo apt-get update && sudo apt-get install -y netcat-openbsd; fi
+          for i in {1..60}; do
+            if nc -z 127.0.0.1 "${PORT:-8080}"; then
+              echo "Host port ${PORT:-8080} is open."
+              break
             fi
-          fi
-          # Probe known candidates
+            echo "Waiting for host port ${PORT:-8080} to open... ($i/60)"
+            sleep 1
+          done
+
+          # Probe candidates from the host
           for p in "${CANDIDATES[@]}"; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "${AUTH[@]}" "$API$p" || true)
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "x-api-key: ${API_KEY}" "$API$p" || true)
             echo "$p -> $code"
             if [ "$code" = "200" ]; then
               echo "HEALTH_PATH=$p" >> "$GITHUB_ENV"
-              exit 0
+              found="$p"
+              break
             fi
           done
-          echo "::error::Could not find a working health endpoint"
-          exit 1
 
-      # Wait for API to be healthy at the discovered path
-      - name: Wait for API to be healthy (authenticated)
-        if: ${{ env.HEALTH_PATH != '' }}
-        shell: bash
+          # Fallback: probe from inside the container (in case ports aren't mapped)
+          if [ -z "$found" ]; then
+            echo "Trying in-container probe at 127.0.0.1:\${PORT}"
+            for p in "${CANDIDATES[@]}"; do
+              code=$(docker exec telemetry-api sh -lc 'apk add --no-cache curl >/dev/null 2>&1 || true; curl -s -o /dev/null -w "%{http_code}" -H "x-api-key: '"${API_KEY}"'" http://127.0.0.1:${PORT:-8080}'"$p"' || true')
+              echo "[in-container] $p -> $code"
+              if [ "$code" = "200" ]; then
+                echo "HEALTH_PATH=$p" >> "$GITHUB_ENV"
+                found="$p"
+                break
+              fi
+            done
+          fi
+
+          if [ -z "$found" ]; then
+            echo "==== docker ps (ports) ===="
+            docker ps --format 'table {{.Names}}\t{{.Ports}}'
+            echo "==== API logs tail ===="
+            docker logs --tail=200 telemetry-api || true
+            echo "Error: Could not find a working health endpoint"
+            exit 1
+          fi
+
+          echo "Discovered health path: $found"
+
+      - name: Wait for API to be healthy
         env:
           API_KEY: TEST_ADMIN_KEY
+          PORT: 8080
         run: |
           set -euo pipefail
-          URL="http://localhost:8080${HEALTH_PATH}"
-          echo "Probing $URL"
+          API="${API:-http://127.0.0.1:${PORT:-8080}}"
+          : "${HEALTH_PATH:?HEALTH_PATH not set}"
           for i in {1..120}; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' -H "x-api-key: ${API_KEY}" "$URL" || true)
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "x-api-key: ${API_KEY}" "$API$HEALTH_PATH" || true)
             if [ "$code" = "200" ]; then
-              echo "API is healthy at $URL"
+              echo "API is healthy at $API$HEALTH_PATH"
               exit 0
             fi
             sleep 1
           done
-          echo "API never became healthy at $URL (last status: $code)"
-          echo "---- debug response ----"
-          curl -i -H "x-api-key: ${API_KEY}" "$URL" || true
-          echo "---- docker logs (telemetry-api) ----"
+
+          echo "API never became healthy (last status: $code)"
           docker logs --tail=300 telemetry-api || true
           exit 1
 

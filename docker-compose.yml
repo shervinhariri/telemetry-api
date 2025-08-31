@@ -4,7 +4,8 @@ services:
     build: .
     container_name: telemetry-api
     environment:
-      - APP_PORT=80
+      - PORT=8080
+      - HOST=0.0.0.0
       - APP_VERSION=0.8.10
       - TELEMETRY_FEATURE_SOURCES=false
       - TELEMETRY_FEATURE_UDP=false
@@ -34,17 +35,17 @@ services:
       - FEATURE_SOURCES=${FEATURE_SOURCES:-1}
       - FEATURE_UDP_HEAD=${FEATURE_UDP_HEAD:-0}
     ports:
-      - "80:80"
+      - "${PORT:-8080}:${PORT:-8080}"
     volumes:
       - dbdata:/data
       - ./geo:/data/geo:ro
       - ./ti:/data/ti:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost/v1/health', timeout=2)"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${PORT:-8080}/v1/healthz || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 30
 
   # keep disabled until UDP ingest exists in backend
   udp-ingestor:
