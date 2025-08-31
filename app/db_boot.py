@@ -1,103 +1,106 @@
 # app/db_boot.py
-import os
-import json
-import hashlib
+import os, json, hashlib, logging, subprocess, sys
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from sqlalchemy.sql.sqltypes import String
-from .db import Base
+
+from .db import engine, Base, SessionLocal
 from .models.tenant import Tenant
 from .models.apikey import ApiKey
 
-DEFAULT_KEY = os.getenv("API_KEY", "TEST_ADMIN_KEY")
+log = logging.getLogger("bootstrap")
 
-def _hash_token(token: str) -> str:
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+ADMIN_KEY_ID = "admin"
+DEFAULT_TENANT = "default"
+DEFAULT_SCOPES = ["admin","ingest","read_metrics","export","manage_indicators"]
 
-def _make_scopes_value(scopes_list, is_text_column: bool):
-    # Store as JSON string only if the column is TEXT; otherwise keep list
-    return json.dumps(scopes_list) if is_text_column else scopes_list
+def _sha256(s: str) -> str:
+    import hashlib
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
-def bootstrap_db(engine) -> None:
-    """
-    Create tables and upsert default tenant + admin key.
-    - If 'admin' key exists, UPDATE hash/scopes/disabled.
-    - If missing, INSERT a new one.
-    Safe to run on every startup.
-    """
-    Base.metadata.create_all(bind=engine)
+def _migrate_sqlite():
+    # if you have scripts/migrate_sqlite.py in container
+    try:
+        subprocess.run(
+            [sys.executable, "/app/scripts/migrate_sqlite.py"],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        log.info("DB_BOOT: migrate_sqlite.py completed")
+    except Exception as e:
+        log.warning("DB_BOOT: migrate_sqlite.py not run or failed: %s", e)
 
-    desired_scopes = ["admin", "ingest", "read_metrics", "export", "manage_indicators"]
-    desired_hash = _hash_token(DEFAULT_KEY)
-
-    is_scopes_text = isinstance(ApiKey.__table__.c.scopes.type, String)
-    scopes_value = _make_scopes_value(desired_scopes, is_scopes_text)
-
-    with Session(bind=engine) as s:
-        try:
-            # ensure tenant
-            tenant = s.query(Tenant).filter_by(tenant_id="default").one_or_none()
-            if tenant is None:
-                tenant = Tenant(tenant_id="default", name="Default")
-                s.add(tenant)
-                s.flush()
-
-            # UPSERT admin key by key_id
-            key = s.query(ApiKey).filter_by(key_id="admin").one_or_none()
-            if key is None:
-                key = ApiKey(
-                    key_id="admin",
-                    tenant_id=tenant.tenant_id,
-                    hash=desired_hash,
-                    scopes=scopes_value,
-                    disabled=False,
-                )
-                s.add(key)
-            else:
-                key.hash = desired_hash
-                key.disabled = False
-                # normalize scopes to the right shape
-                if is_scopes_text:
-                    # If DB has JSON string already, keep; else set fresh
-                    try:
-                        # If it's a string that parses to list, keep existing + merge admin perms
-                        existing = json.loads(key.scopes) if isinstance(key.scopes, str) else []
-                        if not isinstance(existing, list):
-                            existing = []
-                        merged = sorted(set(existing + desired_scopes))
-                        key.scopes = json.dumps(merged)
-                    except Exception:
-                        key.scopes = json.dumps(desired_scopes)
-                else:
-                    # JSON column
-                    if not isinstance(key.scopes, list):
-                        key.scopes = desired_scopes
-                    else:
-                        merged = sorted(set(key.scopes + desired_scopes))
-                        key.scopes = merged
-
-            s.commit()
-
-        except Exception:
-            s.rollback()
-            # last-resort: try update-only path (handles "UNIQUE constraint" on prior insert)
+def _sanitize_scopes(session: Session):
+    try:
+        # Convert non-JSON scopes to JSON array strings once
+        keys = session.query(ApiKey).all()
+        touched = 0
+        for k in keys:
+            raw = k.scopes
             try:
-                key = s.query(ApiKey).filter_by(key_id="admin").one_or_none()
-                if key is not None:
-                    key.hash = desired_hash
-                    key.disabled = False
-                    key.scopes = scopes_value
-                    s.commit()
-                else:
-                    # if still not there, insert once more
-                    key = ApiKey(
-                        key_id="admin",
-                        tenant_id="default",
-                        hash=desired_hash,
-                        scopes=scopes_value,
-                        disabled=False,
-                    )
-                    s.add(key)
-                    s.commit()
+                if isinstance(raw, list):
+                    continue
+                if isinstance(raw, str):
+                    json.loads(raw)  # already JSON?
+                    continue
             except Exception:
-                s.rollback()
-                raise
+                pass
+            # force-json
+            k.scopes = json.dumps(DEFAULT_SCOPES if not raw else [raw] if isinstance(raw, str) else DEFAULT_SCOPES)
+            touched += 1
+        if touched:
+            session.commit()
+            log.info("DB_BOOT: sanitized %d key scopes to JSON lists", touched)
+        else:
+            log.info("DB_BOOT: scopes already normalized")
+    except Exception as e:
+        log.warning("DB_BOOT: scope sanitize skipped: %s", e)
+
+def _seed_admin(session: Session):
+    token = os.getenv("API_KEY", "TEST_ADMIN_KEY")
+    h = _sha256(token)
+
+    # ensure default tenant
+    tenant = session.query(Tenant).filter(Tenant.tenant_id == DEFAULT_TENANT).one_or_none()
+    if not tenant:
+        tenant = Tenant(tenant_id=DEFAULT_TENANT, name="Default")
+        session.add(tenant)
+        session.commit()
+
+    key = session.query(ApiKey).filter(ApiKey.key_id == ADMIN_KEY_ID).one_or_none()
+    if key:
+        # update hash & scopes if needed
+        key.hash = h
+        key.scopes = json.dumps(DEFAULT_SCOPES)
+        key.disabled = False
+        session.commit()
+        log.info("DB_BOOT: admin key refreshed")
+    else:
+        try:
+            session.add(ApiKey(
+                key_id=ADMIN_KEY_ID,
+                tenant_id=DEFAULT_TENANT,
+                hash=h,
+                scopes=json.dumps(DEFAULT_SCOPES),
+                disabled=False
+            ))
+            session.commit()
+            log.info("DB_BOOT: admin key inserted")
+        except IntegrityError:
+            session.rollback()
+            log.info("DB_BOOT: admin key existed, refreshed instead")
+            _seed_admin(session)  # retry as refresh
+
+def bootstrap_db():
+    # 1) create tables
+    Base.metadata.create_all(bind=engine)
+    # 2) run migrations (safe to run repeatedly)
+    _migrate_sqlite()
+    # 3) normalize scopes
+    session = SessionLocal()
+    try:
+        _sanitize_scopes(session)
+        # 4) seed/refresh admin
+        _seed_admin(session)
+    finally:
+        session.close()

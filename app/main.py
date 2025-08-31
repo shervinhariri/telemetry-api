@@ -89,8 +89,7 @@ async def lifespan(application: FastAPI):
     # DB bootstrap
     try:
         from .db_boot import bootstrap_db
-        from .db import engine
-        bootstrap_db(engine)
+        bootstrap_db()
         logger.info("DB_BOOT: idempotent bootstrap completed")
     except Exception as e:
         logger.error("DB_BOOTSTRAP failed (non-fatal): %s", e)
@@ -332,7 +331,7 @@ app.include_router(outputs_router, prefix=API_PREFIX)
 app.include_router(stats_router, prefix=API_PREFIX)
 app.include_router(logs_router, prefix=API_PREFIX)
 app.include_router(requests_router, prefix=API_PREFIX)
-app.include_router(system_router, prefix=API_PREFIX)
+app.include_router(system_router)
 app.include_router(keys_router, prefix=API_PREFIX)
 app.include_router(demo_router, prefix=API_PREFIX)
 app.include_router(prometheus_router, prefix=API_PREFIX)

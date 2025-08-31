@@ -13,11 +13,15 @@ from ..pipeline import STATS
 from ..config import FEATURES
 from ..queue_manager import queue_manager
 
-from app.auth.deps import require_admin
+from ..auth.deps import require_admin_new as require_admin
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/v1/system",
+    tags=["system"],
+    dependencies=[Depends(require_admin)]  # enforce admin on every endpoint here
+)
 
-@router.get("/system", dependencies=[Depends(require_admin())])
+@router.get("")
 async def get_system_info() -> Dict[str, Any]:
     """Get structured system information"""
     try:
