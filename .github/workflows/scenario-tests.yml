@@ -69,7 +69,7 @@ jobs:
                       for row in rows:
                           print(f"  {row[0]}: {row[1]}")
                       break
-              except Exception as e:
+              except Exception as exc:
                   if attempt < max_retries - 1:
                       print(f"Waiting for api_keys table (attempt {attempt + 1}/{max_retries})...")
                       time.sleep(2)
@@ -111,12 +111,15 @@ jobs:
                   rows=c.execute(text("SELECT key_id, scopes, disabled FROM api_keys;")).all()
                   for row in rows:
                       print(f"  {row[0]}: {row[1]} (disabled={row[2]})")
-          except Exception as e:
-              print(f"Error querying api_keys table: {e}")
+          except Exception as exc:
+              print(f"Error querying api_keys table: {exc}")
               # Show available tables
-              with e.connect() as c:
-                  tables=c.execute(text("SELECT name FROM sqlite_master WHERE type='table';")).all()
-                  print(f"Available tables: {[t[0] for t in tables]}")
+              try:
+                  with e.connect() as c:
+                      tables=c.execute(text("SELECT name FROM sqlite_master WHERE type='table';")).all()
+                      print(f"Available tables: {[t[0] for t in tables]}")
+              except Exception as table_exc:
+                  print(f"Error querying available tables: {table_exc}")
           PY'
 
       - name: Upload report artifact
