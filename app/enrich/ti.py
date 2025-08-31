@@ -11,6 +11,21 @@ import csv
 from typing import Dict, Any, Optional, List
 from .base import EnrichmentLoader
 
+from typing import Optional
+from pydantic import BaseModel, IPvAnyNetwork
+from sqlalchemy.exc import OperationalError, IntegrityError
+from sqlalchemy.orm import Session
+
+from ..db import Base, engine, get_db
+
+class IndicatorModel(BaseModel):
+    ip_or_cidr: IPvAnyNetwork
+    category: str
+    confidence: int
+
+# If you have a proper ORM model, use it; otherwise a simple table via SQLAlchemy Core works.
+from ..models.indicator import Indicator  # prefer a model if it exists
+
 logger = logging.getLogger("enrich.ti")
 
 class ThreatIntelLoader(EnrichmentLoader):
@@ -198,3 +213,58 @@ def match_domain(domain: str) -> List[Dict[str, Any]]:
 def initialize_threatintel():
     """Initialize threat intelligence loader"""
     ti_loader.load()
+
+# In-memory storage for indicators (in production, this would be a database)
+_indicators = {}
+_indicator_counter = 0
+
+def add_indicator(db: Session, model: IndicatorModel):
+    row = Indicator(
+        ip_or_cidr=str(model.ip_or_cidr),
+        category=model.category,
+        confidence=model.confidence
+    )
+    try:
+        db.add(row); db.commit()
+    except OperationalError as e:
+        if "no such table" in str(e).lower():
+            import app.models  # ensure models are registered
+            Base.metadata.create_all(bind=engine)
+            db.add(row); db.commit()
+        else:
+            raise
+    except IntegrityError as e:
+        if "UNIQUE constraint failed" in str(e):
+            # Rollback the session first
+            db.rollback()
+            # Update existing record instead
+            existing = db.query(Indicator).filter(Indicator.ip_or_cidr == str(model.ip_or_cidr)).first()
+            if existing:
+                existing.category = model.category
+                existing.confidence = model.confidence
+                db.commit()
+            else:
+                raise
+        else:
+            raise
+
+def remove_indicator(db: Session, ip_or_cidr: str):
+    try:
+        db.query(Indicator).filter(Indicator.ip_or_cidr == ip_or_cidr).delete()
+        db.commit()
+    except OperationalError as e:
+        if "no such table" in str(e).lower():
+            import app.models
+            Base.metadata.create_all(bind=engine)
+            # If table was missing, nothing to delete; treat as success
+            return
+        else:
+            raise
+
+def get_indicator(indicator_id: str) -> Optional[Dict[str, Any]]:
+    """Get a threat intelligence indicator by ID"""
+    return _indicators.get(indicator_id)
+
+def list_indicators() -> List[Dict[str, Any]]:
+    """List all threat intelligence indicators"""
+    return list(_indicators.values())
