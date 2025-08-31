@@ -17,26 +17,33 @@ router = APIRouter(prefix="/v1", tags=["system"])
 
 async def has_valid_admin_scope(authorization: Optional[str], x_api_key: Optional[str]) -> bool:
     """Check if the provided auth headers contain a valid admin token"""
-    token = None
-    if authorization and authorization.lower().startswith("bearer "):
-        token = authorization.split(" ", 1)[1].strip()
-    elif x_api_key:
-        token = x_api_key.strip()
+    from ..auth import _extract_token, _sha256
+    from ..db import SessionLocal
+    from ..models.apikey import ApiKey
+    import json
+    
+    # Create a mock request to use existing auth utilities
+    class MockRequest:
+        def __init__(self, auth: Optional[str], api_key: Optional[str]):
+            self.headers = {}
+            if auth:
+                self.headers["authorization"] = auth
+            if api_key:
+                self.headers["x-api-key"] = api_key
+    
+    mock_req = MockRequest(authorization, x_api_key)
+    token = _extract_token(mock_req)
     
     if not token:
         return False
     
     try:
-        from ..db import SessionLocal
-        from ..models.apikey import ApiKey
-        import hashlib
-        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        token_hash = _sha256(token)
         with SessionLocal() as db:
             key = db.query(ApiKey).filter(ApiKey.hash == token_hash, ApiKey.disabled == False).one_or_none()
             if not key:
                 return False
             # Check if admin scope
-            import json
             try:
                 scopes = json.loads(key.scopes) if isinstance(key.scopes, str) else (key.scopes or [])
             except Exception:
