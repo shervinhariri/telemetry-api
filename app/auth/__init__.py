@@ -8,11 +8,7 @@ from sqlalchemy.orm import Session
 from ..db import SessionLocal
 from ..models.apikey import ApiKey
 
-# Import the old auth functions from deps for compatibility
-from .deps import authenticate, require_scopes
-from .tenant import require_tenant
-
-__all__ = ["get_db", "require_key", "require_admin", "authenticate", "require_scopes", "require_tenant"]
+__all__ = ["get_db", "require_key", "require_admin"]
 
 def get_db():
     db = SessionLocal()
@@ -25,7 +21,6 @@ def _sha256(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 def _extract_token(req: Request):
-    # Accept: "Authorization: Bearer <token>", "Authorization: <token>", or "X-API-Key: <token>"
     auth = req.headers.get("authorization") or req.headers.get("Authorization")
     if auth:
         parts = auth.strip().split()
