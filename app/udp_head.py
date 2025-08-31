@@ -19,6 +19,9 @@ _udp_thread: Optional[threading.Thread] = None
 _udp_ready = False
 _udp_bind_errors = 0
 _udp_datagrams_total = 0
+_udp_packets_total = 0
+_udp_bytes_total = 0
+_udp_last_packet_ts = 0.0
 _udp_lock = threading.Lock()
 
 logger = logging.getLogger("udp_head")
@@ -38,7 +41,7 @@ def get_udp_head_status() -> str:
 
 def _udp_listener_loop():
     """Main UDP listener loop"""
-    global _udp_socket, _udp_ready, _udp_bind_errors, _udp_datagrams_total
+    global _udp_socket, _udp_ready, _udp_bind_errors, _udp_datagrams_total, _udp_packets_total, _udp_bytes_total, _udp_last_packet_ts
     
     try:
         # Create UDP socket
@@ -61,9 +64,14 @@ def _udp_listener_loop():
             "addr": ":8081"
         })
         
+        logger.info("UDP head entering main loop", extra={
+            "component": "udp_head",
+            "event": "loop_started"
+        })
+        
         # Set up rate limiting for debug logs
         last_debug_log = time.time()
-        debug_log_interval = 5.0  # Log every 5 seconds max
+        debug_log_interval = 0.1  # Log every 0.1 seconds for testing
         
         while True:
             try:
@@ -74,22 +82,25 @@ def _udp_listener_loop():
                 # Increment counters
                 with _udp_lock:
                     _udp_datagrams_total += 1
+                    _udp_packets_total += 1
+                    _udp_bytes_total += len(data)
+                    _udp_last_packet_ts = time.time()
                 
                 # Update Prometheus metrics
                 prometheus_metrics.increment_udp_packets_received(1)
                 prometheus_metrics.increment_udp_head_datagrams(1)
+                prometheus_metrics.increment_udp_head_packets(1)
+                prometheus_metrics.increment_udp_head_bytes(len(data))
+                prometheus_metrics.set_udp_head_last_packet_ts(time.time())
                 
-                # Rate-limited debug logging
-                current_time = time.time()
-                if current_time - last_debug_log >= debug_log_interval:
-                    logger.debug("UDP datagram received", extra={
-                        "component": "udp_head",
-                        "event": "datagram_received",
-                        "bytes": len(data),
-                        "addr": f"{addr[0]}:{addr[1]}",
-                        "total_datagrams": _udp_datagrams_total
-                    })
-                    last_debug_log = current_time
+                # Always log for debugging
+                logger.info("UDP datagram received", extra={
+                    "component": "udp_head",
+                    "event": "datagram_received",
+                    "bytes": len(data),
+                    "addr": f"{addr[0]}:{addr[1]}",
+                    "total_datagrams": _udp_datagrams_total
+                })
                 
             except socket.timeout:
                 # Timeout is expected, continue
@@ -146,6 +157,13 @@ def start_udp_head():
     
     _udp_thread = threading.Thread(target=_udp_listener_loop, daemon=True)
     _udp_thread.start()
+    
+    # Add debug logging to confirm thread started
+    logger.info("UDP head thread started", extra={
+        "component": "udp_head",
+        "event": "thread_started",
+        "thread_alive": _udp_thread.is_alive()
+    })
 
 def stop_udp_head():
     """Stop UDP head and clean up resources"""
@@ -182,5 +200,8 @@ def get_udp_stats() -> dict:
             "ready": _udp_ready,
             "bind_errors": _udp_bind_errors,
             "datagrams_total": _udp_datagrams_total,
+            "packets_total": _udp_packets_total,
+            "bytes_total": _udp_bytes_total,
+            "last_packet_ts": _udp_last_packet_ts,
             "port": 8081 if _udp_ready else None
         }

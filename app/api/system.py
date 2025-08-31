@@ -13,7 +13,7 @@ from ..pipeline import STATS
 from ..config import FEATURES
 from ..queue_manager import queue_manager
 
-from ..auth import require_admin
+from ..auth import require_admin  # <- works now
 
 router = APIRouter(
     prefix="/v1/system",

@@ -31,6 +31,33 @@ curl -s "http://localhost/v1/download/json?limit=50" \
   -H "Authorization: Bearer TEST_KEY" | head -n 5
 ```
 
+## 🏗️ Two-Container Deployment Policy
+
+This project follows a strict two-container deployment model to ensure stability and enable safe feature development:
+
+### **:80 = Golden Image (Stable Release)**
+- **Purpose**: Production deployments, stable releases
+- **Image**: `shvin/telemetry-api:v0.8.9-golden` (or latest golden tag)
+- **Port**: 80
+- **Policy**: Never change unless approved for release
+- **Use Case**: Production environments, demos, stable testing
+
+### **:8080 = Dev Image (Feature Branch)**
+- **Purpose**: Feature development, testing, validation
+- **Image**: `telemetry-api:dev` (or PR-specific tags)
+- **Port**: 8080 (API) + 8081/udp (UDP Head)
+- **Policy**: Changes frequently during development
+- **Use Case**: Feature testing, development, CI/CD validation
+
+### **Promotion Path: Dev → Golden (Never Reverse)**
+```bash
+# Development workflow:
+# 1. Test features on :8080 (dev container)
+# 2. Validate with e2e tests
+# 3. Promote dev image to golden tag
+# 4. Update production :80 to use new golden image
+```
+
 ## Quick Start
 
 ### 🏆 Golden Release (Recommended for Production)
@@ -38,15 +65,33 @@ curl -s "http://localhost/v1/download/json?limit=50" \
 For production deployments, use the golden release which has been thoroughly tested and validated:
 
 ```bash
-# Pull and run the golden release
-docker pull shvin/telemetry-api:0.8.10-golden
-docker run -d -p 80:80 \
-  -e API_KEY=YOUR_API_KEY \
-  --name telemetry-api-golden \
-  shvin/telemetry-api:0.8.10-golden
+# PROD (port 80) — golden image
+docker rm -f telemetry-prod 2>/dev/null || true
+docker run -d --name telemetry-prod -p 80:80 \
+  -e TELEMETRY_SEED_KEYS="TEST_ADMIN_KEY,DEV_ADMIN_KEY_5a8f9ffdc3" \
+  shvin/telemetry-api:v0.8.9-golden
 
 # Verify the golden release
 curl -s http://localhost/v1/health | jq
+curl -s http://localhost/v1/version | jq
+```
+
+### 🧪 Dev Container (Feature Testing)
+
+For feature development and testing:
+
+```bash
+# DEV (port 8080) — branch image under test
+DEV_TAG=telemetry-api:dev  # or PR-specific tag
+docker rm -f telemetry-dev 2>/dev/null || true
+docker run -d --name telemetry-dev -p 8080:80 -p 8081:8081/udp \
+  -e TELEMETRY_SEED_KEYS="TEST_ADMIN_KEY,DEV_ADMIN_KEY_5a8f9ffdc3" \
+  -e FEATURE_UDP_HEAD=true \
+  $DEV_TAG
+
+# Verify they're different
+curl -s http://localhost:80/v1/version && echo
+curl -s http://localhost:8080/v1/version && echo
 ```
 
 **Golden Release Benefits:**
@@ -138,9 +183,42 @@ curl -s -X POST http://localhost/v1/ingest/zeek \
 |---|---|---|
 | `TELEMETRY_SEED_KEYS` | Seed comma‑separated admin API keys on startup | *(none)* |
 | `API_KEY` | (Legacy single key) if not using `TELEMETRY_SEED_KEYS` | `TEST_KEY` |
-| `FEATURE_UDP_HEAD` | Enable experimental UDP head | `false` |
+| `FEATURE_UDP_HEAD` | Enable experimental UDP head on port 8081 | `false` |
 | `ENRICH_ENABLE_{GEOIP,ASN,TI}` | Toggle enrichments | `true` |
 | `RETENTION_DAYS` | Data retention window | `7` |
+
+## 🆕 New Features (v0.8.10+)
+
+### **System Geo Card**
+- **Location**: System tab in UI
+- **Function**: Shows GeoIP database version and status
+- **Action**: Click to open Toolbox/GeoIP management panel
+- **Format**: `Database • Build Date • Status`
+
+### **Tasks Drawer (≡)**
+- **Location**: Top-right corner of UI
+- **Function**: Shows background jobs (Geo downloads, output tests)
+- **Features**: Real-time polling, job status, progress tracking
+- **Access**: Click ≡ icon to open/close
+
+### **UDP Head (Experimental)**
+- **Location**: Settings → Features tab
+- **Function**: UDP listener on port 8081 for IPFIX/NetFlow packets
+- **Enable**: Set `FEATURE_UDP_HEAD=true` environment variable
+- **Metrics**: Available at `/v1/metrics` (packets, bytes, last packet timestamp)
+- **Status**: Shows Ready/Stopped/Error in System tab
+
+### **Output Connectors "Test Connection"**
+- **Location**: Outputs configuration forms
+- **Function**: Tests connectivity to Splunk/Elastic
+- **Endpoint**: `POST /v1/outputs/test`
+- **Response**: Diagnostic JSON with timing, bytes, error details
+- **Validation**: Strict config validation with 422 errors for misconfigs
+
+### **Enhanced Validation**
+- **Splunk**: URL scheme validation, token required, batch/retry limits
+- **Elastic**: URL validation, index required, authentication options
+- **Response**: Structured 422 errors with `{field, reason}` format
 
 ## 📊 Structured Logging
 
@@ -191,6 +269,20 @@ export HTTP_LOG_EXCLUDE_PATHS=/health,/metrics,/system
 ```
 
 See [docs/LOGGING.md](docs/LOGGING.md) for complete configuration options.
+
+## ⚠️ Known Issues
+
+### **Chrome Extension Noise**
+- **Issue**: Chrome console shows `quillbot-content.js ... editorId` errors
+- **Cause**: Harmless browser extension interference
+- **Solution**: Ignore or disable locally, doesn't affect functionality
+- **Status**: Not a bug in the application
+
+### **Browser Cache Issues**
+- **Issue**: UI changes not reflected after code updates
+- **Cause**: Browser caching of JavaScript/CSS assets
+- **Solution**: Hard refresh (Ctrl+F5) or clear browser cache
+- **Prevention**: Cache-busting parameters added to dev builds
 
 ## 🎯 Quickstart (Demo Mode + Prometheus)
 

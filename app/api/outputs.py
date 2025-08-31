@@ -5,6 +5,7 @@ from typing import List, Optional, Dict, Any
 import time
 import httpx
 import asyncio
+import uuid
 from ..auth.deps import require_scopes
 from ..services.prometheus_metrics import prometheus_metrics
 from ..metrics import record_export_test
@@ -14,34 +15,59 @@ import json
 router = APIRouter()
 
 class SplunkConfig(BaseModel):
-    hec_url: AnyHttpUrl
-    token: str
-    index: str = "telemetry"
-    sourcetype: str = "telemetry:event"
-    batch_size: int = 500
-    max_retries: int = 5
-    backoff_ms: int = 200
-    verify_tls: bool = True
-    extra_fields: Dict[str, Any] = {}
+    url: str = Field(..., description="Splunk HEC URL")
+    token: str = Field(..., description="Splunk HEC token")
+    verify_tls: bool = Field(True, description="Verify TLS certificates")
+    batch_max: int = Field(1000, ge=1, le=5000, description="Maximum batch size")
+    retries: int = Field(3, ge=0, le=5, description="Number of retries")
+    timeout_sec: int = Field(10, ge=1, le=30, description="Timeout in seconds")
+    
+    @model_validator(mode='after')
+    def validate_url(self) -> 'SplunkConfig':
+        if not self.url:
+            raise ValueError("URL is required")
+        if not self.url.startswith(('http://', 'https://')):
+            raise ValueError("URL must start with http:// or https://")
+        if ' ' in self.url:
+            raise ValueError("URL cannot contain spaces")
+        # Normalize trailing slashes
+        self.url = self.url.rstrip('/')
+        return self
+    
+    @model_validator(mode='after')
+    def validate_token(self) -> 'SplunkConfig':
+        if not self.token or not self.token.strip():
+            raise ValueError("Token is required and cannot be empty")
+        return self
 
 class ElasticConfig(BaseModel):
-    url: Optional[str] = None
-    urls: Optional[List[str]] = None
-    index: Optional[str] = "telemetry"
-    username: Optional[str] = None
-    password: Optional[str] = None
-    api_key: Optional[str] = None
-
-    @model_validator(mode='before')
-    @classmethod
-    def choose_url(cls, values):
-        if isinstance(values, dict):
-            url, urls = values.get("url"), values.get("urls")
-            if not url and urls:
-                values["url"] = urls[0]
-            if not values.get("url"):
-                raise ValueError("At least one Elastic URL is required (url or urls).")
-        return values
+    url: str = Field(..., description="Elasticsearch URL")
+    index: str = Field(..., description="Elasticsearch index pattern")
+    verify_tls: bool = Field(True, description="Verify TLS certificates")
+    batch_max: int = Field(1000, ge=1, le=5000, description="Maximum batch size")
+    retries: int = Field(3, ge=0, le=5, description="Number of retries")
+    timeout_sec: int = Field(10, ge=1, le=30, description="Timeout in seconds")
+    username: Optional[str] = Field(None, description="Elasticsearch username")
+    password: Optional[str] = Field(None, description="Elasticsearch password")
+    api_key: Optional[str] = Field(None, description="Elasticsearch API key")
+    
+    @model_validator(mode='after')
+    def validate_url(self) -> 'ElasticConfig':
+        if not self.url:
+            raise ValueError("URL is required")
+        if not self.url.startswith(('http://', 'https://')):
+            raise ValueError("URL must start with http:// or https://")
+        if ' ' in self.url:
+            raise ValueError("URL cannot contain spaces")
+        # Normalize trailing slashes
+        self.url = self.url.rstrip('/')
+        return self
+    
+    @model_validator(mode='after')
+    def validate_index(self) -> 'ElasticConfig':
+        if not self.index or not self.index.strip():
+            raise ValueError("Index is required and cannot be empty")
+        return self
 
 STATE: Dict[str, Any] = {
     "splunk": None,
@@ -68,22 +94,24 @@ HEALTH_STATUS: Dict[str, Dict[str, Any]] = {
     }
 }
 
-async def test_splunk_send() -> tuple[bool, Optional[int], Optional[str]]:
+async def test_splunk_send() -> tuple[bool, Optional[int], Optional[str], int]:
     """Test send to Splunk HEC"""
     if not STATE.get("splunk"):
-        return False, None, "Splunk not configured"
+        return False, None, "Splunk not configured", 0
     
     config = STATE["splunk"]
     test_event = {
-        "event": {"telemetry": "ping", "ts": time.time()},
-        "sourcetype": config.get("sourcetype", "telemetry:event"),
-        "index": config.get("index", "telemetry")
+        "telemetry_test": True,
+        "target": "splunk",
+        "ts": time.time(),
+        "id": str(uuid.uuid4()),
+        "message": "NETREEX connectivity test"
     }
     
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=config.get("timeout_sec", 10), verify=config.get("verify_tls", True)) as client:
             r = await client.post(
-                str(config["hec_url"]),
+                config["url"],
                 json=[test_event],
                 headers={
                     "Authorization": f"Splunk {config['token']}",
@@ -91,21 +119,37 @@ async def test_splunk_send() -> tuple[bool, Optional[int], Optional[str]]:
                 }
             )
             r.raise_for_status()
-            return True, r.status_code, None
+            return True, r.status_code, None, len(str(test_event))
+    except httpx.ConnectError:
+        return False, 0, "conn_refused", 0
+    except httpx.TimeoutException:
+        return False, 0, "timeout", 0
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 401:
+            return False, e.response.status_code, "unauthorized", 0
+        elif e.response.status_code == 403:
+            return False, e.response.status_code, "forbidden", 0
+        else:
+            return False, e.response.status_code, f"http_{e.response.status_code}", 0
     except Exception as e:
-        return False, getattr(e, 'status_code', None), str(e)
+        return False, 0, str(e), 0
 
-async def test_elastic_send() -> tuple[bool, Optional[int], Optional[str]]:
+async def test_elastic_send() -> tuple[bool, Optional[int], Optional[str], int]:
     """Test send to Elasticsearch"""
     if not STATE.get("elastic"):
-        return False, None, "Elasticsearch not configured"
+        return False, None, "Elasticsearch not configured", 0
     
     config = STATE["elastic"]
-    test_event = {"telemetry": "ping", "ts": time.time()}
-    index_name = f"{config.get('index_prefix', 'telemetry-')}test"
+    test_event = {
+        "telemetry_test": True,
+        "target": "elastic",
+        "ts": time.time(),
+        "id": str(uuid.uuid4()),
+        "message": "NETREEX connectivity test"
+    }
     
     bulk_data = [
-        json.dumps({"index": {"_index": index_name}}),
+        json.dumps({"index": {"_index": config["index"]}}),
         json.dumps(test_event)
     ]
     bulk_payload = '\n'.join(bulk_data) + '\n'
@@ -115,23 +159,46 @@ async def test_elastic_send() -> tuple[bool, Optional[int], Optional[str]]:
         if config.get("username") and config.get("password"):
             auth = (config["username"], config["password"])
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        headers = {"Content-Type": "application/x-ndjson"}
+        if config.get("api_key"):
+            headers["Authorization"] = f"ApiKey {config['api_key']}"
+        
+        async with httpx.AsyncClient(timeout=config.get("timeout_sec", 10), verify=config.get("verify_tls", True)) as client:
             r = await client.post(
-                f"{config['urls'][0]}/_bulk",
+                f"{config['url']}/_bulk",
                 content=bulk_payload,
-                headers={"Content-Type": "application/x-ndjson"},
+                headers=headers,
                 auth=auth
             )
             r.raise_for_status()
-            return True, r.status_code, None
+            return True, r.status_code, None, len(bulk_payload)
+    except httpx.ConnectError:
+        return False, 0, "conn_refused", 0
+    except httpx.TimeoutException:
+        return False, 0, "timeout", 0
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 401:
+            return False, e.response.status_code, "unauthorized", 0
+        elif e.response.status_code == 403:
+            return False, e.response.status_code, "forbidden", 0
+        elif e.response.status_code == 404:
+            return False, e.response.status_code, "index_missing", 0
+        else:
+            return False, e.response.status_code, f"http_{e.response.status_code}", 0
     except Exception as e:
-        return False, getattr(e, 'status_code', None), str(e)
+        return False, 0, str(e), 0
 
 @router.post("/outputs/splunk")
 @router.put("/outputs/splunk")
 def set_splunk(cfg: SplunkConfig):
-    STATE["splunk"] = cfg.model_dump()
-    return {"status": "ok", "splunk": STATE["splunk"]}
+    try:
+        STATE["splunk"] = cfg.model_dump()
+        return {"status": "ok", "splunk": STATE["splunk"]}
+    except ValueError as e:
+        return JSONResponse(
+            status_code=422, 
+            content={"status": "error", "field": "validation", "reason": str(e)}
+        )
 
 @router.get("/outputs/splunk")
 def get_splunk():
@@ -179,9 +246,12 @@ async def test_splunk(request: Request):
 def set_elastic(cfg: ElasticConfig):
     try:
         STATE["elastic"] = cfg.model_dump()
-        return {"status": "ok"}
+        return {"status": "ok", "elastic": STATE["elastic"]}
     except ValueError as e:
-        return JSONResponse(status_code=422, content={"status": "error", "error": str(e)})
+        return JSONResponse(
+            status_code=422, 
+            content={"status": "error", "field": "validation", "reason": str(e)}
+        )
 
 @router.get("/outputs/elastic")
 def get_elastic():
@@ -199,7 +269,7 @@ async def test_elastic(request: Request):
         raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'export' or 'admin' scope")
     
     t0 = time.perf_counter()
-    ok, code, err = await test_elastic_send()
+    ok, code, err, bytes_sent = await test_elastic_send()
     ms = int((time.perf_counter() - t0) * 1000)
     
     # Update metrics
@@ -222,6 +292,60 @@ async def test_elastic(request: Request):
         "latency_ms": ms,
         "http_code": code,
         "error": err
+    }
+
+# New unified test endpoint
+class TestOutputRequest(BaseModel):
+    target: str = Field(..., description="Target to test: 'splunk' or 'elastic'")
+
+@router.post("/outputs/test")
+async def test_output(request: TestOutputRequest, req: Request):
+    """Test output connectivity with unified response format"""
+    # Check authorization
+    scopes = getattr(req.state, 'scopes', [])
+    if "export" not in scopes and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'export' or 'admin' scope")
+    
+    if request.target not in ["splunk", "elastic"]:
+        return JSONResponse(
+            status_code=422,
+            content={"status": "error", "field": "target", "reason": "Target must be 'splunk' or 'elastic'"}
+        )
+    
+    t0 = time.perf_counter()
+    
+    if request.target == "splunk":
+        ok, http_status, error, bytes_sent = await test_splunk_send()
+    else:  # elastic
+        ok, http_status, error, bytes_sent = await test_elastic_send()
+    
+    duration_ms = int((time.perf_counter() - t0) * 1000)
+    
+    # Update metrics
+    from ..metrics import record_outputs_test_success, record_outputs_test_fail
+    if ok:
+        record_outputs_test_success(request.target)
+    else:
+        record_outputs_test_fail(request.target)
+    
+    # Update health status
+    if ok:
+        HEALTH_STATUS[request.target]["reachable"] = True
+        HEALTH_STATUS[request.target]["last_success_ts"] = time.time()
+        HEALTH_STATUS[request.target]["last_http_code"] = http_status
+        HEALTH_STATUS[request.target]["last_error"] = None
+    else:
+        HEALTH_STATUS[request.target]["reachable"] = False
+        HEALTH_STATUS[request.target]["last_http_code"] = http_status
+        HEALTH_STATUS[request.target]["last_error"] = error
+    
+    return {
+        "target": request.target,
+        "http_status": http_status or 0,
+        "duration_ms": duration_ms,
+        "bytes": bytes_sent,
+        "error": error,
+        "request_id": str(uuid.uuid4())
     }
 
 @router.get("/outputs/status")
