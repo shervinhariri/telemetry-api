@@ -1,6 +1,199 @@
 // Modern Telemetry Dashboard - Vanilla JavaScript with Tailwind CSS
 console.log('app.js loaded');
 
+// ---- helpers reused everywhere ----
+const API_BASE = "/v1";
+const LS_KEY = "telemetry_api_key";
+const $ = (id) => document.getElementById(id);
+const show = (el, on=true) => el && el.classList.toggle("hidden", !on);
+
+async function fetchJSON(path, opts={}) {
+  const key = localStorage.getItem(LS_KEY) || "";
+  const headers = Object.assign({"Content-Type":"application/json"}, opts.headers||{});
+  if (key) headers["Authorization"] = "Bearer " + key;
+  const res = await fetch(API_BASE + path, Object.assign({}, opts, {headers}));
+  const ct = res.headers.get("content-type")||"";
+  const body = ct.includes("application/json") ? await res.json() : await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}: ${typeof body==='string'?body:JSON.stringify(body)}`);
+  return body;
+}
+
+// ---- System tab renderer ----
+async function renderSystemTab() {
+  const root = $("system-root");
+  if (!root || root.dataset.bound) return;
+  root.dataset.bound = "1";
+
+  const loading = $("system-loading");
+  const asJson  = $("system-json");
+  const cards   = $("system-cards");
+
+  show(loading, true); show(asJson, false); show(cards, false);
+
+  try {
+    const data = await fetchJSON("/system");
+
+    // Hide JSON view - only show structured cards
+    show(asJson, false);
+
+
+  } catch (e) {
+    asJson.textContent = "Failed to load /v1/system\n" + e.message +
+      "\nTip: Set API Key (Authorization: Bearer …) first.";
+    show(asJson, true);
+  } finally {
+    show(loading, false);
+  }
+}
+
+// ---- Tasks drawer functionality ----
+function bindTasksDrawerOnce() {
+  console.log('bindTasksDrawerOnce called');
+  // Remove existing event listeners to prevent duplicates
+  const openHeader = $("tasks-toggle");
+  const openSystem = $("tasks-open");
+  const close = $("tasks-close");
+  const panel = $("tasks-drawer");
+  
+  if (!close || !panel) {
+    console.warn("Tasks drawer elements not found:", { close: !!close, panel: !!panel });
+    return;
+  }
+
+  // Remove existing event listeners by cloning and replacing elements
+  let newHeader = null;
+  let newSystem = null;
+  let newClose = null;
+  
+  if (openHeader) {
+    newHeader = openHeader.cloneNode(true);
+    openHeader.parentNode.replaceChild(newHeader, openHeader);
+  }
+  
+  if (openSystem) {
+    newSystem = openSystem.cloneNode(true);
+    openSystem.parentNode.replaceChild(newSystem, openSystem);
+  }
+  
+  // For close button, try both cloning and direct binding
+  if (close) {
+    newClose = close.cloneNode(true);
+    close.parentNode.replaceChild(newClose, close);
+  } else {
+    // Fallback: try to find the close button again after cloning
+    newClose = document.getElementById('tasks-close');
+  }
+
+  const openFn  = () => { 
+    console.log("Tasks drawer opening...");
+    panel.classList.remove("translate-x-full");
+    panel.focus?.(); 
+    console.log("Drawer state:", panel.classList.contains("translate-x-full") ? "closed" : "open");
+  };
+  const closeFn = () => { 
+    console.log("Tasks drawer closing...");
+    panel.classList.add("translate-x-full");
+    console.log("Drawer state:", panel.classList.contains("translate-x-full") ? "closed" : "open");
+  };
+
+  // Bind header tasks button
+  if (newHeader) {
+    newHeader.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openFn();
+    });
+    console.log("Tasks header button bound");
+  }
+  
+  // Bind system panel tasks button
+  if (newSystem) {
+    newSystem.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openFn();
+    });
+    console.log("Tasks system button bound");
+  }
+  
+  // Bind close button
+  if (newClose) {
+    newClose.addEventListener("click", (e) => {
+      console.log("Close button clicked in main binding");
+      e.preventDefault();
+      e.stopPropagation();
+      closeFn();
+    });
+    console.log("Close button bound in main binding");
+  } else {
+    console.warn("Close button not found for binding");
+  }
+
+  // click-off to close
+  const clickOffHandler = (e) => {
+    if (!panel.classList.contains("translate-x-full") &&
+        !panel.contains(e.target) && 
+        e.target !== newHeader && 
+        e.target !== newSystem) {
+      closeFn();
+    }
+  };
+  document.removeEventListener("click", clickOffHandler);
+  document.addEventListener("click", clickOffHandler);
+
+  // esc to close
+  const escHandler = (e) => {
+    if (e.key === "Escape" && !panel.classList.contains("translate-x-full")) {
+      closeFn();
+    }
+  };
+  document.removeEventListener("keydown", escHandler);
+  document.addEventListener("keydown", escHandler);
+  
+  console.log("Tasks drawer bound successfully");
+  
+  // Add global test function
+  window.testTasksDrawer = () => {
+    const panel = $("tasks-drawer");
+    if (panel) {
+      const isOpen = !panel.classList.contains("translate-x-full");
+      console.log("Tasks drawer test:", isOpen ? "OPEN" : "CLOSED");
+      return isOpen;
+    }
+    console.log("Tasks drawer not found");
+    return false;
+  };
+  
+  // Backup close button binding
+  setTimeout(() => {
+    const backupClose = document.getElementById('tasks-close');
+    if (backupClose) {
+      backupClose.addEventListener("click", (e) => {
+        console.log("Backup close button clicked");
+        e.preventDefault();
+        e.stopPropagation();
+        const panel = document.getElementById('tasks-drawer');
+        if (panel) {
+          panel.classList.add("translate-x-full");
+          console.log("Backup close: Drawer closed");
+        }
+      });
+      console.log("Backup close button bound");
+    }
+  }, 1000);
+}
+
+// Fallback binding in case dashboard init fails
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOMContentLoaded - attempting fallback Tasks drawer binding');
+  setTimeout(() => {
+    if (!document.body.dataset.tasksBound) {
+      console.log('Fallback: binding Tasks drawer');
+      bindTasksDrawerOnce();
+    }
+  }, 1000);
+});
+
 // --- Early key bootstrap from URL fragment or query, then scrub URL ---
 (function bootstrapKeyOnce() {
   try {
@@ -697,6 +890,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const dash = new TelemetryDashboard({ apiBase: '/v1' });
     window.telemetryDashboard = dash;
     
+    // Backup Tasks drawer binding
+    console.log('Backup: attempting Tasks drawer binding...');
+    setTimeout(() => {
+        try {
+            bindTasksDrawerOnce();
+            console.log('Backup Tasks drawer binding completed');
+        } catch (e) {
+            console.error('Backup Tasks drawer binding failed:', e);
+        }
+    }, 500);
+    
     // Reliable "hard refresh" on the logo – avoids stacking listeners
     const logo = document.getElementById('logoLink');
     if (logo) {
@@ -710,6 +914,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // === VEFIX: event delegation so re-renders don't break clicks ===
     document.addEventListener('click', function (e) {
+      // Skip the close button to prevent interference
+      if (e.target.id === 'tasks-close' || e.target.closest('#tasks-close')) {
+        console.log('[vefix] Skipping close button click');
+        return;
+      }
+      
       console.log('[vefix] Click event detected on:', e.target);
       const el = e.target.closest?.('[data-action]');
       console.log('[vefix] Closest data-action element:', el);
@@ -1046,21 +1256,27 @@ window.submitEditSource = async function (evt) {
 class TelemetryDashboard {
     constructor(opts) {
         console.log('TelemetryDashboard constructor called');
-        // Normalize API base to exactly '/v1' (no trailing slash, no duplication)
-        const base = (opts?.apiBase || '/v1').replace(/\/+$/,''); // remove trailing slashes
-        this.apiBase = base.endsWith('/v1') ? base : '/v1';
-        this.apiKey = getApiKey();
-        this.currentRequestsData = [];
-        this.logsEventSource = null;
-        this.logsInterval = null;
-        this.autoRefreshInterval = null;
-        this._initialized = false;
-        this.features = { sources: true, udp_head: false }; // sane defaults always present
-        
-        console.log('API Base URL:', this.apiBase);
-        console.log('API Key:', this.apiKey);
-        
-        this.init();
+        try {
+            // Normalize API base to exactly '/v1' (no trailing slash, no duplication)
+            const base = (opts?.apiBase || '/v1').replace(/\/+$/,''); // remove trailing slashes
+            this.apiBase = base.endsWith('/v1') ? base : '/v1';
+            this.apiKey = getApiKey();
+            this.currentRequestsData = [];
+            this.logsEventSource = null;
+            this.logsInterval = null;
+            this.autoRefreshInterval = null;
+            this._initialized = false;
+            this.features = { sources: true, udp_head: false }; // sane defaults always present
+            
+            console.log('API Base URL:', this.apiBase);
+            console.log('API Key:', this.apiKey);
+            
+            console.log('About to call init()...');
+            this.init();
+            console.log('init() completed');
+        } catch (e) {
+            console.error('Error in TelemetryDashboard constructor:', e);
+        }
     }
 
     // --- Features normalization (prevents 'undefined' crashes everywhere) ---
@@ -1095,12 +1311,26 @@ class TelemetryDashboard {
         console.log('TelemetryDashboard initialized');
         
         this.setupEventListeners();
-        await this.loadInitialData();
-        this.applyFeatureGates(); // uses normalized defaults even if /system failed
+        this.applyFeatureGates({ sources: true, udp_head: false }); // uses normalized defaults even if /system failed
+        
+        // Show UI immediately
         const defaultTab = location.hash?.substring(1) || 'dashboard'; // preserve hash routing
         queueMicrotask(() => this.switchTab(defaultTab));
         
+        // Load data in background
+        this.loadInitialData();
+        
         this.startAutoRefresh();
+        
+        // Bind Tasks drawer
+        console.log('About to bind Tasks drawer...');
+        try {
+            bindTasksDrawerOnce();
+            console.log('Tasks drawer binding completed');
+        } catch (e) {
+            console.error('Error binding Tasks drawer:', e);
+        }
+        
         console.log('TelemetryDashboard initialized');
     }
 
@@ -1274,8 +1504,17 @@ class TelemetryDashboard {
 
         // Load data for the selected tab using a mapping
         const loaders = {
-            dashboard: this.loadRequestsData,  // or a dedicated dashboard loader
-            requests: this.loadRequestsData,
+            dashboard: async () => {
+                // Dashboard data is already loaded in loadInitialData, just update requests table
+                await this.loadRequestsData();
+            },
+            requests: async () => {
+                await this.loadRequestsData();
+                renderSystemTab(); // Render system data when requests tab is shown
+            },
+            system: async () => {
+                renderSystemTab(); // Render system data when system tab is shown
+            },
             logs: this.loadLogsData,
             sources: this.loadSourcesData,
             toolbox: async () => {}          // no-op for now
@@ -1397,6 +1636,9 @@ class TelemetryDashboard {
         try {
             console.log('Loading initial data...');
             
+            // Show loading state immediately
+            this.showLoadingState();
+            
             // Initialize error ring with default value
             const errorRing = document.getElementById('error-ring');
             if (errorRing) {
@@ -1406,24 +1648,30 @@ class TelemetryDashboard {
             const k = getApiKey();
             if (!k) { this.showError('dashboard','API key required.'); promptForKey('no key found'); return; }
             
-            // Load /system first; keep defaults if it fails so UI stays usable.
-            try {
-                const system = await this.apiCall('/system');
+            // Load system and metrics in parallel for faster loading
+            const [systemResult, metricsResult] = await Promise.allSettled([
+                this.apiCall('/system'),
+                this.apiCall('/metrics')
+            ]);
+            
+            // Handle system data
+            if (systemResult.status === 'fulfilled') {
+                const system = systemResult.value;
                 console.log('System info loaded:', system);
                 this.setFeatures(system?.features);
-                this.updateSystemInfo?.(system); // MUST NOT overwrite this.features inside
-            } catch (e) {
-                console.error('Failed to load /system:', e);
+                this.updateSystemInfo?.(system);
+            } else {
+                console.error('Failed to load /system:', systemResult.reason);
             }
             
-            // Load metrics (non-fatal)
-            try {
-                const metrics = await this.apiCall('/metrics');
+            // Handle metrics data
+            if (metricsResult.status === 'fulfilled') {
+                const metrics = metricsResult.value;
                 console.log('Metrics loaded:', metrics);
                 this.updateDashboardMetrics?.(metrics);
-            } catch (e) {
-                console.error('Failed to load metrics:', e);
-                this.showError?.('dashboard', e.message || String(e));
+            } else {
+                console.error('Failed to load metrics:', metricsResult.reason);
+                this.showError?.('dashboard', metricsResult.reason.message || String(metricsResult.reason));
             }
             
         } catch (error) {
@@ -1432,7 +1680,33 @@ class TelemetryDashboard {
             if (!error.message.includes('HTTP 503')) {
                 this.showError('dashboard', error.message);
             }
+        } finally {
+            // Hide loading state
+            this.hideLoadingState();
         }
+    }
+
+    showLoadingState() {
+        // Show loading indicators on dashboard tiles
+        const elements = ['queue-lag', 'avg-risk', 'threat-matches'];
+        elements.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.textContent = '...';
+                el.style.opacity = '0.6';
+            }
+        });
+    }
+
+    hideLoadingState() {
+        // Hide loading indicators
+        const elements = ['queue-lag', 'avg-risk', 'threat-matches'];
+        elements.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.opacity = '1';
+            }
+        });
     }
 
     updateSystemInfo(system) {
@@ -1586,8 +1860,8 @@ class TelemetryDashboard {
     updateDashboardMetrics(metrics) {
         console.log('Updating dashboard metrics:', metrics);
         
-        // Queue Lag (p50)
-        const queueLag = metrics?.queue?.lag_ms_p50 ?? 0;
+        // Queue Lag (p50) - use queue_depth as fallback
+        const queueLag = metrics?.queue?.lag_ms_p50 ?? metrics?.queue_depth ?? 0;
         const queueLagElement = document.getElementById('queue-lag');
         if (queueLagElement) {
             queueLagElement.textContent = queueLag;
@@ -2967,4 +3241,265 @@ function getStatusBadgeClass(status) {
 // Initialize Sources functionality when dashboard is ready
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(addSourcesFunctionality, 100);
+    setTimeout(wireToolbox, 100);
 });
+
+// Wire up Toolbox functionality
+function wireToolbox() {
+    console.log('Wiring Toolbox...');
+    
+    // API Key functionality
+    const STORAGE_KEY = 'telemetry_api_key';
+    const API_BASE = '/v1';
+    
+    // Elements
+    const pill = document.getElementById('api-key-pill');
+    const lbl = document.getElementById('api-key-label');
+    const btnClear = document.getElementById('api-key-clear');
+    const btnOpenModal = document.getElementById('api-key-open-modal');
+    const modal = document.getElementById('key-modal');
+    const inKey = document.getElementById('key-modal-input');
+    const btnTest = document.getElementById('key-modal-test');
+    const btnSave = document.getElementById('key-modal-save');
+    const btnCancel = document.getElementById('key-modal-cancel');
+    const btnClose = document.getElementById('key-modal-close');
+    const backdrop = document.getElementById('key-modal-backdrop');
+    
+    // API buttons
+    const btnSystem = document.getElementById('btn-system');
+    const btnMetrics = document.getElementById('btn-metrics');
+    const btnLookup = document.getElementById('btn-lookup');
+    const inLookup = document.getElementById('lookup-input');
+    const btnSampleFlows = document.getElementById('btn-sample-flows');
+    const btnSampleZeek = document.getElementById('btn-sample-zeek');
+    const btnSendIngest = document.getElementById('btn-send-ingest');
+    const taPayload = document.getElementById('ingest-payload');
+    const preResponse = document.getElementById('resp-box');
+    const btnCopyOutput = document.getElementById('btn-copy-output');
+    const btnClearOutput = document.getElementById('btn-clear-output');
+    
+    // Helpers
+    const getKey = () => localStorage.getItem(STORAGE_KEY) || '';
+    const setKey = (v) => localStorage.setItem(STORAGE_KEY, v || '');
+    const clearKey = () => localStorage.removeItem(STORAGE_KEY);
+    
+    const maskKey = (k) => {
+        if (!k) return 'Not set';
+        const tail = k.slice(-6);
+        return `${k.split('.')[0]}_${tail}`;
+    };
+    
+    const updateKeyUI = () => {
+        const k = getKey();
+        const set = !!k;
+        if (lbl) lbl.textContent = maskKey(k);
+        if (btnClear) btnClear.style.opacity = set ? '1' : '0.35';
+        [btnSystem, btnMetrics, btnLookup, btnSampleFlows, btnSampleZeek, btnSendIngest]
+            .forEach(b => { if (b) b.disabled = !set; });
+    };
+    
+    const showResp = (obj) => {
+        if (preResponse) {
+            preResponse.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+        }
+    };
+    
+    const headers = () => {
+        const k = getKey();
+        const h = { 'Content-Type': 'application/json' };
+        if (k) h['Authorization'] = `Bearer ${k}`;
+        return h;
+    };
+    
+    // Modal controls
+    const openModal = () => { 
+        if (modal) modal.classList.remove('hidden'); 
+        if (inKey) {
+            inKey.value = getKey(); 
+            inKey.focus(); 
+        }
+    };
+    const closeModal = () => { if (modal) modal.classList.add('hidden'); };
+    
+    // Sample data
+    const SAMPLE_FLOWS_V1 = [
+        {
+            kind: "flow.v1",
+            tenant: "demo",
+            start_ts: "2025-08-29T10:00:00Z",
+            end_ts: "2025-08-29T10:00:10Z",
+            src_ip: "10.0.1.10",
+            dst_ip: "8.8.8.8",
+            src_port: 54123,
+            dst_port: 53,
+            proto: "udp",
+            bytes_in: 1200,
+            bytes_out: 340
+        },
+        {
+            kind: "flow.v1",
+            tenant: "demo",
+            start_ts: "2025-08-29T10:01:00Z",
+            end_ts: "2025-08-29T10:05:30Z",
+            src_ip: "10.0.2.15",
+            dst_ip: "203.0.113.50",
+            src_port: 51744,
+            dst_port: 3389,
+            proto: "tcp",
+            bytes_in: 1048576,
+            bytes_out: 7340032
+        }
+    ];
+    
+    const SAMPLE_ZEEK_CONN = [
+        {
+            kind: "zeek.conn",
+            tenant: "demo",
+            ts: "2025-08-29T10:02:03Z",
+            uid: "C8r1yF3Fv8",
+            "id.orig_h": "10.0.3.7",
+            "id.resp_h": "198.51.100.25",
+            "id.orig_p": 44321,
+            "id.resp_p": 443,
+            proto: "tcp",
+            duration: 12.34,
+            orig_bytes: 2048,
+            resp_bytes: 65536,
+            conn_state: "SF"
+        },
+        {
+            kind: "zeek.conn",
+            tenant: "demo",
+            ts: "2025-08-29T10:06:40Z",
+            uid: "D1x2yZ9Qp1",
+            "id.orig_h": "10.0.3.9",
+            "id.resp_h": "8.8.4.4",
+            "id.orig_p": 53211,
+            "id.resp_p": 53,
+            proto: "udp",
+            duration: 0.05,
+            orig_bytes: 64,
+            resp_bytes: 128,
+            conn_state: "SF"
+        }
+    ];
+    
+    // Helper functions
+    const setPayload = (value) => {
+        if (!taPayload) return;
+        taPayload.value = value;
+        taPayload.focus();
+        taPayload.selectionStart = taPayload.value.length;
+        taPayload.selectionEnd = taPayload.value.length;
+        taPayload.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    
+    const pretty = (obj) => JSON.stringify(obj, null, 2);
+    
+    // API calls
+    const doGet = async (path) => {
+        try {
+            const r = await fetch(`${API_BASE}${path}`, { method: 'GET', headers: headers() });
+            const t = await r.text();
+            try { return JSON.parse(t); } catch { return t; }
+        } catch (error) {
+            return `Error: ${error.message}`;
+        }
+    };
+    
+    const doPost = async (path, body) => {
+        try {
+            const r = await fetch(`${API_BASE}${path}`, { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+            const t = await r.text();
+            try { return JSON.parse(t); } catch { return t; }
+        } catch (error) {
+            return `Error: ${error.message}`;
+        }
+    };
+    
+    // Event listeners
+    btnOpenModal?.addEventListener('click', openModal);
+    btnCancel?.addEventListener('click', closeModal);
+    btnClose?.addEventListener('click', closeModal);
+    backdrop?.addEventListener('click', closeModal);
+    
+    btnTest?.addEventListener('click', async () => {
+        const tmp = inKey.value.trim();
+        if (!tmp) return showResp('Enter a key to test...');
+        const old = getKey(); setKey(tmp);
+        try { showResp(await doGet('/health')); }
+        catch (e) { showResp(String(e)); }
+        finally { setKey(old); }
+    });
+    
+    btnSave?.addEventListener('click', () => {
+        setKey(inKey.value.trim()); updateKeyUI(); closeModal();
+    });
+    
+    btnClear?.addEventListener('click', () => {
+        clearKey(); updateKeyUI(); showResp('Key cleared.');
+    });
+    
+    btnSystem?.addEventListener('click', async () => {
+        try { showResp(await doGet('/system')); } catch (e) { showResp(String(e)); }
+    });
+    
+    btnMetrics?.addEventListener('click', async () => {
+        try { showResp(await doGet('/metrics')); } catch (e) { showResp(String(e)); }
+    });
+    
+    btnLookup?.addEventListener('click', async () => {
+        let body;
+        const txt = inLookup.value.trim();
+        if (!txt) { showResp('Provide JSON for /v1/lookup'); return; }
+        try { body = JSON.parse(txt); } catch { showResp('Lookup value must be valid JSON'); return; }
+        try { showResp(await doPost('/lookup', body)); } catch (e) { showResp(String(e)); }
+    });
+    
+    btnSampleFlows?.addEventListener('click', () => {
+        setPayload(pretty(SAMPLE_FLOWS_V1));
+    });
+    
+    btnSampleZeek?.addEventListener('click', () => {
+        setPayload(pretty(SAMPLE_ZEEK_CONN));
+    });
+    
+    btnSendIngest?.addEventListener('click', async () => {
+        try {
+            const payload = getPayloadOrAlert();
+            showResp(await doPost('/ingest', payload));
+        } catch (e) {
+            // Error already shown by getPayloadOrAlert
+        }
+    });
+    
+    btnCopyOutput?.addEventListener('click', () => {
+        navigator.clipboard.writeText(preResponse.textContent || '').catch(() => {});
+    });
+    
+    btnClearOutput?.addEventListener('click', () => {
+        showResp('');
+    });
+    
+    // Payload validation function
+    const getPayloadOrAlert = () => {
+        try {
+            const parsed = JSON.parse(taPayload.value || '[]');
+            if (!Array.isArray(parsed)) throw new Error('Top-level JSON must be an array');
+            return parsed;
+        } catch (e) {
+            showResp('Invalid JSON payload: ' + e.message);
+            throw e;
+        }
+    };
+    
+    // Initialize
+    updateKeyUI();
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+            closeModal();
+        }
+    });
+}
