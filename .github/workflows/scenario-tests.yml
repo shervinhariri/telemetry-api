@@ -37,6 +37,10 @@ jobs:
             sleep 2
           done
           [ "$ok" = "1" ] || { docker compose ps; docker compose logs --tail 300; exit 1; }
+          
+          # Wait additional time for database initialization to complete
+          echo "Waiting for database initialization to complete..."
+          sleep 10
 
       - name: Sanity check container
         run: |
@@ -47,14 +51,27 @@ jobs:
         run: |
           docker exec telemetry-api bash -lc 'python - <<"PY"
           from sqlalchemy import create_engine, text
-          import os, json
+          import os, json, time
           db=os.getenv("DB_URL","sqlite:////app/telemetry.db")
           e=create_engine(db, future=True)
-          with e.connect() as c:
-              rows=c.execute(text("select key_id, scopes from api_keys limit 3;")).all()
-              print("DB scopes check:")
-              for row in rows:
-                  print(f"  {row[0]}: {row[1]}")
+          
+          # Wait for api_keys table to exist
+          max_retries = 10
+          for attempt in range(max_retries):
+              try:
+                  with e.connect() as c:
+                      rows=c.execute(text("select key_id, scopes from api_keys limit 3;")).all()
+                      print("DB scopes check:")
+                      for row in rows:
+                          print(f"  {row[0]}: {row[1]}")
+                      break
+              except Exception as e:
+                  if attempt < max_retries - 1:
+                      print(f"Waiting for api_keys table (attempt {attempt + 1}/{max_retries})...")
+                      time.sleep(2)
+                  else:
+                      print(f"Failed to find api_keys table after {max_retries} attempts")
+                      raise
           PY'
 
       # Run tests against the running container
@@ -85,10 +102,17 @@ jobs:
           import os
           db=os.getenv("DB_URL","sqlite:////app/telemetry.db")
           e=create_engine(db, future=True)
-          with e.connect() as c:
-              rows=c.execute(text("SELECT key_id, scopes, disabled FROM api_keys;")).all()
-              for row in rows:
-                  print(f"  {row[0]}: {row[1]} (disabled={row[2]})")
+          try:
+              with e.connect() as c:
+                  rows=c.execute(text("SELECT key_id, scopes, disabled FROM api_keys;")).all()
+                  for row in rows:
+                      print(f"  {row[0]}: {row[1]} (disabled={row[2]})")
+          except Exception as e:
+              print(f"Error querying api_keys table: {e}")
+              # Show available tables
+              with e.connect() as c:
+                  tables=c.execute(text("SELECT name FROM sqlite_master WHERE type='table';")).all()
+                  print(f"Available tables: {[t[0] for t in tables]}")
           PY'
 
       - name: Upload report artifact

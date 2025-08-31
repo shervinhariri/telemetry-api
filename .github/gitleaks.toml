@@ -1,0 +1,43 @@
+title = "gitleaks config for telemetry-api"
+
+[allowlist]
+description = "Allowlist for telemetry-api"
+paths = [
+    "tests/",
+    "docs/",
+    "*.md",
+    "*.txt",
+    "*.json",
+    "*.yaml",
+    "*.yml"
+]
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(api[_-]?key|apikey|secret|password|token|key)[_-]?(id|name|value|key)?[_-]?['"]?[a-zA-Z0-9]{32,}['"]?'''
+tags = ["key", "api", "secret"]
+
+[[rules]]
+id = "aws-access-key-id"
+description = "AWS Access Key ID"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["key", "aws"]
+
+[[rules]]
+id = "aws-secret-access-key"
+description = "AWS Secret Access Key"
+regex = '''(?i)aws[_-]?(secret[_-]?)?access[_-]?key[_-]?id[_-]?['"]?[A-Z0-9]{20}['"]?'''
+tags = ["key", "aws"]
+
+[[rules]]
+id = "github-personal-access-token"
+description = "GitHub Personal Access Token"
+regex = '''ghp_[a-zA-Z0-9]{36}'''
+tags = ["key", "github"]
+
+[[rules]]
+id = "docker-registry-password"
+description = "Docker Registry Password"
+regex = '''(?i)docker[_-]?registry[_-]?password[_-]?['"]?[a-zA-Z0-9]{8,}['"]?'''
+tags = ["key", "docker"]
