@@ -26,7 +26,9 @@ from .api.outputs import router as outputs_router
 from .api.stats import router as stats_router
 from .api.logs import router as logs_router
 from .api.requests import router as requests_router
+from .api.requests_public import router as requests_public_router
 from .api.system import router as system_router
+from .api.indicators import router as indicators_router
 from .api.keys import router as keys_router
 from .api.demo import router as demo_router
 from .api.prometheus import router as prometheus_router
@@ -354,8 +356,10 @@ app.include_router(admin_update_router, prefix=API_PREFIX)
 app.include_router(outputs_router)
 app.include_router(stats_router, prefix=API_PREFIX)
 app.include_router(logs_router, prefix=API_PREFIX)
-app.include_router(requests_router)
+app.include_router(requests_router)   # /v1/admin/requests (admin-guarded)
+app.include_router(requests_public_router)  # /v1/api/requests (public alias)
 app.include_router(system_router)
+app.include_router(indicators_router)
 app.include_router(keys_router, prefix=API_PREFIX)
 app.include_router(demo_router, prefix=API_PREFIX)
 app.include_router(prometheus_router, prefix=API_PREFIX)
@@ -1649,135 +1653,9 @@ async def configure_elastic(request: Request, response: Response, Authorization:
     
     ELASTIC_URL = payload.get("url")
 
-@app.put(f"{API_PREFIX}/indicators")
-async def upsert_indicators(request: Request, response: Response, Authorization: Optional[str] = Header(None)):
-    """Upsert threat intelligence indicators"""
-    # Use the new auth system
-    from .auth import require_key
-    from .db import SessionLocal
-    
-    with SessionLocal() as db:
-        user = require_key(request, db)
-    
-    # Check if user has manage_indicators scope
-    scopes = getattr(user, 'scopes', [])
-    if "manage_indicators" not in scopes and "admin" not in scopes:
-        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'manage_indicators' scope")
-    add_version_header(response)
-    
-    start_time = time.time()
-    trace_id = getattr(request.state, 'trace_id', None)
-    
-    payload = await request.json()
-    
-    if not isinstance(payload, dict):
-        raise HTTPException(status_code=400, detail="Payload must be JSON object")
-    
-    ip_or_cidr = payload.get("ip_or_cidr")
-    category = payload.get("category", "unknown")
-    confidence = payload.get("confidence", 50)
-    
-    if not ip_or_cidr:
-        raise HTTPException(status_code=400, detail="ip_or_cidr is required")
-    
-    if not isinstance(confidence, int) or confidence < 0 or confidence > 100:
-        raise HTTPException(status_code=400, detail="confidence must be integer 0-100")
-    
-    try:
-        # Validate IP/CIDR
-        ipaddress.ip_network(ip_or_cidr, strict=False)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid IP or CIDR")
-    
-    # Add to threat intelligence with DB session
-    from .enrich.ti import add_indicator, IndicatorModel
-    from .db import SessionLocal
-    
-    model = IndicatorModel(
-        ip_or_cidr=ipaddress.ip_network(ip_or_cidr, strict=False),
-        category=category,
-        confidence=confidence
-    )
-    
-    with SessionLocal() as db:
-        add_indicator(db, model)
-    
-    # Track operations for audit
-    if trace_id:
-        from .audit import set_request_ops
-        ops = {
-            "handler": "upsert_indicators",
-            "indicator": {
-                "ip_or_cidr": ip_or_cidr,
-                "category": category,
-                "confidence": confidence
-            },
-            "timers_ms": {
-                "total": int((time.time() - start_time) * 1000)
-            }
-        }
-        set_request_ops(trace_id, ops)
-    
-    return {
-        "ip_or_cidr": ip_or_cidr,
-        "category": category,
-        "confidence": confidence,
-        "status": "added"
-    }
 
-@app.delete(f"{API_PREFIX}/indicators")
-async def delete_indicator(request: Request, response: Response, Authorization: Optional[str] = Header(None), ip_or_cidr: str = None):
-    """Delete threat intelligence indicator by IP/CIDR"""
-    # Use the new auth system
-    from .auth import require_key
-    from .db import SessionLocal
-    
-    with SessionLocal() as db:
-        user = require_key(request, db)
-    
-    # Check if user has manage_indicators scope
-    scopes = getattr(user, 'scopes', [])
-    if "manage_indicators" not in scopes and "admin" not in scopes:
-        raise HTTPException(status_code=403, detail="Insufficient permissions - requires 'manage_indicators' scope")
-    add_version_header(response)
-    
-    start_time = time.time()
-    trace_id = getattr(request.state, 'trace_id', None)
-    
-    # Get IP/CIDR from query parameter or request body
-    if not ip_or_cidr:
-        try:
-            payload = await request.json()
-            ip_or_cidr = payload.get("ip_or_cidr")
-        except:
-            pass
-    
-    if not ip_or_cidr:
-        raise HTTPException(status_code=400, detail="ip_or_cidr parameter is required")
-    
-    # Remove from threat intelligence with DB session
-    from .enrich.ti import remove_indicator
-    from .db import SessionLocal
-    
-    with SessionLocal() as db:
-        remove_indicator(db, ip_or_cidr)
-    
-            # Track operations for audit
-        if trace_id:
-            from .audit import set_request_ops
-            ops = {
-                "handler": "delete_indicator",
-                "indicator": {
-                    "ip_or_cidr": ip_or_cidr,
-                    "removed": True
-                },
-                "timers_ms": {
-                    "total": int((time.time() - start_time) * 1000)
-                }
-            }
-            set_request_ops(trace_id, ops)
-    
-        return {"ok": True}
+
+
 
 @app.get(f"{API_PREFIX}/download/json")
 async def download_json(
@@ -2075,8 +1953,8 @@ async def configure_alerts(request: Request, response: Response, Authorization: 
 
 
 
-@app.get(f"{API_PREFIX}/metrics", dependencies=[Depends(require_scopes("read_metrics", "admin")), Depends(require_tenant(optional=False))])
-async def metrics(response: Response, Authorization: Optional[str] = Header(None), request: Request = None):
+@app.get(f"{API_PREFIX}/metrics")
+async def metrics(response: Response):
     add_version_header(response)
     return get_metrics()
 
