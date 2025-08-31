@@ -50,7 +50,7 @@ jobs:
           echo "Waiting for API to be fully ready..."
           max_wait=30
           for i in $(seq 1 $max_wait); do
-              if docker exec telemetry-api python -c "import sqlite3; conn = sqlite3.connect('./telemetry.db'); cursor = conn.cursor(); cursor.execute('SELECT COUNT(*) FROM api_keys'); count = cursor.fetchone()[0]; conn.close(); print(f'Found {count} api_keys'); exit(0 if count > 0 else 1)" 2>/dev/null; then
+              if docker exec telemetry-api python -c "import sqlite3; conn = sqlite3.connect('/data/telemetry.db'); cursor = conn.cursor(); cursor.execute('SELECT COUNT(*) FROM api_keys'); count = cursor.fetchone()[0]; conn.close(); print(f'Found {count} api_keys'); exit(0 if count > 0 else 1)" 2>/dev/null; then
                   echo "API is ready with api_keys table populated"
                   break
               fi
@@ -68,7 +68,7 @@ jobs:
           docker exec telemetry-api bash -lc 'python - <<"PY"
           from sqlalchemy import create_engine, text
           import os, json, time
-          db=os.getenv("DB_URL","sqlite:///./telemetry.db")
+          db=os.getenv("DB_URL","sqlite:////data/telemetry.db")
           e=create_engine(db, future=True)
           
           # Wait for api_keys table to exist
@@ -120,7 +120,7 @@ jobs:
           docker exec telemetry-api bash -lc 'python - <<"PY"
           from sqlalchemy import create_engine, text
           import os
-          db=os.getenv("DB_URL","sqlite:///./telemetry.db")
+          db=os.getenv("DB_URL","sqlite:////data/telemetry.db")
           e=create_engine(db, future=True)
           try:
               with e.connect() as c:
