@@ -41,6 +41,10 @@ jobs:
           # Wait additional time for database initialization to complete
           echo "Waiting for database initialization to complete..."
           sleep 10
+          
+          # Ensure database migration runs
+          echo "Running database migration..."
+          docker exec telemetry-api python scripts/migrate_sqlite.py
 
       - name: Sanity check container
         run: |

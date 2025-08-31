@@ -5,11 +5,11 @@ description = "Allowlist for telemetry-api"
 paths = [
     "tests/",
     "docs/",
-    "*.md",
-    "*.txt",
-    "*.json",
-    "*.yaml",
-    "*.yml"
+    ".*\\.md$",
+    ".*\\.txt$",
+    ".*\\.json$",
+    ".*\\.yaml$",
+    ".*\\.yml$"
 ]
 
 [[rules]]

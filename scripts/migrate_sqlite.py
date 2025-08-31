@@ -18,6 +18,34 @@ def add_col(cur, table, col, ddl):
         return True
     return False
 
+def migrate_api_keys(cur):
+    if not table_exists(cur, "api_keys"):
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS api_keys (
+          key_id TEXT PRIMARY KEY,
+          tenant_id TEXT,
+          hash TEXT,
+          scopes TEXT,
+          disabled INTEGER DEFAULT 0,
+          created_at TEXT
+        );
+        """)
+        return {"created": True, "added": []}
+    
+    added = []
+    # Add any columns that might be missing in older DBs
+    if add_col(cur, "api_keys", "tenant_id", "TEXT"):
+        added.append("tenant_id")
+    if add_col(cur, "api_keys", "hash", "TEXT"):
+        added.append("hash")
+    if add_col(cur, "api_keys", "scopes", "TEXT"):
+        added.append("scopes")
+    if add_col(cur, "api_keys", "disabled", "INTEGER DEFAULT 0"):
+        added.append("disabled")
+    if add_col(cur, "api_keys", "created_at", "TEXT"):
+        added.append("created_at")
+    return {"created": False, "added": added}
+
 def migrate_sources(cur):
     if not table_exists(cur, "sources"):
         # If the table truly doesn't exist, create it the modern way.
@@ -94,8 +122,9 @@ def main():
     conn = sqlite3.connect(DB)
     cur = conn.cursor()
 
-    report = {"db": DB, "sources": None}
+    report = {"db": DB, "sources": None, "api_keys": None}
     try:
+        report["api_keys"] = migrate_api_keys(cur)
         report["sources"] = migrate_sources(cur)
         conn.commit()
         print(json.dumps({"ok": True, "report": report}))
