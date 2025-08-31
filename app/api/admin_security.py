@@ -2,7 +2,7 @@
 Admin Security API endpoints for firewall and security management
 """
 
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, HTTPException, Request, Query, Depends
 import subprocess
 import tempfile
 import json
@@ -13,10 +13,11 @@ from ..services.sources import sources_cache
 from ..services.audit import log_admin_action
 from ..db import SessionLocal
 from ..models.source import Source
+from ..auth import require_admin
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin/security", tags=["admin"])
+router = APIRouter(prefix="/admin/security", tags=["admin"], dependencies=[Depends(require_admin)])
 
 def list_enabled_sources() -> List[Dict[str, Any]]:
     """Get all enabled sources with their allowed IPs"""
@@ -42,11 +43,6 @@ def list_enabled_sources() -> List[Dict[str, Any]]:
 @router.post("/sync-allowlist")
 async def sync_allowlist(request: Request, dry_run: bool = Query(False, description="Preview changes without applying")):
     """Sync nftables allowlist with enabled sources"""
-    # Check if user has admin scope
-    scopes = getattr(request.state, 'scopes', [])
-    if "admin" not in scopes:
-        raise HTTPException(status_code=403, detail="Admin scope required")
-    
     try:
         import os
         from datetime import datetime

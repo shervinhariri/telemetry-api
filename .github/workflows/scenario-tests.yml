@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           docker compose -f docker-compose.yml up -d --build --wait
           docker ps --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}'
-          echo "API_BASE=http://127.0.0.1" >> "$GITHUB_ENV"
+          echo "API_BASE=http://127.0.0.1:8080" >> "$GITHUB_ENV"
           echo "HEALTH_PATH=/v1/health" >> "$GITHUB_ENV"
 
       - name: HTTP smoke check
@@ -45,6 +45,10 @@ jobs:
             sleep 1
           done
           echo "Health never reached 200"; exit 1
+          
+          # sanity debug
+          docker compose ps
+          curl -i --max-time 2 "${API_BASE}${HEALTH_PATH}" || true
 
       - name: Sanity check container
         run: |

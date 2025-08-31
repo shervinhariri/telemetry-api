@@ -4,7 +4,7 @@ services:
     build: .
     container_name: telemetry-api
     environment:
-      - PORT=80
+      - PORT=8080
       - HOST=0.0.0.0
       - APP_VERSION=0.8.10
       - TELEMETRY_FEATURE_SOURCES=false
@@ -35,7 +35,7 @@ services:
       - FEATURE_SOURCES=${FEATURE_SOURCES:-1}
       - FEATURE_UDP_HEAD=${FEATURE_UDP_HEAD:-0}
     ports:
-      - "80:80"                      # tests talk to localhost:80
+      - "8080:8080"
     volumes:
       - dbdata:/data
       - ./geo:/data/geo:ro
@@ -46,9 +46,9 @@ services:
         - CMD-SHELL
         - >
           python -c 'import socket,os,sys;s=socket.socket();s.settimeout(1);
-          s.connect(("127.0.0.1",int(os.environ.get("PORT","80"))));s.close();sys.exit(0)'
+          s.connect(("127.0.0.1",int(os.environ.get("PORT","8080"))));s.close();sys.exit(0)'
           || python3 -c 'import socket,os,sys;s=socket.socket();s.settimeout(1);
-          s.connect(("127.0.0.1",int(os.environ.get("PORT","80"))));s.close();sys.exit(0)'
+          s.connect(("127.0.0.1",int(os.environ.get("PORT","8080"))));s.close();sys.exit(0)'
       interval: 2s
       timeout: 1s
       retries: 90
