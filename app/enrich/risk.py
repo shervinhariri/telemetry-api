@@ -70,8 +70,18 @@ def score(record: Dict[str, Any], ti_matches: List[Any]) -> int:
     if r["dst_port"] in RISKY_PORTS:
         s += 10
 
-    # large transfer bytes
-    if isinstance(r["bytes"], (int, float)) and r["bytes"] >= BYTES_THRESHOLD:
-        s += 10
+    # bytes boost ONLY when client/orig port is ephemeral (>=1024)
+    orig_p = (
+        record.get("id.orig_p") or record.get("id_orig_p") or
+        record.get("src_port") or 0
+    )
+    try:
+        orig_p = int(orig_p)
+    except Exception:
+        orig_p = 0
+
+    if orig_p >= 1024:
+        if int(record.get("orig_bytes") or 0) > 1_000_000 or int(r["bytes"] or 0) > 1_000_000:
+            s += 10
 
     return clamp(int(s))

@@ -1,106 +1,68 @@
 # app/db_boot.py
-import os, json, hashlib, logging, subprocess, sys
+import os, json, logging
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
 from .db import engine, Base, SessionLocal
 from .models.tenant import Tenant
 from .models.apikey import ApiKey
+import hashlib
 
 log = logging.getLogger("bootstrap")
 
-ADMIN_KEY_ID = "admin"
-DEFAULT_TENANT = "default"
-DEFAULT_SCOPES = ["admin","ingest","read_metrics","export","manage_indicators"]
-
 def _sha256(s: str) -> str:
-    import hashlib
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
-def _migrate_sqlite():
-    # if you have scripts/migrate_sqlite.py in container
-    try:
-        subprocess.run(
-            [sys.executable, "/app/scripts/migrate_sqlite.py"],
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        log.info("DB_BOOT: migrate_sqlite.py completed")
-    except Exception as e:
-        log.warning("DB_BOOT: migrate_sqlite.py not run or failed: %s", e)
+DEFAULT_TENANT = "default"
+ADMIN_KEY_ID = "admin"
+USER_KEY_ID = "user"
 
-def _sanitize_scopes(session: Session):
-    try:
-        # Convert non-JSON scopes to JSON array strings once
-        keys = session.query(ApiKey).all()
-        touched = 0
-        for k in keys:
-            raw = k.scopes
-            try:
-                if isinstance(raw, list):
-                    continue
-                if isinstance(raw, str):
-                    json.loads(raw)  # already JSON?
-                    continue
-            except Exception:
-                pass
-            # force-json
-            k.scopes = json.dumps(DEFAULT_SCOPES if not raw else [raw] if isinstance(raw, str) else DEFAULT_SCOPES)
-            touched += 1
-        if touched:
-            session.commit()
-            log.info("DB_BOOT: sanitized %d key scopes to JSON lists", touched)
-        else:
-            log.info("DB_BOOT: scopes already normalized")
-    except Exception as e:
-        log.warning("DB_BOOT: scope sanitize skipped: %s", e)
+ADMIN_SCOPES = ["admin", "ingest", "read_metrics", "export", "manage_indicators"]
+USER_SCOPES  = ["ingest", "read_metrics"]  # no 'admin'
 
-def _seed_admin(session: Session):
-    token = os.getenv("API_KEY", "TEST_ADMIN_KEY")
-    h = _sha256(token)
-
-    # ensure default tenant
-    tenant = session.query(Tenant).filter(Tenant.tenant_id == DEFAULT_TENANT).one_or_none()
-    if not tenant:
-        tenant = Tenant(tenant_id=DEFAULT_TENANT, name="Default")
-        session.add(tenant)
+def _upsert_key(session, key_id, raw_token, scopes, disabled=False):
+    h = _sha256(raw_token)
+    row = session.query(ApiKey).filter(ApiKey.key_id == key_id).one_or_none()
+    if row:
+        row.hash = h
+        row.scopes = json.dumps(scopes)
+        row.disabled = disabled
         session.commit()
-
-    key = session.query(ApiKey).filter(ApiKey.key_id == ADMIN_KEY_ID).one_or_none()
-    if key:
-        # update hash & scopes if needed
-        key.hash = h
-        key.scopes = json.dumps(DEFAULT_SCOPES)
-        key.disabled = False
+        return "updated"
+    try:
+        session.add(ApiKey(
+            key_id=key_id, tenant_id=DEFAULT_TENANT,
+            hash=h, scopes=json.dumps(scopes), disabled=disabled
+        ))
         session.commit()
-        log.info("DB_BOOT: admin key refreshed")
-    else:
-        try:
-            session.add(ApiKey(
-                key_id=ADMIN_KEY_ID,
-                tenant_id=DEFAULT_TENANT,
-                hash=h,
-                scopes=json.dumps(DEFAULT_SCOPES),
-                disabled=False
-            ))
-            session.commit()
-            log.info("DB_BOOT: admin key inserted")
-        except IntegrityError:
-            session.rollback()
-            log.info("DB_BOOT: admin key existed, refreshed instead")
-            _seed_admin(session)  # retry as refresh
+        return "inserted"
+    except IntegrityError:
+        session.rollback()
+        return "skipped"
 
 def bootstrap_db():
-    # 1) create tables
+    # 1) ensure tables
     Base.metadata.create_all(bind=engine)
-    # 2) run migrations (safe to run repeatedly)
-    _migrate_sqlite()
-    # 3) normalize scopes
-    session = SessionLocal()
+
+    # 2) migrations (safe if present)
     try:
-        _sanitize_scopes(session)
-        # 4) seed/refresh admin
-        _seed_admin(session)
+        import subprocess, sys
+        subprocess.run([sys.executable, "/app/scripts/migrate_sqlite.py"], check=True)
+        log.info("DB_BOOT: migrations applied")
+    except Exception as e:
+        log.info("DB_BOOT: migrations skipped: %s", e)
+
+    # 3) upsert tenant + keys
+    s = SessionLocal()
+    try:
+        tenant = s.query(Tenant).filter(Tenant.tenant_id == DEFAULT_TENANT).one_or_none()
+        if not tenant:
+            s.add(Tenant(tenant_id=DEFAULT_TENANT, name="Default"))
+            s.commit()
+
+        admin_token = os.getenv("API_KEY", "TEST_ADMIN_KEY")
+        user_token  = os.getenv("USER_API_KEY", "***")
+
+        ares = _upsert_key(s, ADMIN_KEY_ID, admin_token, ADMIN_SCOPES)
+        ures = _upsert_key(s, USER_KEY_ID, user_token, USER_SCOPES)
+        log.info("DB_BOOT: admin key %s; user key %s", ares, ures)
     finally:
-        session.close()
+        s.close()

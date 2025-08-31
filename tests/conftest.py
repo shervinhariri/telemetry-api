@@ -1,43 +1,36 @@
-import os, time, requests, pytest
+# tests/conftest.py
+import os
+import pytest
+import requests
 
-BASE_URL = os.getenv("API_BASE_URL", "http://localhost:80")
-API_KEY  = os.getenv("API_KEY", "TEST_ADMIN_KEY")
+BASE_URL = os.getenv("BASE_URL") or os.getenv("APP_BASE_URL") or "http://localhost:80"
 
-@pytest.fixture(scope="session", autouse=True)
-def wait_for_api():
-    # Only wait for API if we're in CI/CD or explicitly testing against a container
-    if os.getenv("CI") or os.getenv("GITHUB_ACTIONS") or BASE_URL != "http://localhost:80":
-        for i in range(60):
-            try:
-                r = requests.get(f"{BASE_URL}/v1/health", timeout=1.5)
-                if r.status_code == 200:
-                    print(f"✅ API ready at {BASE_URL} (attempt {i+1})")
-                    return
-            except Exception:
-                pass
-            time.sleep(1)
-        pytest.fail("API did not become healthy in time")
-    else:
-        # For local testing, skip the wait
-        print("⏭️ Skipping API health check for local testing")
+class BaseUrlSession(requests.Session):
+    def __init__(self, base_url: str):
+        super().__init__()
+        self._base = base_url.rstrip("/")
 
-@pytest.fixture(scope="function")
+    def request(self, method, url, *args, **kwargs):
+        # Allow relative paths like "/v1/health"
+        if not url.lower().startswith("http"):
+            url = f"{self._base}/{url.lstrip('/')}"
+        return super().request(method, url, *args, **kwargs)
+
+@pytest.fixture(scope="session")
 def client():
-    # For local testing, use FastAPI TestClient
-    if BASE_URL == "http://localhost:80" and not os.getenv("CI") and not os.getenv("GITHUB_ACTIONS"):
-        from fastapi.testclient import TestClient
-        import sys
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-        from app.main import app
-        with TestClient(app) as test_client:
-            # Add Authorization header to TestClient
-            test_client.headers = {"Authorization": f"Bearer {API_KEY}"}
-            yield test_client
-    else:
-        # For container testing, use requests Session
-        s = requests.Session()
-        s.headers.update({"Authorization": f"Bearer {API_KEY}"})
-        try:
-            yield s
-        finally:
-            s.close()
+    """
+    In e2e we talk to the running container on http://localhost:80.
+    This fixture returns a Session that automatically prefixes the base URL,
+    so tests can call client.get('/v1/health') without schema errors.
+    """
+    return BaseUrlSession(BASE_URL)
+
+@pytest.fixture
+def admin_headers():
+    # Admin key used by the app bootstrap (see db_boot)
+    return {"Authorization": os.getenv("API_KEY", "TEST_ADMIN_KEY")}
+
+@pytest.fixture
+def user_headers():
+    # Non-admin key used by several tests
+    return {"Authorization": os.getenv("USER_API_KEY", "***")}
