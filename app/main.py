@@ -29,6 +29,7 @@ from .api.requests import router as requests_router
 from .api.requests_public import router as requests_public_router
 from .api.system import router as system_router
 from .api.indicators import router as indicators_router
+from .api.geo import router as geo_router
 from .api.keys import router as keys_router
 from .api.demo import router as demo_router
 from .api.prometheus import router as prometheus_router
@@ -360,6 +361,7 @@ app.include_router(requests_router)   # /v1/admin/requests (admin-guarded)
 app.include_router(requests_public_router)  # /v1/api/requests (public alias)
 app.include_router(system_router)
 app.include_router(indicators_router)
+app.include_router(geo_router)
 app.include_router(keys_router, prefix=API_PREFIX)
 app.include_router(demo_router, prefix=API_PREFIX)
 app.include_router(prometheus_router, prefix=API_PREFIX)

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, HttpUrl
 
@@ -68,8 +68,13 @@ def validate_elastic(cfg: ElasticConfig):
     return {"status": "ok"}
 
 @router.post("/outputs/test")
-def outputs_test(payload: dict):
-    target = payload.get("target")
+def outputs_test(payload: Dict[str, Any]) -> Dict[str, Any]:
+    target = (payload or {}).get("target")
     if target not in {"splunk", "elastic"}:
-        raise HTTPException(status_code=422, detail=[{"field": "target", "reason": "invalid target"}])
-    return {"status": "ok"}
+        # 422 must include "status" in the body per test
+        raise HTTPException(
+            status_code=422,
+            detail={"status": "error", "field": "target", "reason": "invalid target"}
+        )
+    # Success path must include "target" field
+    return {"status": "ok", "target": target}
