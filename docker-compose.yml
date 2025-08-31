@@ -35,7 +35,8 @@ services:
       - FEATURE_SOURCES=${FEATURE_SOURCES:-1}
       - FEATURE_UDP_HEAD=${FEATURE_UDP_HEAD:-0}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:80:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - dbdata:/data
       - ./geo:/data/geo:ro
@@ -45,14 +46,18 @@ services:
       test:
         - CMD-SHELL
         - >
-          python -c 'import socket,os,sys;s=socket.socket();s.settimeout(1);
-          s.connect(("127.0.0.1",int(os.environ.get("PORT","8080"))));s.close();sys.exit(0)'
-          || python3 -c 'import socket,os,sys;s=socket.socket();s.settimeout(1);
-          s.connect(("127.0.0.1",int(os.environ.get("PORT","8080"))));s.close();sys.exit(0)'
+          curl -fsS "http://127.0.0.1:${PORT:-8080}/v1/health" >/dev/null ||
+          (python - <<'PY'
+import os,sys,socket
+s=socket.socket(); s.settimeout(1)
+s.connect(("127.0.0.1", int(os.environ.get("PORT","8080"))))
+s.close(); sys.exit(0)
+PY
+          )
       interval: 2s
       timeout: 1s
-      retries: 90
-      start_period: 10s
+      retries: 120
+      start_period: 5s
 
   # keep disabled until UDP ingest exists in backend
   udp-ingestor:

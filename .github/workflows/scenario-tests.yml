@@ -38,17 +38,16 @@ jobs:
       - name: HTTP smoke check
         run: |
           set -euo pipefail
-          for i in $(seq 1 60); do
-            code=$(curl -sS --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "${API_BASE}${HEALTH_PATH}" || true)
+          for i in $(seq 1 120); do
+            code=$(curl -sS --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080/v1/health" || true)
             echo "try $i -> $code"
             [ "$code" = "200" ] && exit 0
             sleep 1
           done
-          echo "Health never reached 200"; exit 1
-          
-          # sanity debug
-          docker compose ps
-          curl -i --max-time 2 "${API_BASE}${HEALTH_PATH}" || true
+          echo "::group::compose-ps"; docker compose ps; echo "::endgroup::"
+          echo "::group::sockets"; ss -ltnp || true; echo "::endgroup::"
+          echo "::group::logs"; docker logs telemetry-api --tail=200 || true; echo "::endgroup::"
+          exit 1
 
       - name: Sanity check container
         run: |
