@@ -12,8 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Pull golden image
-        run: docker pull shvin/telemetry-api:$(cat VERSION)-golden
+      - name: Build image from source
+        run: docker compose build
 
       - name: Start e2e stack
         env:
@@ -23,13 +23,8 @@ jobs:
           # Load test environment variables (skip comments)
           export $(grep -v '^#' .github/test.env | xargs)
           echo "Loaded env vars: TELEMETRY_SEED_KEYS=$TELEMETRY_SEED_KEYS"
-          # Use the golden image
-          docker run -d --rm --name telemetry-api -p 80:80 \
-            -e TELEMETRY_SEED_KEYS="$TELEMETRY_SEED_KEYS" \
-            -e DEMO_BASE_URL="http://localhost" \
-            -e FEATURE_SOURCES=1 \
-            -e FEATURE_UDP_HEAD=0 \
-            shvin/telemetry-api:$(cat VERSION)-golden
+          # Start using docker compose (builds from source)
+          docker compose up -d
           echo "Waiting for API to become healthy (up to 80s)..."
           ok=0
           for i in $(seq 1 40); do
@@ -41,7 +36,7 @@ jobs:
             fi
             sleep 2
           done
-          [ "$ok" = "1" ] || { docker ps; docker logs telemetry-api --tail 300; exit 1; }
+          [ "$ok" = "1" ] || { docker compose ps; docker compose logs --tail 300; exit 1; }
 
       - name: Sanity check container
         run: |
