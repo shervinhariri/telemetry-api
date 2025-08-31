@@ -31,42 +31,20 @@ jobs:
         run: |
           set -euo pipefail
           docker compose -f docker-compose.yml up -d --build --wait
-          echo "==== docker ps ===="
           docker ps --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}'
-          echo "==== health statuses ===="
-          for id in $(docker ps -q); do
-            docker inspect -f '{{.Name}} -> {{if .State.Health}}{{.State.Health.Status}}{{else}}(no health){{end}}' "$id" || true
-          done
-          # We expose 8080 explicitly above; set env for later steps
-          echo "API_BASE=http://127.0.0.1:8080" >> "$GITHUB_ENV"
-          echo "HEALTH_PATH=/v1/healthz" >> "$GITHUB_ENV"
+          echo "API_BASE=http://127.0.0.1" >> "$GITHUB_ENV"
+          echo "HEALTH_PATH=/v1/health" >> "$GITHUB_ENV"
 
-      - name: HTTP smoke check (authenticated & unauth)
-        env:
-          API_KEY: TEST_ADMIN_KEY
+      - name: HTTP smoke check
         run: |
           set -euo pipefail
-          : "${API_BASE:?missing}"; : "${HEALTH_PATH:?missing}"
           for i in $(seq 1 60); do
             code=$(curl -sS --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "${API_BASE}${HEALTH_PATH}" || true)
-            if [ "$code" = "200" ]; then
-              echo "Healthy (unauth) at ${API_BASE}${HEALTH_PATH}"
-              exit 0
-            fi
-            code=$(curl -sS --connect-timeout 1 --max-time 2 -H "x-api-key: ${API_KEY}" -o /dev/null -w '%{http_code}' "${API_BASE}${HEALTH_PATH}" || true)
-            if [ "$code" = "200" ]; then
-              echo "Healthy (auth) at ${API_BASE}${HEALTH_PATH}"
-              exit 0
-            fi
+            echo "try $i -> $code"
+            [ "$code" = "200" ] && exit 0
             sleep 1
           done
-          echo "API never became healthy (last status: $code)"
-          for id in $(docker ps -q); do
-            name=$(docker inspect -f '{{.Name}}' "$id" | sed 's#^/##')
-            echo "----- $name ($id) logs tail -----"
-            docker logs --tail=200 "$id" || true
-          done
-          exit 1
+          echo "Health never reached 200"; exit 1
 
       - name: Sanity check container
         run: |
