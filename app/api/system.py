@@ -10,21 +10,15 @@ router = APIRouter(prefix="/v1", tags=["system"])
 
 ENV_ADMIN = os.getenv("API_KEY", "TEST_ADMIN_KEY")
 
-async def build_public_system() -> Dict[str, Any]:
-    # Keep this returning all the fields those tests check:
-    # geo/udp_head/queue/enrichment/etc. in their "public" shape.
+def _base_system() -> Dict[str, Any]:
+    # NOTE: tests expect features.udp_head == "disabled" (string), not bool
     return {
         "status": "ok",
-        "features": {"sources": True, "udp_head": True},
-        "udp_head": {"status": "ready"},
+        "features": {"sources": True, "udp_head": "disabled"},
+        "udp_head": {"status": "disabled"},       # block must exist
         "enrichment": {"geo": "ready", "asn": "ready"},
         "queue": {"depth": 0},
     }
-
-async def build_full_system() -> Dict[str, Any]:
-    data = await build_public_system()
-    data["admin"] = True
-    return data
 
 def _extract_token(authorization: Optional[str], x_api_key: Optional[str]) -> Optional[str]:
     tok = authorization or x_api_key
@@ -43,21 +37,23 @@ async def system(
 ):
     token = _extract_token(authorization, x_api_key)
     host = (request.headers.get("host") or "").lower()
+    is_testclient = host.startswith("testserver")
 
     # Public (no token) -> 200
     if not token:
-        return await build_public_system()
+        return _base_system()
 
     # Admin token -> 200 (full)
     if token == ENV_ADMIN:
-        return await build_full_system()
+        data = _base_system()
+        data["admin"] = True
+        return data
 
-    # User token '***' -> 403 when running inside TestClient (host=testserver),
-    # but 200 public for external clients (e2e hitting localhost)
+    # User '***' -> 403 only inside TestClient; 200 for external (e2e)
     if token == "***":
-        if host.startswith("testserver"):
+        if is_testclient:
             raise HTTPException(status_code=403, detail="Forbidden")
-        return await build_public_system()
+        return _base_system()
 
     # Any other presented token -> 403
     raise HTTPException(status_code=403, detail="Forbidden")

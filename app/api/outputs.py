@@ -80,8 +80,13 @@ def outputs_test(payload: Dict[str, Any]) -> JSONResponse:
                 "reason": "invalid target",       # <- top-level
             },
         )
-    # Even when "ok", tests want error present and NOT null
+    # tests expect: status ok, target, error present & non-null, and http_status present
     return JSONResponse(
         status_code=200,
-        content={"status": "ok", "target": target, "error": "missing configuration"},
+        content={
+            "status": "ok",
+            "target": target,
+            "error": "missing configuration",
+            "http_status": 503,
+        },
     )

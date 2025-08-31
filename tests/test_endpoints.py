@@ -24,6 +24,8 @@ def make_request(method: str, path: str, payload=None):
             resp = requests.post(url, json=payload, headers=headers)
         elif method == "PUT":
             resp = requests.put(url, json=payload, headers=headers)
+        elif method == "DELETE":
+            resp = requests.delete(url, headers=headers)
         else:
             raise ValueError(f"Unsupported method {method}")
         resp.raise_for_status()
