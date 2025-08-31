@@ -11,7 +11,12 @@ BASE_URL = os.getenv("API_BASE_URL", "http://localhost:80")
 
 def test_system_endpoint_basic(client):
     """Test basic system endpoint response"""
-    response = client.get("/v1/system")
+    if hasattr(client, 'app'):
+        # TestClient
+        response = client.get("/v1/system")
+    else:
+        # requests.Session
+        response = client.get(f"{BASE_URL}/v1/system")
     assert response.status_code == 200
     
     data = response.json()
@@ -27,7 +32,10 @@ def test_system_endpoint_udp_head_disabled(client):
     """Test system endpoint with UDP head disabled"""
     with patch('app.config.FEATURES', {'sources': True, 'udp_head': False}), \
          patch('app.udp_head.get_udp_head_status', return_value='disabled'):
-        response = client.get("/v1/system")
+        if hasattr(client, 'app'):
+            response = client.get("/v1/system")
+        else:
+            response = client.get(f"{BASE_URL}/v1/system")
         assert response.status_code == 200
         
         data = response.json()
@@ -37,7 +45,10 @@ def test_system_endpoint_udp_head_enabled(client):
     """Test system endpoint with UDP head enabled"""
     with patch('app.config.FEATURES', {'sources': True, 'udp_head': True}), \
          patch('app.udp_head.get_udp_head_status', return_value='ready'):
-        response = client.get("/v1/system")
+        if hasattr(client, 'app'):
+            response = client.get("/v1/system")
+        else:
+            response = client.get(f"{BASE_URL}/v1/system")
         assert response.status_code == 200
         
         data = response.json()
@@ -45,7 +56,10 @@ def test_system_endpoint_udp_head_enabled(client):
 
 def test_system_endpoint_queue_info(client):
     """Test system endpoint includes queue information"""
-    response = client.get("/v1/system")
+    if hasattr(client, 'app'):
+        response = client.get("/v1/system")
+    else:
+        response = client.get(f"{BASE_URL}/v1/system")
     assert response.status_code == 200
     
     data = response.json()
@@ -59,7 +73,10 @@ def test_system_endpoint_queue_info(client):
 
 def test_system_endpoint_enrichment_status(client):
     """Test system endpoint includes enrichment status"""
-    response = client.get("/v1/system")
+    if hasattr(client, 'app'):
+        response = client.get("/v1/system")
+    else:
+        response = client.get(f"{BASE_URL}/v1/system")
     assert response.status_code == 200
     
     data = response.json()
@@ -86,9 +103,8 @@ def test_system_endpoint_requires_auth(client):
     # Create a session without auth headers
     import requests
     s = requests.Session()
-    # For local testing, use the TestClient without auth
     if hasattr(client, 'app'):
-        # Clear the default Authorization header
+        # TestClient without auth
         client.headers = {}
         response = client.get("/v1/system")
     else:
@@ -101,7 +117,6 @@ def test_system_endpoint_requires_admin_scope(client):
     import requests
     s = requests.Session()
     s.headers.update({"Authorization": "Bearer TEST_KEY"})
-    # For local testing, use the TestClient with different auth
     if hasattr(client, 'app'):
         response = client.get("/v1/system", headers={"Authorization": "Bearer TEST_KEY"})
     else:

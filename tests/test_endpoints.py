@@ -12,33 +12,24 @@ from typing import Dict, Any
 
 BASE_URL = os.getenv("API_BASE_URL", "http://localhost:80")
 API_KEY = os.getenv("API_KEY", "TEST_ADMIN_KEY")
+AUTH     = f"Bearer {API_KEY}"
 
-def make_request(method: str, endpoint: str, data: Dict[str, Any] = None, headers: Dict[str, str] = None) -> Dict[str, Any]:
-    """Make a request to the API"""
-    url = f"{BASE_URL}{endpoint}"
-    real_headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
-    log_headers = {**real_headers, "Authorization": "***"}  # mask logs only
-    
-    if headers:
-        real_headers.update(headers)
-        log_headers.update(headers)
-    
+def make_request(method: str, path: str, payload=None):
+    url = f"{BASE_URL}{path}"
+    headers = {"Authorization": AUTH, "Content-Type": "application/json"}
     try:
         if method == "GET":
-            response = requests.get(url, headers=real_headers)
+            resp = requests.get(url, headers=headers)
         elif method == "POST":
-            response = requests.post(url, json=data, headers=real_headers)
+            resp = requests.post(url, json=payload, headers=headers)
         elif method == "PUT":
-            response = requests.put(url, json=data, headers=real_headers)
-        elif method == "DELETE":
-            response = requests.delete(url, headers=real_headers)
+            resp = requests.put(url, json=payload, headers=headers)
         else:
-            raise ValueError(f"Unsupported method: {method}")
-        
-        response.raise_for_status()
-        return response.json() if response.content else {}
+            raise ValueError(f"Unsupported method {method}")
+        resp.raise_for_status()
+        return resp.json() if resp.content else {}
     except requests.exceptions.RequestException as e:
-        print(f"❌ {method} {endpoint} failed: {e}")
+        print(f"❌ {method} {path} failed: {e}")
         return None
 
 def test_health():

@@ -91,8 +91,9 @@ async def lifespan(application: FastAPI):
         from .db_boot import bootstrap_db
         from .db import engine
         bootstrap_db(engine)
+        logger.info("DB_BOOT: idempotent bootstrap completed")
     except Exception as e:
-        logger.error("DB_BOOTSTRAP failed: %s", e)
+        logger.error("DB_BOOTSTRAP failed (non-fatal): %s", e)
     
     # Rewrite any legacy non-JSON scopes to a valid JSON array
     try:
