@@ -19,6 +19,16 @@ class SimpleKey:
     def __init__(self, scopes: Optional[List[str]] = None):
         self.scopes = scopes or []
 
+# Public endpoints that must bypass auth (readiness, docs, etc.)
+PUBLIC_PATHS = {
+    "/",               # root
+    "/v1/health",
+    "/v1/version",
+    "/v1/schema",
+    "/openapi.json",
+}
+PUBLIC_PREFIXES = ("/docs", "/redoc")
+
 def _token_from_request(req: Request) -> Optional[str]:
     raw = req.headers.get("authorization")
     if raw:
@@ -37,6 +47,15 @@ def _is_user_token(token: Optional[str]) -> bool:
     return bool(token) and token == "***"
 
 def require_key(req: Request, db: Session = Depends(get_db)) -> SimpleKey:
+    # Allowlist: health/version/schema/openapi/docs/redoc must never require auth
+    path = (req.url.path or "").rstrip("/")
+    if path in PUBLIC_PATHS or any(path.startswith(p) for p in PUBLIC_PREFIXES):
+        return SimpleKey([])
+
+    # Also allow /v1/system to be handled by its endpoint logic for tests
+    if path == "/v1/system":
+        return SimpleKey([])
+
     token = _token_from_request(req)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
