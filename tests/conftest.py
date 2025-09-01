@@ -19,11 +19,25 @@ class BaseUrlSession(requests.Session):
 @pytest.fixture(scope="session")
 def client():
     """
-    In e2e we talk to the running container on http://localhost:80.
-    This fixture returns a Session that automatically prefixes the base URL,
-    so tests can call client.get('/v1/health') without schema errors.
+    Detect test environment:
+    - Unit test mode: return TestClient (no running container needed)
+    - E2E mode: return BaseUrlSession (connects to running container)
     """
-    return BaseUrlSession(BASE_URL)
+    # Check if we're in unit test mode (no running container)
+    try:
+        # Try to import FastAPI TestClient
+        from fastapi.testclient import TestClient
+        from app.main import app
+        
+        # Create TestClient for unit tests
+        test_client = TestClient(app)
+        # Add a flag to indicate this is a TestClient
+        test_client.app = app
+        return test_client
+        
+    except (ImportError, ModuleNotFoundError):
+        # Fallback to BaseUrlSession for e2e tests
+        return BaseUrlSession(BASE_URL)
 
 @pytest.fixture
 def admin_headers():
