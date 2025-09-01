@@ -1,6 +1,7 @@
 {
   "name": "telemetry-ui",
   "version": "1.0.0",
+  "type": "module",
   "description": "Professional Telemetry Dashboard UI",
   "main": "index.js",
   "scripts": {

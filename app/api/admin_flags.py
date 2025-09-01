@@ -2,25 +2,21 @@
 Admin Feature Flags API endpoints for runtime configuration management
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 import logging
 from typing import Dict, Any
 
 from ..config import runtime_config
 from ..services.audit import log_admin_action, get_recent_audit_logs
+from ..auth import require_admin
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 @router.get("/featureflags")
 async def get_feature_flags(request: Request):
     """Get current feature flags (admin only)"""
-    # Check if user has admin scope
-    scopes = getattr(request.state, 'scopes', [])
-    if "admin" not in scopes:
-        raise HTTPException(status_code=403, detail="Admin scope required")
-    
     try:
         return runtime_config.get_all()
     except Exception as e:
@@ -30,11 +26,6 @@ async def get_feature_flags(request: Request):
 @router.patch("/featureflags")
 async def update_feature_flags(request: Request):
     """Update feature flags (admin only)"""
-    # Check if user has admin scope
-    scopes = getattr(request.state, 'scopes', [])
-    if "admin" not in scopes:
-        raise HTTPException(status_code=403, detail="Admin scope required")
-    
     try:
         payload = await request.json()
         
@@ -75,11 +66,6 @@ async def update_feature_flags(request: Request):
 @router.get("/audit")
 async def get_audit_logs(request: Request, limit: int = 100):
     """Get recent admin audit logs (admin only)"""
-    # Check if user has admin scope
-    scopes = getattr(request.state, 'scopes', [])
-    if "admin" not in scopes:
-        raise HTTPException(status_code=403, detail="Admin scope required")
-    
     try:
         logs = get_recent_audit_logs(limit=min(limit, 1000))  # Cap at 1000
         return {"audit_logs": logs, "count": len(logs)}

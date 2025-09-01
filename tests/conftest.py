@@ -1,74 +1,52 @@
-import pytest
+# tests/conftest.py
 import os
-import sys
-from fastapi.testclient import TestClient
+import pytest
+import requests
 
-# Add the app directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+BASE_URL = os.getenv("BASE_URL") or os.getenv("APP_BASE_URL") or "http://localhost:80"
 
-from app.main import app
-from app.db import engine, Base
-from app.models.tenant import Tenant
-from app.models.apikey import ApiKey
-import hashlib
+class BaseUrlSession(requests.Session):
+    def __init__(self, base_url: str):
+        super().__init__()
+        self._base = base_url.rstrip("/")
+
+    def request(self, method, url, *args, **kwargs):
+        # Allow relative paths like "/v1/health"
+        if not url.lower().startswith("http"):
+            url = f"{self._base}/{url.lstrip('/')}"
+        return super().request(method, url, *args, **kwargs)
 
 @pytest.fixture(scope="session")
-def test_db():
-    """Set up test database - in container, database is already initialized"""
-    # In the container environment, the database is already initialized by bootstrap
-    # We just need to ensure the test API key exists
-    from sqlalchemy.orm import sessionmaker
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    
-    # Check if test admin API key exists, create if not
-    test_admin_key = "TEST_ADMIN_KEY"
-    key_hash = hashlib.sha256(test_admin_key.encode()).hexdigest()
-    
-    api_key = session.query(ApiKey).filter_by(hash=key_hash).first()
-    if not api_key:
-        # Create test admin API key
-        api_key = ApiKey(
-            key_id="test-admin", 
-            tenant_id="default", 
-            hash=key_hash,
-            scopes=["admin", "ingest", "read_metrics", "export", "manage_indicators"]
-        )
-        session.add(api_key)
-        session.commit()
-    
-    # Check if test user API key exists, create if not
-    test_user_key = "user-key"
-    user_key_hash = hashlib.sha256(test_user_key.encode()).hexdigest()
-    
-    user_api_key = session.query(ApiKey).filter_by(hash=user_key_hash).first()
-    if not user_api_key:
-        # Create test user API key (no admin scope)
-        user_api_key = ApiKey(
-            key_id="test-user", 
-            tenant_id="default", 
-            hash=user_key_hash,
-            scopes=["ingest", "read_metrics"]  # No admin scope
-        )
-        session.add(user_api_key)
-        session.commit()
-    
-    session.close()
-    
-    yield
-
-@pytest.fixture
-def client(test_db):
-    """Test client with initialized database"""
-    with TestClient(app) as test_client:
-        yield test_client
+def client():
+    """
+    Detect test environment:
+    - Unit test mode: return TestClient (no running container needed)
+    - E2E mode: return BaseUrlSession (connects to running container)
+    """
+    # Check if we're in unit test mode (no running container)
+    try:
+        # Try to import FastAPI TestClient
+        from fastapi.testclient import TestClient
+        from app.main import app
+        
+        # Create TestClient for unit tests
+        test_client = TestClient(app)
+        # Add a flag to indicate this is a TestClient
+        test_client.app = app
+        return test_client
+        
+    except (ImportError, ModuleNotFoundError):
+        # Fallback to BaseUrlSession for e2e tests
+        return BaseUrlSession(BASE_URL)
 
 @pytest.fixture
 def admin_headers():
-    """Headers with admin API key"""
-    return {"Authorization": "Bearer TEST_ADMIN_KEY"}
+    # Use new key management system with fallback to legacy
+    admin_key = os.getenv("TEST_API_KEY") or os.getenv("DEV_ADMIN_KEY") or os.getenv("API_KEY") or "DEV_ADMIN_KEY_5a8f9ffdc3"
+    return {"Authorization": f"Bearer {admin_key}"}
 
 @pytest.fixture
 def user_headers():
-    """Headers with user API key (no admin)"""
-    return {"Authorization": "Bearer user-key"}
+    # Non-admin key used by several tests
+    user_key = os.getenv("DEV_USER_KEY") or "***"
+    return {"Authorization": f"Bearer {user_key}"}

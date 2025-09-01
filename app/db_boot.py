@@ -1,61 +1,61 @@
 # app/db_boot.py
-import os, time, hashlib, logging
-from sqlalchemy import text
-from .db import SessionLocal
+import os, json, hashlib, logging
+from sqlalchemy.exc import IntegrityError
+from .db import engine, Base, SessionLocal
+from .models.tenant import Tenant
+from .models.apikey import ApiKey
 
-log = logging.getLogger("telemetry")
+log = logging.getLogger("bootstrap")
 
-DDL_API_KEYS = """
-CREATE TABLE IF NOT EXISTS api_keys (
-  key_id TEXT PRIMARY KEY,
-  tenant_id TEXT,
-  hash TEXT,
-  scopes TEXT,
-  disabled INTEGER DEFAULT 0,
-  created_at TEXT
-)
-"""
+def _sha256(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
-def _sha(s: str) -> str:
-    return hashlib.sha256(s.encode()).hexdigest()
+def _upsert_key(session, key_id, raw_token, scopes, disabled=False):
+    h = _sha256(raw_token)
+    row = session.query(ApiKey).filter(ApiKey.key_id == key_id).one_or_none()
+    if row:
+        row.hash = h
+        row.scopes = json.dumps(scopes)
+        row.disabled = disabled
+        session.commit()
+        return "updated"
+    try:
+        session.add(ApiKey(
+            key_id=key_id, tenant_id="default",
+            hash=h, scopes=json.dumps(scopes), disabled=disabled
+        ))
+        session.commit()
+        return "inserted"
+    except IntegrityError:
+        session.rollback()
+        return "skipped"
 
-def ensure_schema_and_seed_keys():
-    with SessionLocal() as db:
-        # 1) Ensure schema
-        db.execute(text(DDL_API_KEYS))
-        db.commit()
+def bootstrap_db():
+    Base.metadata.create_all(bind=engine)
+    # run migrations if you want (safe no-op if already done)
 
-        # 2) Seed defaults if empty OR ensure presence of provided keys
-        res = db.execute(text("SELECT COUNT(*) FROM api_keys"))
-        count = int(list(res)[0][0])
+    s = SessionLocal()
+    try:
+        if not s.query(Tenant).filter_by(tenant_id="default").one_or_none():
+            s.add(Tenant(tenant_id="default", name="Default"))
+            s.commit()
 
-        env_keys = os.getenv("TELEMETRY_SEED_KEYS", "TEST_ADMIN_KEY,DEV_ADMIN_KEY_5a8f9ffdc3")
-        tokens = [t.strip() for t in env_keys.split(",") if t.strip()]
+        admin_scopes = ["admin", "ingest", "read_metrics", "export", "manage_indicators"]
+        user_scopes  = ["ingest", "read_metrics"]
 
-        # ensure each token exists (idempotent)
-        for tok in tokens:
-            h = _sha(tok)
-            key_id = f"seed-{h[:8]}"
-            scopes = '["admin","*"]'  # JSON array format
-            
-            db.execute(text("""
-            INSERT INTO api_keys (key_id, tenant_id, hash, scopes, disabled, created_at)
-            VALUES (:key_id, :tenant, :hash, :scopes, 0, :ts)
-            ON CONFLICT(key_id) DO UPDATE SET hash=excluded.hash, scopes=excluded.scopes
-            """), dict(
-                key_id=key_id,
-                tenant="default",
-                hash=h,
-                scopes=scopes,
-                ts=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            ))
-            log.info("DB_BOOT: seeded key_id=%s scopes=%s", key_id, scopes)
-        
-        db.commit()
+        # Admin key(s)
+        admin_token = os.getenv("API_KEY", "TEST_ADMIN_KEY")
+        _upsert_key(s, "admin", admin_token, admin_scopes)
 
-        # 3) Diagnostic: show what we have
-        res = db.execute(text("SELECT key_id, scopes, disabled FROM api_keys"))
-        keys = res.fetchall()
-        log.info("DB_BOOT: ensured schema; total_keys=%d (seeded=%d)", len(keys), len(tokens))
-        for key in keys[:2]:  # Show first 2 keys with their scopes
-            log.info("DB_BOOT: key_id=%s scopes=%s disabled=%s", key[0], key[1], key[2])
+        # Additional admin keys (CI passes TELEMETRY_SEED_KEYS)
+        extra = os.getenv("TELEMETRY_SEED_KEYS", "")
+        for idx, tok in enumerate([t.strip() for t in extra.split(",") if t.strip()]):
+            _upsert_key(s, f"admin_{idx+1}", tok, admin_scopes)
+
+        # Non-admin user key used by tests
+        user_token = os.getenv("USER_API_KEY", "***")
+        _upsert_key(s, "user", user_token, user_scopes)
+
+        log.info("DB_BOOT: seeded admin/user API keys")
+    finally:
+        s.close()

@@ -69,6 +69,10 @@ class MetricsAggregator:
         self.export_failed_total = {"splunk": {}, "elastic": {}}
         self.export_test_total = {"splunk": 0, "elastic": 0}
         
+        # P1 T4: Output test counters
+        self.outputs_test_success_total = {"splunk": 0, "elastic": 0}
+        self.outputs_test_fail_total = {"splunk": 0, "elastic": 0}
+        
         # Per-source counters and ring buffers
         self.source_admitted_total = {}  # source_id -> count
         self.source_dropped_total = {}   # source_id -> {reason -> count}
@@ -176,6 +180,18 @@ class MetricsAggregator:
     def record_export_test(self, dest: str, count: int = 1):
         with self.lock:
             self.export_test_total[dest] = self.export_test_total.get(dest, 0) + count
+    
+    def record_outputs_test_success(self, target: str):
+        """Record successful output test"""
+        with self.lock:
+            self.outputs_test_success_total[target] = self.outputs_test_success_total.get(target, 0) + 1
+            prometheus_metrics.increment_outputs_test_success(target)
+    
+    def record_outputs_test_fail(self, target: str):
+        """Record failed output test"""
+        with self.lock:
+            self.outputs_test_fail_total[target] = self.outputs_test_fail_total.get(target, 0) + 1
+            prometheus_metrics.increment_outputs_test_fail(target)
             
     # ----- Per-source accounting -----
     def record_source_admitted(self, source_id: str, count: int = 1):
@@ -225,6 +241,31 @@ class MetricsAggregator:
             if source_id not in self.source_error_buffers or not self.source_error_buffers[source_id]:
                 return 0.0
             return sum(self.source_error_buffers[source_id]) / len(self.source_error_buffers[source_id])
+    
+    def _get_udp_head_metrics(self) -> Dict[str, Any]:
+        """Get UDP head metrics"""
+        try:
+            from .udp_head import get_udp_stats
+            stats = get_udp_stats()
+            return {
+                "ready": stats["ready"],
+                "bind_errors": stats["bind_errors"],
+                "datagrams_total": stats["datagrams_total"],
+                "packets_total": stats["packets_total"],
+                "bytes_total": stats["bytes_total"],
+                "last_packet_ts": stats["last_packet_ts"],
+                "port": stats["port"]
+            }
+        except Exception:
+            return {
+                "ready": False,
+                "bind_errors": 0,
+                "datagrams_total": 0,
+                "packets_total": 0,
+                "bytes_total": 0,
+                "last_packet_ts": 0.0,
+                "port": None
+            }
             
     def tick(self):
         """Background tick to roll windows and update time series"""
@@ -337,7 +378,15 @@ class MetricsAggregator:
                     "test_total": self.export_test_total.copy()
                 },
                 "source_admitted_total": self.source_admitted_total.copy(),
-                "source_dropped_total": self.source_dropped_total.copy()
+                "source_dropped_total": self.source_dropped_total.copy(),
+                "udp_head": self._get_udp_head_metrics(),
+                # P1: Additional UDP head metrics
+                "udp_head_packets_total": self._get_udp_head_metrics().get("packets_total", 0),
+                "udp_head_bytes_total": self._get_udp_head_metrics().get("bytes_total", 0),
+                "udp_head_last_packet_ts": self._get_udp_head_metrics().get("last_packet_ts", 0.0),
+                # P1 T4: Output test metrics
+                "outputs_test_success_total": self.outputs_test_success_total.copy(),
+                "outputs_test_fail_total": self.outputs_test_fail_total.copy()
             }
             
     def record_event(self, risk_score: int, threat_matches: int):
@@ -417,6 +466,14 @@ def record_export_failed(dest: str, reason: str, count: int = 1):
 def record_export_test(dest: str, count: int = 1):
     """Record export test attempts"""
     metrics.record_export_test(dest, count)
+
+def record_outputs_test_success(target: str):
+    """Record successful output test"""
+    metrics.record_outputs_test_success(target)
+
+def record_outputs_test_fail(target: str):
+    """Record failed output test"""
+    metrics.record_outputs_test_fail(target)
 
 def record_source_admitted(source_id: str, count: int = 1):
     """Record admitted events for source"""

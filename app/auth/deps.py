@@ -4,8 +4,10 @@ import os
 import re
 import time
 import json
+import hashlib
 from sqlalchemy.exc import OperationalError
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.models.apikey import ApiKey
 from app.models.tenant import Tenant
@@ -44,11 +46,13 @@ async def authenticate(request: Request):
     # Try X-API-Key or X-Api-Key headers first
     token = request.headers.get("X-API-Key") or request.headers.get("X-Api-Key")
     
-    # Fallback to Authorization Bearer header
+    # Fallback to Authorization header (Bearer or raw token)
     if not token:
         auth = request.headers.get("authorization", "") or request.headers.get("Authorization", "")
         if auth.lower().startswith("bearer "):
             token = auth.split(" ", 1)[1].strip()
+        elif auth.strip():  # Also allow raw "Authorization: <token>"
+            token = auth.strip()
     
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
@@ -128,4 +132,64 @@ def require_scopes(*allowed: str):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden: missing scope")
 
     return dep
+
+def require_admin():
+    """Require admin scope specifically"""
+    return require_scopes("admin")
+
+def _sha256(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def _norm_scopes_list(scopes) -> list:
+    if scopes is None:
+        return []
+    if isinstance(scopes, list):
+        return scopes
+    if isinstance(scopes, str):
+        try:
+            val = json.loads(scopes)
+            return val if isinstance(val, list) else []
+        except Exception:
+            return []
+    return []
+
+# New auth functions for multiple header format support
+def _extract_token(req: Request) -> str:
+    # Authorization: Bearer <token>   OR   Authorization: <token>
+    auth = req.headers.get("authorization") or req.headers.get("Authorization")
+    if auth:
+        parts = auth.strip().split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return parts[1]
+        if len(parts) == 1:
+            return parts[0]
+    # X-API-Key: <token>
+    x = req.headers.get("x-api-key") or req.headers.get("X-API-Key")
+    if x:
+        return x.strip()
+    return ""
+
+def require_key(req: Request, db: Session = Depends(get_db)) -> ApiKey:
+    token = _extract_token(req)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
+    h = _sha256(token)
+    key = db.query(ApiKey).filter(ApiKey.hash == h, ApiKey.disabled == False).one_or_none()
+    if not key:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+    key._norm_scopes = _norm_scopes_list(key.scopes)
+    return key
+
+def require_admin_new(key: ApiKey = Depends(require_key)) -> ApiKey:
+    scopes = getattr(key, "_norm_scopes", _norm_scopes_list(key.scopes))
+    if "admin" not in scopes and "*" not in scopes:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin scope required")
+    return key
 

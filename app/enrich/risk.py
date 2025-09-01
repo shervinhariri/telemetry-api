@@ -1,54 +1,87 @@
-from typing import Dict, Any, List
+"""
+Risk scoring module
+Calculates risk scores based on threat intelligence matches and other factors
+"""
 
-class RiskScorer:
-    def __init__(self):
-        # Risky destination ports
-        self.risky_ports = {23, 445, 1433, 3389}
-        
-    def score(self, event: Dict[str, Any], ti_matches: List[str]) -> int:
-        """
-        Calculate risk score for an event
-        
-        Deterministic v1 rubric:
-        - Base = 10
-        - +60 if TI match
-        - +10 if dst_port in {23,445,1433,3389} or src_port ephemeral + high bytes
-        - +5 if geo country != tenant_country (if available)
-        - Clamp 0..100
-        """
-        score = 10  # Base score
-        
-        # Threat intelligence match (heaviest weight)
-        if ti_matches:
-            score += 60
-            
-        # Risky destination ports
-        dst_port = event.get('dst_port') or event.get('id_resp_p')
-        if dst_port and dst_port in self.risky_ports:
-            score += 10
-            
-        # High bytes with ephemeral source port
-        src_port = event.get('src_port') or event.get('id_orig_p')
-        bytes_field = event.get('bytes') or event.get('orig_bytes', 0) or event.get('resp_bytes', 0)
-        
-        if src_port and bytes_field:
-            # Check if source port is ephemeral (1024-65535) and bytes > 1MB
-            if 1024 <= src_port <= 65535 and bytes_field > 1_000_000:
-                score += 10
-                
-        # Geographic risk (if tenant country is available)
-        # This would require tenant context - for now, skip this factor
-        # tenant_country = get_tenant_country()
-        # geo_country = event.get('geo', {}).get('country')
-        # if tenant_country and geo_country and geo_country != tenant_country:
-        #     score += 5
-            
-        # Clamp to 0-100 range
-        return max(0, min(100, score))
+from typing import Any, Dict, List
+import ipaddress
 
-# Global instance
-risk_scorer = RiskScorer()
+RISKY_PORTS = {3389, 445}  # RDP, SMB
+BYTES_THRESHOLD = 2_000_000  # 2MB
 
-def score(event: Dict[str, Any], ti_matches: List[str]) -> int:
-    """Convenience function to score an event"""
-    return risk_scorer.score(event, ti_matches)
+def _ip_in_list(ip: str, matches: List[Any]) -> bool:
+    """Accept either list of dicts (with 'value' or 'cidr') or strings (CIDR/IP)."""
+    if not ip:
+        return False
+    for m in matches or []:
+        if isinstance(m, dict):
+            cidr = m.get("value") or m.get("cidr")
+        else:
+            cidr = str(m)
+        try:
+            if "/" in cidr:
+                if ipaddress.ip_address(ip) in ipaddress.ip_network(cidr, strict=False):
+                    return True
+            else:
+                if ip == cidr:
+                    return True
+        except Exception:
+            continue
+    return False
+
+def _normalize(record: Dict[str, Any]) -> Dict[str, Any]:
+    # Accept NetFlow-ish and Zeek conn-ish fields
+    src_ip = record.get("src_ip") or record.get("id_orig_h") or record.get("id.orig_h")
+    dst_ip = record.get("dst_ip") or record.get("id_resp_h") or record.get("id.resp_h")
+    dst_port = (
+        record.get("dst_port")
+        or record.get("id_resp_p")
+        or record.get("id.resp_p")
+    )
+    # bytes can be in different fields
+    bytes_total = record.get("bytes")
+    if bytes_total is None:
+        # zeek conn approximation: orig_bytes + resp_bytes
+        ob = record.get("orig_bytes")
+        rb = record.get("resp_bytes")
+        if ob is not None or rb is not None:
+            try:
+                bytes_total = int(ob or 0) + int(rb or 0)
+            except Exception:
+                bytes_total = None
+    return {"src_ip": src_ip, "dst_ip": dst_ip, "dst_port": dst_port, "bytes": bytes_total}
+
+def clamp(n: int, lo=0, hi=100) -> int:
+    return max(lo, min(hi, n))
+
+def score(record: Dict[str, Any], ti_matches: List[Any]) -> int:
+    """
+    Contract: if ti_matches is non-empty, the event ALREADY matched threat intel.
+    Do not try to re-evaluate CIDRs here.
+    """
+    r = _normalize(record)
+    s = 10  # base
+
+    # TI boost: any non-empty match list means matched
+    if ti_matches:
+        s += 60
+
+    # risky destination ports
+    if r["dst_port"] in RISKY_PORTS:
+        s += 10
+
+    # bytes boost ONLY when client/orig port is ephemeral (>=1024)
+    orig_p = (
+        record.get("id.orig_p") or record.get("id_orig_p") or
+        record.get("src_port") or 0
+    )
+    try:
+        orig_p = int(orig_p)
+    except Exception:
+        orig_p = 0
+
+    if orig_p >= 1024:
+        if int(record.get("orig_bytes") or 0) > 1_000_000 or int(r["bytes"] or 0) > 1_000_000:
+            s += 10
+
+    return clamp(int(s))

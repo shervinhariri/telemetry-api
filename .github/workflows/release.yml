@@ -56,7 +56,6 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:${{ env.VERSION }}
             ${{ env.IMAGE }}:${{ env.GOLDEN_TAG }}
-            ${{ env.IMAGE }}:latest
           provenance: false
 
       - name: Show digest

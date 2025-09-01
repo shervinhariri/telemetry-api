@@ -7,35 +7,31 @@ import requests
 import json
 import time
 import random
+import os
 from typing import Dict, Any
 
-BASE_URL = "http://localhost"
-API_KEY = "TEST_ADMIN_KEY"
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:80")
+API_KEY = os.getenv("API_KEY", "TEST_ADMIN_KEY")
+AUTH     = f"Bearer {API_KEY}"
 
-def make_request(method: str, endpoint: str, data: Dict[str, Any] = None, headers: Dict[str, str] = None) -> Dict[str, Any]:
-    """Make a request to the API"""
-    url = f"{BASE_URL}{endpoint}"
-    auth_headers = {"Authorization": f"Bearer {API_KEY}"}
-    
-    if headers:
-        auth_headers.update(headers)
-    
+def make_request(method: str, path: str, payload=None):
+    url = f"{BASE_URL}{path}"
+    headers = {"Authorization": AUTH, "Content-Type": "application/json"}
     try:
         if method == "GET":
-            response = requests.get(url, headers=auth_headers)
+            resp = requests.get(url, headers=headers)
         elif method == "POST":
-            response = requests.post(url, json=data, headers=auth_headers)
+            resp = requests.post(url, json=payload, headers=headers)
         elif method == "PUT":
-            response = requests.put(url, json=data, headers=auth_headers)
+            resp = requests.put(url, json=payload, headers=headers)
         elif method == "DELETE":
-            response = requests.delete(url, headers=auth_headers)
+            resp = requests.delete(url, headers=headers)
         else:
-            raise ValueError(f"Unsupported method: {method}")
-        
-        response.raise_for_status()
-        return response.json()
+            raise ValueError(f"Unsupported method {method}")
+        resp.raise_for_status()
+        return resp.json() if resp.content else {}
     except requests.exceptions.RequestException as e:
-        print(f"❌ {method} {endpoint} failed: {e}")
+        print(f"❌ {method} {path} failed: {e}")
         return None
 
 def test_health():
@@ -57,26 +53,22 @@ def test_ingest_zeek():
     """Test Zeek ingest endpoint"""
     print("🔍 Testing /v1/ingest/zeek...")
     
-    # Create sample data instead of loading from file
-    zeek_data = {
-        "collector_id": "test-zeek",
-        "format": "zeek.conn",
-        "records": [
-            {
-                "ts": 1723351200.456,
-                "uid": "C1234567890abcdef",
-                "id.orig_h": "10.1.2.3",
-                "id.orig_p": 55342,
-                "id.resp_h": "8.8.8.8",
-                "id.resp_p": 53,
-                "proto": "udp",
-                "service": "dns",
-                "duration": 0.025,
-                "orig_bytes": 78,
-                "resp_bytes": 256
-            }
-        ]
-    }
+    # Use canonical JSON array format for /v1/ingest
+    zeek_data = [
+        {
+            "ts": 1723351200.456,
+            "uid": "C1234567890abcdef",
+            "id.orig_h": "10.1.2.3",
+            "id.orig_p": 55342,
+            "id.resp_h": "8.8.8.8",
+            "id.resp_p": 53,
+            "proto": "udp",
+            "service": "dns",
+            "duration": 0.025,
+            "orig_bytes": 78,
+            "resp_bytes": 256
+        }
+    ]
     
     result = make_request("POST", "/v1/ingest", zeek_data)
     assert result is not None, "Zeek ingest request failed"
@@ -87,23 +79,19 @@ def test_ingest_netflow():
     """Test NetFlow ingest endpoint"""
     print("🔍 Testing /v1/ingest/netflow...")
     
-    # Create sample data instead of loading from file
-    netflow_data = {
-        "collector_id": "test-netflow",
-        "format": "flows.v1",
-        "records": [
-            {
-                "ts": 1723351200.456,
-                "src_ip": "192.168.1.100",
-                "dst_ip": "1.1.1.1",
-                "src_port": 12345,
-                "dst_port": 80,
-                "proto": "tcp",
-                "bytes": 1024,
-                "packets": 10
-            }
-        ]
-    }
+    # Use canonical JSON array format for /v1/ingest
+    netflow_data = [
+        {
+            "ts": 1723351200.456,
+            "src_ip": "192.168.1.100",
+            "dst_ip": "1.1.1.1",
+            "src_port": 12345,
+            "dst_port": 80,
+            "proto": "tcp",
+            "bytes": 1024,
+            "packets": 10
+        }
+    ]
     
     result = make_request("POST", "/v1/ingest", netflow_data)
     assert result is not None, "NetFlow ingest request failed"
@@ -191,8 +179,8 @@ def test_download():
     # For streaming endpoints, we need to handle the response differently
     try:
         response = requests.get(
-            "http://localhost/v1/download/json?limit=10",
-            headers={"Authorization": "Bearer TEST_ADMIN_KEY"},
+            f"{BASE_URL}/v1/download/json?limit=10",
+            headers={"Authorization": f"Bearer {API_KEY}"},
             stream=True
         )
         assert response.status_code == 200, f"Download endpoint failed: {response.status_code}"

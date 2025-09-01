@@ -9,8 +9,8 @@ RUN CGO_ENABLED=0 go build -o /out/goflow2 ./cmd/goflow2
 # ---- Stage 2: base image (shared dependencies) ----
 FROM python:3.11-slim@sha256:1d6131b5d479888b43200645e03a78443c7157efbdb730e6b48129740727c312 as base
 
-ARG APP_VERSION=dev
-ARG VERSION=0.0.0-dev
+ARG APP_VERSION=0.8.10
+ARG VERSION=0.8.10
 ARG GIT_SHA=dev
 ARG IMAGE=shvin/telemetry-api
 
@@ -45,8 +45,8 @@ COPY VERSION /app/VERSION
 # Copy logging configuration
 COPY LOGGING.yaml /app/LOGGING.yaml
 
-# Copy UI files
-COPY ops/ui/ui /app/ui
+# Copy NETREEX UI (not React UI)
+COPY ops/ui/ui/ /app/ui/
 
 # Copy OpenAPI spec and docs
 COPY openapi.yaml /app/openapi.yaml
@@ -80,6 +80,9 @@ EXPOSE 2055/udp
 
 # Remove default API key; keys must be provided at runtime via env/secrets
 ENV APP_PORT=80
+ENV PORT=8080 HOST=0.0.0.0
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Default MMDB/CSV mount points (read-only)
 ENV GEOIP_DB_CITY=/data/GeoLite2-City.mmdb
@@ -94,18 +97,20 @@ LABEL org.opencontainers.image.title="telemetry-api" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.description="Live Network Threat Telemetry API (MVP)"
 
-# ---- Stage 3: runtime (prod) ----
+# ---- Stage 4: runtime (prod) ----
 FROM base AS runtime
-ARG VERSION=0.0.0-dev
+ARG VERSION=0.8.10
 ENV TELEMETRY_VERSION=${VERSION}
 ENV APP_ENV=prod
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENV PORT=8080 HOST=0.0.0.0
+ENTRYPOINT ["/entrypoint.sh"]
 
-# ---- Stage 4: test (CI/e2e) ----
+# ---- Stage 5: test (CI/e2e) ----
 FROM base AS test
 # tools only for tests
 RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 && rm -rf /var/lib/apt/lists/*
 COPY requirements-dev.txt .
 RUN pip install --no-cache-dir -r requirements-dev.txt
 ENV APP_ENV=test
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENV PORT=8080 HOST=0.0.0.0
+ENTRYPOINT ["/entrypoint.sh"]
