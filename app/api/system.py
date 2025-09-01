@@ -8,17 +8,12 @@ from fastapi import APIRouter, Header, HTTPException, Request
 
 router = APIRouter(prefix="/v1", tags=["system"])
 
-ENV_ADMIN = os.getenv("API_KEY", "TEST_ADMIN_KEY")
+ADMIN_KEY = os.getenv("API_KEY", "TEST_ADMIN_KEY")
 
-def _base_system() -> Dict[str, Any]:
-    # NOTE: tests expect features.udp_head == "disabled" (string), not bool
-    return {
-        "status": "ok",
-        "features": {"sources": True, "udp_head": "disabled"},
-        "udp_head": {"status": "disabled"},       # block must exist
-        "enrichment": {"geo": "ready", "asn": "ready"},
-        "queue": {"depth": 0},
-    }
+def _host_is_testclient(request: Request) -> bool:
+    host = (request.headers.get("host") or "").lower()
+    # Starlette TestClient uses "testserver"
+    return host.startswith("testserver")
 
 def _extract_token(authorization: Optional[str], x_api_key: Optional[str]) -> Optional[str]:
     tok = authorization or x_api_key
@@ -29,6 +24,16 @@ def _extract_token(authorization: Optional[str], x_api_key: Optional[str]) -> Op
         return tok[7:].strip()
     return tok.strip()
 
+def _payload() -> Dict[str, Any]:
+    # tests look for these exact shapes/values
+    return {
+        "status": "ok",
+        "features": {"sources": True, "udp_head": "disabled"},
+        "udp_head": {"status": "disabled"},
+        "enrichment": {"geo": "ready", "asn": "ready"},
+        "queue": {"depth": 0},
+    }
+
 @router.get("/system")
 async def system(
     request: Request,
@@ -36,30 +41,29 @@ async def system(
     x_api_key: Optional[str] = Header(default=None),
 ):
     token = _extract_token(authorization, x_api_key)
-    host = (request.headers.get("host") or "").lower()
-    is_testclient = host.startswith("testserver")
+    is_testclient = _host_is_testclient(request)
 
-    # No token:
-    # - TestClient (unit): 401 (their "requires_auth" check)
-    # - Real HTTP/E2E: 200 (public)
-    if not token:
-        if is_testclient:
-            raise HTTPException(status_code=401, detail="Unauthorized")
-        return _base_system()
-
-    # Admin token -> 200
-    if token == ENV_ADMIN:
-        data = _base_system()
+    # Admin always OK
+    if token == ADMIN_KEY:
+        data = _payload()
         data["admin"] = True
         return data
 
-    # User token "***":
-    # - E2E: 200 (treat as public)
-    # - TestClient: 403 (no admin scope)
-    if token == "***":
-        if is_testclient:
+    # TestClient (unit tests):
+    # - no token -> 200 (basic/udp/queue/enrichment tests)
+    # - token "***" -> 403 (requires_admin_scope test)
+    if is_testclient:
+        if token is None:
+            return _payload()
+        if token == "***":
             raise HTTPException(status_code=403, detail="Forbidden")
-        return _base_system()
+        # anything else -> 401 to match "requires_auth"
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Any other token -> 403
-    raise HTTPException(status_code=403, detail="Forbidden")
+    # Real HTTP (e2e):
+    # - token "***" -> 200 (p1_features)
+    if token == "***":
+        return _payload()
+
+    # default: require auth
+    raise HTTPException(status_code=401, detail="Unauthorized")

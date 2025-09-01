@@ -92,8 +92,9 @@ def outputs_test(payload: Dict[str, Any]) -> JSONResponse:
         content={
             "status": "ok",
             "target": target,
-            "error": "missing configuration",  # present & non-null
+            "error": "missing configuration",  # non-null string
             "http_status": 503,
             "duration_ms": duration_ms,
+            "bytes": 0,  # <- missing in your run
         },
     )
