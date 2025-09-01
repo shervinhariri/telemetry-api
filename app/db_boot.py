@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from .db import engine, Base, SessionLocal
 from .models.tenant import Tenant
 from .models.apikey import ApiKey
+from .db_init import init_schema_and_seed_if_needed
 
 log = logging.getLogger("bootstrap")
 
@@ -31,9 +32,11 @@ def _upsert_key(session, key_id, raw_token, scopes, disabled=False):
         return "skipped"
 
 def bootstrap_db():
-    Base.metadata.create_all(bind=engine)
-    # run migrations if you want (safe no-op if already done)
-
+    # Use the comprehensive initialization that creates all tables including sources
+    init_schema_and_seed_if_needed()
+    
+    # Additional seeding for API keys (this is now handled by init_schema_and_seed_if_needed)
+    # but we keep the environment-specific key seeding here
     s = SessionLocal()
     try:
         if not s.query(Tenant).filter_by(tenant_id="default").one_or_none():
