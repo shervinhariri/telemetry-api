@@ -1,3 +1,7 @@
+# DEPRECATED: Legacy worker/queue prototype kept temporarily for reference.
+# Production path is app/queue_manager.py with Prometheus-based metrics.
+# This file will be removed after the DLQ migration and metrics unification.
+
 import asyncio
 import json
 import logging

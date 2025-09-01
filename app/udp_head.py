@@ -11,7 +11,7 @@ import time
 from typing import Optional
 from contextlib import asynccontextmanager
 from .config import FEATURES
-from .metrics import prometheus_metrics
+from .services.prometheus_metrics import prometheus_metrics
 
 # Global state
 _udp_socket: Optional[socket.socket] = None
