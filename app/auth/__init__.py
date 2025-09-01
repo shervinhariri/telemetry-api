@@ -19,12 +19,12 @@ def _extract_api_key(request: Request) -> Optional[str]:
     # 1) Authorization: Bearer <key>
     auth = request.headers.get("Authorization", "")
     if auth:
-        parts = auth.split(None, 1)  # ["Bearer", "<key>"] or ["<key>"]
+        parts = auth.strip().split(None, 1)
         if len(parts) == 2 and parts[0].lower() == "bearer":
             return parts[1].strip()
-        # 2) Authorization: <key> (fallback)
-        if len(parts) == 1 and parts[0] and parts[0].lower() != "bearer":
-            return parts[0].strip()
+        # 2) Authorization: <key> (fallback - allow raw token without "Bearer")
+        if len(parts) >= 1 and parts[0].lower() != "bearer":
+            return auth.strip()
 
     # 3) X-API-Key: <key>
     x_key = request.headers.get("X-API-Key")

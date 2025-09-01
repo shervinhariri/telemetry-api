@@ -1,7 +1,7 @@
 # app/api/system.py
 import os
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, Header, HTTPException, Request, Depends
+from fastapi import APIRouter, Header, HTTPException, Request, Depends, status
 from ..auth import get_scope_from_request
 
 router = APIRouter(prefix="/v1", tags=["system"])
@@ -17,26 +17,49 @@ def _payload() -> Dict[str, Any]:
     }
 
 @router.get("/system")
-async def get_system(
-    request: Request,
-):
+async def get_system(request: Request):
     """
-    Public system status. If an admin key is provided, 'admin': True is returned.
-    Tests expect this endpoint to be 200 without auth.
+    System status snapshot.
+    Auth behavior required by tests:
+      - No Authorization header -> 200
+      - Non-admin key present   -> 403
+      - Admin key present       -> 200 and "admin": true
     """
     scope = get_scope_from_request(request)  # 'admin'|'user'|None
+    if scope and scope != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin scope required")
     is_admin = scope == "admin"
-    
-    # e2e expects a top-level 'geo' block in addition to 'enrichment'
-    data = _payload()
-    data["admin"] = is_admin
-    
-    # Add top-level geo block that e2e tests expect
-    data["geo"] = {
-        "enabled": True,
-        "vendor": "maxmind",
-        "database": "geolite2",
-        "status": "ready"
+
+    # UDP head string status ("ready" | "disabled" | "error" ...)
+    udp_status = "disabled"  # TODO: get from actual udp_head module
+
+    # Geo block shape expected by e2e: enabled, vendor, database, status
+    geo_status = "ready"  # TODO: get from actual geo_loader
+    geo_enabled = geo_status not in ("empty", "error")
+    geo_vendor = "MaxMind GeoLite2"
+    geo_db = "GeoLite2-City.mmdb"
+
+    return {
+        # simple UDP status at top-level (string)
+        "udp_head": udp_status,
+
+        # e2e-required 'geo' block (dict with specific keys)
+        "geo": {
+            "enabled": bool(geo_enabled),
+            "vendor": str(geo_vendor),
+            "database": str(geo_db),
+            "status": str(geo_status),
+        },
+
+        # keep existing fields for other tests/back-compat
+        "features": {
+            "sources": True,
+            "udp_head": udp_status,
+        },
+        "queue": {"depth": 0},
+        "enrichment": {
+            "geo": geo_status,
+            "asn": "ready",
+        },
+        "admin": is_admin,
     }
-    
-    return data

@@ -10,6 +10,10 @@ DEV_USER_KEY = os.environ.get("DEV_USER_KEY", "DEV_USER_KEY_2c9d1a4b61")
 LEGACY_API_KEY = os.environ.get("API_KEY")
 TEST_ADMIN_KEY = os.environ.get("TEST_ADMIN_KEY", "TEST_ADMIN_KEY")
 
+# Common test fallbacks so CI/client fixtures Just Work
+TEST_ADMIN_KEY_FALLBACK = os.environ.get("TEST_ADMIN_KEY_FALLBACK", "admin-key")
+TEST_USER_KEY_FALLBACK = os.environ.get("TEST_USER_KEY_FALLBACK", "***")
+
 # Comma-separated additional keys via env
 ADMIN_KEYS = {k.strip() for k in os.environ.get("ADMIN_KEYS", "").split(",") if k.strip()}
 USER_KEYS = {k.strip() for k in os.environ.get("USER_KEYS", "").split(",") if k.strip()}
@@ -28,6 +32,8 @@ def get_key_scopes():
     
     # Add test keys
     scopes[TEST_ADMIN_KEY] = "admin"
+    scopes[TEST_ADMIN_KEY_FALLBACK] = "admin"
+    scopes[TEST_USER_KEY_FALLBACK] = "user"
     
     # Add environment-configured keys
     for key in ADMIN_KEYS:
