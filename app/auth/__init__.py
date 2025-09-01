@@ -33,6 +33,13 @@ def _extract_api_key(request: Request) -> Optional[str]:
     
     return None
 
+def get_scope_from_request(request: Request) -> Optional[str]:
+    """Get the scope for a request, or None if no valid key provided"""
+    key = _extract_api_key(request)
+    if not key:
+        return None
+    return get_key_scope(key)
+
 class SimpleKey:
     def __init__(self, scopes: Optional[List[str]] = None):
         self.scopes = scopes or []

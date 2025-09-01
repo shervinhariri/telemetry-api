@@ -9,99 +9,96 @@ import logging
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from threading import RLock
+from datetime import datetime
 
-from app.auth.deps import require_scopes
+from ..auth import require_admin
 
 logger = logging.getLogger("api.jobs")
 
 router = APIRouter()
 
-# In-memory job store (in production, use Redis or database)
-_jobs: Dict[str, Dict[str, Any]] = {}
+# In-memory job store with thread safety
+_jobs: List[Dict[str, Any]] = []
+_lock = RLock()
 
 class JobCreate(BaseModel):
     type: str
     params: Optional[Dict[str, Any]] = None
 
 class JobResponse(BaseModel):
-    job_id: str
+    id: str
     type: str
     status: str
-    progress: int
-    msg: str
-    created_at: float
-    updated_at: float
+    created_at: str
 
-def create_job(job_type: str, params: Optional[Dict[str, Any]] = None) -> str:
+def create_job(job_type: str, meta: Optional[Dict[str, Any]] = None) -> str:
     """Create a new job"""
     job_id = str(uuid.uuid4())
-    now = time.time()
+    now = datetime.utcnow().isoformat() + "Z"
     
-    _jobs[job_id] = {
-        "job_id": job_id,
+    job = {
+        "id": job_id,
         "type": job_type,
-        "status": "pending",
-        "progress": 0,
-        "msg": "Job created",
-        "params": params or {},
+        "status": "queued",
         "created_at": now,
-        "updated_at": now
+        **({"meta": meta} if meta else {}),
     }
+    
+    with _lock:
+        _jobs.append(job)
     
     logger.info(f"Created job {job_id} of type {job_type}")
     return job_id
 
-def update_job(job_id: str, status: str, progress: int = None, msg: str = None):
+def set_job_status(job_id: str, status: str):
     """Update job status"""
-    if job_id not in _jobs:
-        return
-    
-    job = _jobs[job_id]
-    job["status"] = status
-    job["updated_at"] = time.time()
-    
-    if progress is not None:
-        job["progress"] = progress
-    if msg is not None:
-        job["msg"] = msg
-    
-    logger.info(f"Updated job {job_id}: {status} - {msg}")
+    with _lock:
+        for j in _jobs:
+            if j["id"] == job_id:
+                j["status"] = status
+                return
 
 def get_job(job_id: str) -> Optional[Dict[str, Any]]:
     """Get job by ID"""
-    return _jobs.get(job_id)
+    with _lock:
+        for job in _jobs:
+            if job["id"] == job_id:
+                return job
+    return None
 
 def list_jobs() -> List[Dict[str, Any]]:
     """List all jobs"""
-    return list(_jobs.values())
+    with _lock:
+        return list(_jobs)
 
 async def run_geo_download_job(job_id: str):
     """Run GeoIP download job"""
     try:
-        update_job(job_id, "running", 0, "Starting GeoIP download...")
+        set_job_status(job_id, "running")
         
         # Simulate download progress
         for i in range(1, 11):
             await asyncio.sleep(0.5)  # Simulate work
             progress = i * 10
-            update_job(job_id, "running", progress, f"Downloading... {progress}%")
+            logger.info(f"GeoIP download progress: {progress}%")
         
         # Simulate database update
-        update_job(job_id, "running", 90, "Updating database...")
+        set_job_status(job_id, "running")
         await asyncio.sleep(1)
         
         # Mark as complete
-        update_job(job_id, "completed", 100, "GeoIP database updated successfully")
+        set_job_status(job_id, "completed")
         
         # TODO: Actually download and update the GeoIP database
         logger.info(f"GeoIP download job {job_id} completed")
         
     except Exception as e:
         logger.error(f"GeoIP download job {job_id} failed: {e}")
-        update_job(job_id, "failed", 0, f"Download failed: {str(e)}")
+        set_job_status(job_id, "failed")
 
-@router.post("/geo/download", dependencies=[Depends(require_scopes("admin"))])
-async def create_geo_download_job() -> Dict[str, str]:
+@router.post("/geo/download")
+async def create_geo_download_job(_: Any = Depends(require_admin)) -> Dict[str, str]:
     """Create a GeoIP download job"""
     job_id = create_job("geo_download")
     
@@ -110,14 +107,14 @@ async def create_geo_download_job() -> Dict[str, str]:
     
     return {"job_id": job_id}
 
-@router.get("/jobs", dependencies=[Depends(require_scopes("admin"))])
-async def get_jobs() -> List[JobResponse]:
+@router.get("/jobs")
+async def get_jobs(_: Any = Depends(require_admin)) -> List[JobResponse]:
     """Get list of all jobs"""
     jobs = list_jobs()
     return [JobResponse(**job) for job in jobs]
 
-@router.get("/jobs/{job_id}", dependencies=[Depends(require_scopes("admin"))])
-async def get_job_by_id(job_id: str) -> JobResponse:
+@router.get("/jobs/{job_id}")
+async def get_job_by_id(job_id: str, _: Any = Depends(require_admin)) -> JobResponse:
     """Get job by ID"""
     job = get_job(job_id)
     if not job:
@@ -125,8 +122,8 @@ async def get_job_by_id(job_id: str) -> JobResponse:
     
     return JobResponse(**job)
 
-@router.get("/geo/test", dependencies=[Depends(require_scopes("admin"))])
-async def test_geoip(ip: str = "8.8.8.8") -> Dict[str, Any]:
+@router.get("/geo/test")
+async def test_geoip(ip: str = "8.8.8.8", _: Any = Depends(require_admin)) -> Dict[str, Any]:
     """Test GeoIP lookup for an IP address"""
     from ..enrich.geo import geoip_loader, asn_loader
     
