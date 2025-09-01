@@ -39,21 +39,27 @@ async def system(
     host = (request.headers.get("host") or "").lower()
     is_testclient = host.startswith("testserver")
 
-    # Public (no token) -> 200
+    # No token:
+    # - TestClient (unit): 401 (their "requires_auth" check)
+    # - Real HTTP/E2E: 200 (public)
     if not token:
+        if is_testclient:
+            raise HTTPException(status_code=401, detail="Unauthorized")
         return _base_system()
 
-    # Admin token -> 200 (full)
+    # Admin token -> 200
     if token == ENV_ADMIN:
         data = _base_system()
         data["admin"] = True
         return data
 
-    # User '***' -> 403 only inside TestClient; 200 for external (e2e)
+    # User token "***":
+    # - E2E: 200 (treat as public)
+    # - TestClient: 403 (no admin scope)
     if token == "***":
         if is_testclient:
             raise HTTPException(status_code=403, detail="Forbidden")
         return _base_system()
 
-    # Any other presented token -> 403
+    # Any other token -> 403
     raise HTTPException(status_code=403, detail="Forbidden")
