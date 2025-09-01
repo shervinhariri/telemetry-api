@@ -1,7 +1,8 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
-from app.db import SessionLocal
+from sqlalchemy.exc import OperationalError
+from app.db import SessionLocal, engine
 from app.auth.deps import require_scopes
 
 from app.schemas.source import (
@@ -11,6 +12,65 @@ from app.services.sources import SourceService
 from app.models.source import Source
 
 router = APIRouter()
+
+
+def _ensure_sources_table():
+    """Ensure sources table exists, create if missing"""
+    try:
+        with engine.begin() as conn:
+            # Check if sources table exists
+            result = conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='sources'").fetchone()
+            if not result:
+                # Create sources table with minimal schema
+                conn.exec_driver_sql("""
+                    CREATE TABLE sources (
+                        id VARCHAR(64) PRIMARY KEY,
+                        tenant_id VARCHAR(64) NOT NULL,
+                        type VARCHAR(32) NOT NULL,
+                        origin VARCHAR(32),
+                        display_name VARCHAR(128) NOT NULL,
+                        collector VARCHAR(64) NOT NULL,
+                        site VARCHAR(64),
+                        tags TEXT,
+                        health_status VARCHAR(32) DEFAULT 'stale',
+                        last_seen TIMESTAMP,
+                        notes TEXT,
+                        status VARCHAR(32) NOT NULL DEFAULT 'enabled',
+                        allowed_ips TEXT NOT NULL DEFAULT '[]',
+                        max_eps INTEGER NOT NULL DEFAULT 0,
+                        block_on_exceed BOOLEAN NOT NULL DEFAULT 1,
+                        enabled BOOLEAN NOT NULL DEFAULT 1,
+                        eps_cap INTEGER NOT NULL DEFAULT 0,
+                        last_seen_ts INTEGER,
+                        eps_1m REAL,
+                        error_pct_1m REAL,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    )
+                """)
+                
+                # Insert default sources
+                import time
+                now = int(time.time())
+                default_sources = [
+                    ("default-http", "default", "http", "http", "Default HTTP Source", "api", "HQ", "[]", "healthy", None, "Default HTTP ingest source", "enabled", "[]", 0, 1, 1, 0, now, 0.0, 0.0, now, now),
+                    ("default-udp", "default", "udp", "udp", "Default UDP Source", "udp_head", "HQ", "[]", "healthy", None, "Default UDP ingest source", "enabled", "[]", 0, 1, 1, 0, now, 0.0, 0.0, now, now)
+                ]
+                
+                for source_data in default_sources:
+                    conn.exec_driver_sql("""
+                        INSERT INTO sources (
+                            id, tenant_id, type, origin, display_name, collector, site, tags, 
+                            health_status, last_seen, notes, status, allowed_ips, max_eps, 
+                            block_on_exceed, enabled, eps_cap, last_seen_ts, eps_1m, 
+                            error_pct_1m, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, source_data)
+    except Exception as e:
+        # Log but don't fail - this is a fallback
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to ensure sources table: {e}")
 
 
 @router.post("/sources", response_model=SourceResponse)
@@ -59,18 +119,43 @@ async def list_sources(
     db = SessionLocal()
     try:
         eff_size = page_size or size
-        sources, total = SourceService.get_sources(
-            db=db,
-            tenant_id=tenant_id,
-            source_type=type,
-            health_status=status,  # Use health_status for filtering
-            site=site,
-            page=page,
-            size=eff_size
-        )
         
-        # Update statuses before returning
-        SourceService.update_source_statuses(db)
+        # Try to get sources, but handle missing table gracefully
+        try:
+            sources, total = SourceService.get_sources(
+                db=db,
+                tenant_id=tenant_id,
+                source_type=type,
+                health_status=status,  # Use health_status for filtering
+                site=site,
+                page=page,
+                size=eff_size
+            )
+            
+            # Update statuses before returning
+            SourceService.update_source_statuses(db)
+            
+        except OperationalError as e:
+            if "no such table: sources" in str(e):
+                # Table doesn't exist, create it and retry
+                _ensure_sources_table()
+                
+                # Retry the query
+                sources, total = SourceService.get_sources(
+                    db=db,
+                    tenant_id=tenant_id,
+                    source_type=type,
+                    health_status=status,
+                    site=site,
+                    page=page,
+                    size=eff_size
+                )
+                
+                # Update statuses before returning
+                SourceService.update_source_statuses(db)
+            else:
+                # Re-raise if it's a different database error
+                raise
         
         pages = (total + eff_size - 1) // eff_size
         
