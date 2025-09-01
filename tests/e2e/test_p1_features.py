@@ -13,6 +13,7 @@ import pytest
 import requests
 import json
 import time
+import os
 from typing import Dict, Any
 
 
@@ -27,8 +28,10 @@ class TestP1Features:
     @pytest.fixture
     def auth_headers(self) -> Dict[str, str]:
         """Authentication headers"""
+        # Use environment variables with fallbacks
+        admin_key = os.getenv("TEST_API_KEY") or os.getenv("DEV_ADMIN_KEY") or "DEV_ADMIN_KEY_5a8f9ffdc3"
         return {
-            "Authorization": "Bearer DEV_ADMIN_KEY_5a8f9ffdc3",
+            "Authorization": f"Bearer {admin_key}",
             "Content-Type": "application/json"
         }
     

@@ -27,10 +27,12 @@ def client():
 
 @pytest.fixture
 def admin_headers():
-    # Admin key used by the app bootstrap (see db_boot)
-    return {"Authorization": os.getenv("API_KEY", "TEST_ADMIN_KEY")}
+    # Use new key management system with fallback to legacy
+    admin_key = os.getenv("TEST_API_KEY") or os.getenv("DEV_ADMIN_KEY") or os.getenv("API_KEY") or "DEV_ADMIN_KEY_5a8f9ffdc3"
+    return {"Authorization": f"Bearer {admin_key}"}
 
 @pytest.fixture
 def user_headers():
     # Non-admin key used by several tests
-    return {"Authorization": os.getenv("USER_API_KEY", "***")}
+    user_key = os.getenv("DEV_USER_KEY") or "***"
+    return {"Authorization": f"Bearer {user_key}"}

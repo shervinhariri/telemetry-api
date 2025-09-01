@@ -255,7 +255,6 @@ BASE_PUBLIC = (
     "/",
     f"{API_PREFIX}/health",
     f"{API_PREFIX}/version",
-    "/v1/system",  # Allow /v1/system to bypass auth
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -353,11 +352,9 @@ ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0]
 app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
 app.mount("/assets", StaticFiles(directory=os.path.join(ui_dir, "assets")), name="assets")
 
-# Public-ish: /v1/system (no auth dependency)
-app.include_router(system_router)
-
-# Secured: everything else behind require_key
+# Secured: everything behind require_key
 secured = APIRouter(dependencies=[Depends(require_key)])
+secured.include_router(system_router)
 secured.include_router(version_router, prefix=API_PREFIX)
 secured.include_router(admin_update_router, prefix=API_PREFIX)
 secured.include_router(outputs_router)

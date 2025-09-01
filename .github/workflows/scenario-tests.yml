@@ -10,7 +10,13 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     env:
+      # Legacy support
       API_KEY: TEST_ADMIN_KEY
+      # New key management system
+      DEV_ADMIN_KEY: DEV_ADMIN_KEY_5a8f9ffdc3
+      DEV_USER_KEY: DEV_USER_KEY_2c9d1a4b61
+      ALLOW_DEV_KEYS: "true"
+      TEST_API_KEY: DEV_ADMIN_KEY_5a8f9ffdc3
     steps:
       - uses: actions/checkout@v4
 
@@ -55,6 +61,10 @@ jobs:
         env:
           API_BASE_URL: http://localhost:8080
           API_KEY: TEST_ADMIN_KEY
+          DEV_ADMIN_KEY: DEV_ADMIN_KEY_5a8f9ffdc3
+          DEV_USER_KEY: DEV_USER_KEY_2c9d1a4b61
+          ALLOW_DEV_KEYS: "true"
+          TEST_API_KEY: DEV_ADMIN_KEY_5a8f9ffdc3
         run: |
           # Wait for API to be ready
           for i in $(seq 1 60); do
@@ -67,6 +77,10 @@ jobs:
         env:
           API_BASE_URL: http://localhost:8080
           API_KEY: TEST_ADMIN_KEY
+          DEV_ADMIN_KEY: DEV_ADMIN_KEY_5a8f9ffdc3
+          DEV_USER_KEY: DEV_USER_KEY_2c9d1a4b61
+          ALLOW_DEV_KEYS: "true"
+          TEST_API_KEY: DEV_ADMIN_KEY_5a8f9ffdc3
         run: |
           python tools/scenario_tester.py | tee scenario_report.json
           echo "---- Summary ----"

@@ -1,9 +1,10 @@
 import time
 import uuid
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, HttpUrl
+from ..auth import require_admin
 
 router = APIRouter(prefix="/v1", tags=["outputs"])
 
@@ -30,7 +31,7 @@ class ElasticConfig(BaseModel):
 
 # --- POST: success path (unit tests expect status: ok) ---
 @router.post("/outputs/splunk")
-def configure_splunk(cfg: SplunkConfig):
+def configure_splunk(cfg: SplunkConfig, _: Any = Depends(require_admin)):
     # minimal "success" shape for tests
     _ = cfg.resolved_url()
     if not cfg.token:
@@ -38,7 +39,7 @@ def configure_splunk(cfg: SplunkConfig):
     return {"status": "ok"}
 
 @router.post("/outputs/elastic")
-def configure_elastic(cfg: ElasticConfig):
+def configure_elastic(cfg: ElasticConfig, _: Any = Depends(require_admin)):
     _ = cfg.resolved_urls()
     if not cfg.username:
         raise HTTPException(status_code=422, detail=[{"field": "username", "reason": "missing username"}])
@@ -48,7 +49,7 @@ def configure_elastic(cfg: ElasticConfig):
 
 # --- PUT: validation path (e2e expects 422s) ---
 @router.put("/outputs/splunk")
-def validate_splunk(cfg: SplunkConfig):
+def validate_splunk(cfg: SplunkConfig, _: Any = Depends(require_admin)):
     try:
         _ = cfg.resolved_url()
     except ValueError:
@@ -58,7 +59,7 @@ def validate_splunk(cfg: SplunkConfig):
     return {"status": "ok"}  # harmless success if valid
 
 @router.put("/outputs/elastic")
-def validate_elastic(cfg: ElasticConfig):
+def validate_elastic(cfg: ElasticConfig, _: Any = Depends(require_admin)):
     try:
         urls = cfg.resolved_urls()
     except ValueError:
@@ -71,7 +72,7 @@ def validate_elastic(cfg: ElasticConfig):
     return {"status": "ok"}
 
 @router.post("/outputs/test")
-def outputs_test(payload: Dict[str, Any]) -> JSONResponse:
+def outputs_test(payload: Dict[str, Any], _: Any = Depends(require_admin)) -> JSONResponse:
     t0 = time.time()
     target = (payload or {}).get("target")
 
