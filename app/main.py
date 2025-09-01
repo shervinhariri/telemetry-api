@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Header, HTTPException, Request, Response, Query, Depends
+from fastapi import FastAPI, APIRouter, Header, HTTPException, Request, Response, Query, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -49,6 +49,7 @@ from .auth.deps import require_scopes
 from .auth.tenant import require_tenant
 from . import pipeline as pipeline_mod  # import the *module*, not the FastAPI instance
 from .db_init import init_schema_and_seed_if_needed
+from .auth import require_key
 
 from sqlalchemy import text
 
@@ -254,6 +255,7 @@ BASE_PUBLIC = (
     "/",
     f"{API_PREFIX}/health",
     f"{API_PREFIX}/version",
+    "/v1/system",  # Allow /v1/system to bypass auth
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -351,29 +353,33 @@ ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0]
 app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
 app.mount("/assets", StaticFiles(directory=os.path.join(ui_dir, "assets")), name="assets")
 
-# Include API routers
-app.include_router(version_router, prefix=API_PREFIX)
-app.include_router(admin_update_router, prefix=API_PREFIX)
-app.include_router(outputs_router)
-app.include_router(stats_router, prefix=API_PREFIX)
-app.include_router(logs_router, prefix=API_PREFIX)
-app.include_router(requests_router)   # /v1/admin/requests (admin-guarded)
-app.include_router(requests_public_router)  # /v1/api/requests (public alias)
+# Public-ish: /v1/system (no auth dependency)
 app.include_router(system_router)
-app.include_router(indicators_router)
-app.include_router(geo_router)
-app.include_router(keys_router, prefix=API_PREFIX)
-app.include_router(demo_router, prefix=API_PREFIX)
-app.include_router(prometheus_router, prefix=API_PREFIX)
-app.include_router(sources_router, prefix=API_PREFIX)
-app.include_router(admin_security_router, prefix=API_PREFIX)
-app.include_router(admin_flags_router, prefix=API_PREFIX)
-app.include_router(utils_router, prefix=API_PREFIX)
-app.include_router(ingest_router, prefix=API_PREFIX)
-app.include_router(uploads_router, prefix=API_PREFIX)
-app.include_router(geoip_cfg_router, prefix=API_PREFIX)
-app.include_router(health_router, prefix=API_PREFIX)
-app.include_router(jobs_router, prefix=API_PREFIX)
+
+# Secured: everything else behind require_key
+secured = APIRouter(dependencies=[Depends(require_key)])
+secured.include_router(version_router, prefix=API_PREFIX)
+secured.include_router(admin_update_router, prefix=API_PREFIX)
+secured.include_router(outputs_router)
+secured.include_router(stats_router, prefix=API_PREFIX)
+secured.include_router(logs_router, prefix=API_PREFIX)
+secured.include_router(requests_router)   # /v1/admin/requests (admin-guarded)
+secured.include_router(requests_public_router)  # /v1/api/requests (public alias)
+secured.include_router(indicators_router)
+secured.include_router(geo_router)
+secured.include_router(keys_router, prefix=API_PREFIX)
+secured.include_router(demo_router, prefix=API_PREFIX)
+secured.include_router(prometheus_router, prefix=API_PREFIX)
+secured.include_router(sources_router, prefix=API_PREFIX)
+secured.include_router(admin_security_router, prefix=API_PREFIX)
+secured.include_router(admin_flags_router, prefix=API_PREFIX)
+secured.include_router(utils_router, prefix=API_PREFIX)
+secured.include_router(ingest_router, prefix=API_PREFIX)
+secured.include_router(uploads_router, prefix=API_PREFIX)
+secured.include_router(geoip_cfg_router, prefix=API_PREFIX)
+secured.include_router(health_router, prefix=API_PREFIX)
+secured.include_router(jobs_router, prefix=API_PREFIX)
+app.include_router(secured)
 
 # UDP Metrics endpoint for mapper reporting
 @app.post(f"{API_PREFIX}/admin/metrics/udp")

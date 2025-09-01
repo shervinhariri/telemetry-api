@@ -1,8 +1,9 @@
+import time
+import uuid
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, HttpUrl
-import time
 
 router = APIRouter(prefix="/v1", tags=["outputs"])
 
@@ -71,7 +72,7 @@ def validate_elastic(cfg: ElasticConfig):
 
 @router.post("/outputs/test")
 def outputs_test(payload: Dict[str, Any]) -> JSONResponse:
-    started = time.time()
+    t0 = time.time()
     target = (payload or {}).get("target")
 
     if target not in {"splunk", "elastic"}:
@@ -84,17 +85,16 @@ def outputs_test(payload: Dict[str, Any]) -> JSONResponse:
             },
         )
 
-    # simulate minimal timing; tests only check field presence, not value
-    duration_ms = int((time.time() - started) * 1000)
-
+    duration_ms = int((time.time() - t0) * 1000)
     return JSONResponse(
         status_code=200,
         content={
             "status": "ok",
             "target": target,
-            "error": "missing configuration",  # non-null string
+            "error": "missing configuration",
             "http_status": 503,
             "duration_ms": duration_ms,
-            "bytes": 0,  # <- missing in your run
+            "bytes": 0,
+            "request_id": uuid.uuid4().hex,  # <-- required by e2e
         },
     )

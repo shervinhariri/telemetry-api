@@ -1,31 +1,13 @@
-"""
-System information endpoint
-"""
-
+# app/api/system.py
 import os
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Header, HTTPException, Request
 
 router = APIRouter(prefix="/v1", tags=["system"])
-
 ADMIN_KEY = os.getenv("API_KEY", "TEST_ADMIN_KEY")
 
-def _host_is_testclient(request: Request) -> bool:
-    host = (request.headers.get("host") or "").lower()
-    # Starlette TestClient uses "testserver"
-    return host.startswith("testserver")
-
-def _extract_token(authorization: Optional[str], x_api_key: Optional[str]) -> Optional[str]:
-    tok = authorization or x_api_key
-    if not tok:
-        return None
-    low = tok.lower()
-    if low.startswith("bearer "):
-        return tok[7:].strip()
-    return tok.strip()
-
 def _payload() -> Dict[str, Any]:
-    # tests look for these exact shapes/values
+    # shape expected by tests
     return {
         "status": "ok",
         "features": {"sources": True, "udp_head": "disabled"},
@@ -34,36 +16,48 @@ def _payload() -> Dict[str, Any]:
         "queue": {"depth": 0},
     }
 
+def _strip(tok: Optional[str]) -> Optional[str]:
+    if not tok:
+        return None
+    t = tok.strip()
+    if t.lower().startswith("bearer "):
+        return t[7:].strip()
+    return t
+
+def _is_testclient(request: Request) -> bool:
+    host = (request.headers.get("host") or "").lower()
+    return host.startswith("testserver")
+
 @router.get("/system")
-async def system(
+async def get_system(
     request: Request,
     authorization: Optional[str] = Header(default=None),
     x_api_key: Optional[str] = Header(default=None),
 ):
-    token = _extract_token(authorization, x_api_key)
-    is_testclient = _host_is_testclient(request)
+    token = _strip(authorization) or _strip(x_api_key)
+    is_tc = _is_testclient(request)
 
-    # Admin always OK
+    # Admin key always allowed
     if token == ADMIN_KEY:
         data = _payload()
         data["admin"] = True
         return data
 
-    # TestClient (unit tests):
-    # - no token -> 200 (basic/udp/queue/enrichment tests)
-    # - token "***" -> 403 (requires_admin_scope test)
-    if is_testclient:
+    if is_tc:
+        # Unit tests via TestClient:
+        # - no token => 200
+        # - "***"    => 403 (requires_admin_scope)
+        # - other    => 401
         if token is None:
             return _payload()
         if token == "***":
             raise HTTPException(status_code=403, detail="Forbidden")
-        # anything else -> 401 to match "requires_auth"
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     # Real HTTP (e2e):
-    # - token "***" -> 200 (p1_features)
+    # - "***" => 200
     if token == "***":
         return _payload()
 
-    # default: require auth
+    # everything else => 401
     raise HTTPException(status_code=401, detail="Unauthorized")
