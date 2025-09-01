@@ -36,6 +36,34 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 """
 
+RAW_SOURCES_DDL = """
+CREATE TABLE IF NOT EXISTS sources (
+  id VARCHAR(64) PRIMARY KEY,
+  tenant_id VARCHAR(64) NOT NULL,
+  type VARCHAR(32) NOT NULL,
+  origin VARCHAR(32),
+  display_name VARCHAR(128) NOT NULL,
+  collector VARCHAR(64) NOT NULL,
+  site VARCHAR(64),
+  tags TEXT,
+  health_status VARCHAR(32) DEFAULT 'stale',
+  last_seen TIMESTAMP,
+  notes TEXT,
+  status VARCHAR(32) NOT NULL DEFAULT 'enabled',
+  allowed_ips TEXT NOT NULL DEFAULT '[]',
+  max_eps INTEGER NOT NULL DEFAULT 0,
+  block_on_exceed BOOLEAN NOT NULL DEFAULT 1,
+  enabled BOOLEAN NOT NULL DEFAULT 1,
+  eps_cap INTEGER NOT NULL DEFAULT 0,
+  last_seen_ts INTEGER,
+  eps_1m REAL,
+  error_pct_1m REAL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id)
+);
+"""
+
 def _raw_create_api_keys_table_and_seed() -> None:
     # Create table if not exists (works even if ORM model wasn't imported)
     with engine.begin() as conn:
@@ -50,6 +78,9 @@ def _raw_create_api_keys_table_and_seed() -> None:
         
         # Create api_keys table
         conn.exec_driver_sql(RAW_API_KEYS_DDL)
+        
+        # Create sources table
+        conn.exec_driver_sql(RAW_SOURCES_DDL)
         
         # Migrate sources table if it exists but is missing columns
         try:
@@ -91,6 +122,26 @@ def _raw_create_api_keys_table_and_seed() -> None:
                     "INSERT INTO api_keys (key_id, tenant_id, hash, scopes, disabled) VALUES (?, ?, ?, ?, 0)",
                     (key_id, tenant_id, hash_token(token), scopes_json),
                 )
+        
+        # Ensure default sources exist
+        sources_cnt = conn.exec_driver_sql("SELECT COUNT(*) FROM sources").scalar()
+        if sources_cnt == 0:
+            import time
+            now = int(time.time())
+            default_sources = [
+                ("default-http", "default", "http", "http", "Default HTTP Source", "api", "HQ", "[]", "healthy", None, "Default HTTP ingest source", "enabled", "[]", 0, 1, 1, 0, now, 0.0, 0.0, now, now),
+                ("default-udp", "default", "udp", "udp", "Default UDP Source", "udp_head", "HQ", "[]", "healthy", None, "Default UDP ingest source", "enabled", "[]", 0, 1, 1, 0, now, 0.0, 0.0, now, now)
+            ]
+            
+            for source_data in default_sources:
+                conn.exec_driver_sql("""
+                    INSERT INTO sources (
+                        id, tenant_id, type, origin, display_name, collector, site, tags, 
+                        health_status, last_seen, notes, status, allowed_ips, max_eps, 
+                        block_on_exceed, enabled, eps_cap, last_seen_ts, eps_1m, 
+                        error_pct_1m, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, source_data)
 
 def init_schema_and_seed_if_needed() -> None:
     """
