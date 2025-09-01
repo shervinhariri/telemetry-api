@@ -519,6 +519,10 @@ function   getApiKey() {
 function setApiKey(k) {
   if (!k || !k.trim()) return;
   localStorage.setItem(KEY_STORAGE, k.trim());
+  // Update dashboard instance if it exists
+  if (window.telemetryDashboard) {
+    window.telemetryDashboard.apiKey = k.trim();
+  }
   // notify all listeners (other tabs/pages) to refresh UI/client
   window.dispatchEvent(new CustomEvent('api-key-changed', { detail: { key: k.trim() }}));
 }
@@ -531,6 +535,13 @@ function promptForKey(msg = 'Unauthorized') {
     if (k && k.trim()) {
       const trimmed = k.trim();
       setApiKey(trimmed);
+      
+      // Update dashboard instance immediately if it exists
+      if (window.telemetryDashboard) {
+        window.telemetryDashboard.apiKey = trimmed;
+        console.log('Updated dashboard API key to:', trimmed);
+      }
+      
       // Reload with ?key to propagate across code paths and tabs
       const url = new URL(window.location.href);
       url.searchParams.set('key', trimmed);
@@ -1261,6 +1272,10 @@ class TelemetryDashboard {
             const base = (opts?.apiBase || '/v1').replace(/\/+$/,''); // remove trailing slashes
             this.apiBase = base.endsWith('/v1') ? base : '/v1';
             this.apiKey = getApiKey();
+            // Ensure API key is properly stored in localStorage if we have one
+            if (this.apiKey) {
+                localStorage.setItem(KEY_STORAGE, this.apiKey);
+            }
             this.currentRequestsData = [];
             this.logsEventSource = null;
             this.logsInterval = null;
@@ -1270,6 +1285,7 @@ class TelemetryDashboard {
             
             console.log('API Base URL:', this.apiBase);
             console.log('API Key:', this.apiKey);
+            console.log('API Key stored in localStorage:', localStorage.getItem(KEY_STORAGE));
             
             console.log('About to call init()...');
             this.init();
@@ -1565,13 +1581,28 @@ class TelemetryDashboard {
     }
 
     getAuthHeaders() {
-        const token = this.apiKey || localStorage.getItem("telemetry_api_key") || "";
+        // First try instance API key, then localStorage, then fallback
+        let token = this.apiKey;
+        if (!token) {
+            token = localStorage.getItem("telemetry_api_key") || "";
+            // If we found a key in localStorage, update our instance
+            if (token) {
+                this.apiKey = token;
+            }
+        }
+        
         const headers = { "Content-Type": "application/json" };
         if (token) {
             headers["Authorization"] = `Bearer ${token}`;
             // also add "X-API-Key" header for backward compat
             headers["X-API-Key"] = token;
         }
+        
+        // Debug logging
+        console.log('getAuthHeaders - Instance key:', this.apiKey);
+        console.log('getAuthHeaders - localStorage key:', localStorage.getItem("telemetry_api_key"));
+        console.log('getAuthHeaders - Final token:', token);
+        
         return headers;
     }
 
