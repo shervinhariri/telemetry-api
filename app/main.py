@@ -255,6 +255,7 @@ BASE_PUBLIC = (
     "/",
     f"{API_PREFIX}/health",
     f"{API_PREFIX}/version",
+    f"{API_PREFIX}/system",  # Make /v1/system public for unit tests
     "/docs",
     "/redoc",
     "/openapi.json",

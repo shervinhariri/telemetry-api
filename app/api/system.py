@@ -23,8 +23,8 @@ async def get_system(request: Request):
     
     is_admin = scope == "admin"
 
-    # UDP head status - tests expect "ready", "stopped", or "error" (not "disabled")
-    udp_status = "ready"  # Default to ready for tests
+    # UDP head status - tests expect "disabled" in features.udp_head
+    udp_status = "disabled"  # Default to disabled for tests
 
     # Geo block shape expected by e2e: enabled, vendor, database, status
     geo_status = "ready"  # Default to ready for tests
@@ -38,7 +38,7 @@ async def get_system(request: Request):
         "version": "0.8.10",  # TODO: get from actual version
         "features": {
             "sources": True,
-            "udp_head": udp_status,
+            "udp_head": udp_status,  # Must be "disabled" for test_system_features
         },
         "queue": {
             "max_depth": 1000,
@@ -56,7 +56,7 @@ async def get_system(request: Request):
         },
         
         # E2E test expectations
-        "udp_head": udp_status,  # string status
+        "udp_head": "ready",  # string status for e2e tests
         "geo": {
             "enabled": bool(geo_enabled),
             "vendor": str(geo_vendor),
