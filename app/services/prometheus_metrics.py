@@ -310,9 +310,10 @@ QUEUE_LAG = Gauge(
 )
 
 # Processing latency
-PROCESSING_LATENCY = Summary(
+PROCESSING_LATENCY = Histogram(
     'telemetry_processing_latency_ms',
-    'Processing latency in milliseconds'
+    'Processing latency per record in milliseconds',
+    buckets=[1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]
 )
 
 class PrometheusMetrics:

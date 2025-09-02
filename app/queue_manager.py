@@ -205,6 +205,7 @@ class QueueManager:
             processing_time = time.time() - start_time
             prometheus_metrics.increment_worker_processed(1)
             prometheus_metrics.observe_event_processing_seconds(processing_time)
+            prometheus_metrics.observe_processing_latency(processing_time * 1000.0)  # Convert to milliseconds
             
             # Update queue metrics
             self._update_queue_metrics()
