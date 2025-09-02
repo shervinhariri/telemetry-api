@@ -47,7 +47,7 @@ groups:
       description: "UDP packets are being received but not successfully parsed."
 
   - alert: APIHighLatency
-    expr: histogram_quantile(0.95, rate(telemetry_api_request_latency_ms_bucket[5m])) > 1000
+    expr: histogram_quantile(0.95, rate(telemetry_processing_latency_ms_bucket[5m])) > 1000
     for: 5m
     labels: 
       severity: warning
