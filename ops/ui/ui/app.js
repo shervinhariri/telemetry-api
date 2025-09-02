@@ -1616,6 +1616,9 @@ class TelemetryDashboard {
 
             console.log('API call:', url);
             console.log('Headers present:', Object.keys(headers).filter(k => k !== 'Authorization' && k !== 'X-API-Key'));
+            console.log('DEBUG - All headers:', headers);
+            console.log('DEBUG - Authorization header:', headers.Authorization);
+            console.log('DEBUG - X-API-Key header:', headers['X-API-Key']);
             const response = await fetch(url, { ...options, headers });
             console.log('Response status:', response.status);
             
