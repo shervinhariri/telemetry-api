@@ -445,7 +445,7 @@ async def docs():
 async def root():
     return JSONResponse({
         "status": "ok",
-        "message": "Telemetry API. See /v1/health, /v1/version, /v1/metrics, and /ops/ui/ (if enabled)."
+        "message": "Telemetry API. See /v1/health, /v1/version, /v1/metrics, and /ui (if enabled)."
     })
 
 # ---------- Stage 5 Helper Functions ----------
