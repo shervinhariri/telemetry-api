@@ -343,15 +343,15 @@ async def tenancy_middleware(request: Request, call_next):
 # Mount static files BEFORE API routers to ensure they take precedence
 app_dir = os.path.dirname(__file__)
 _ui_candidates = [
+    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui")),      # NETREEX UI path (repo ops/ui)
     os.path.abspath(os.path.join(app_dir, "..", "ui")),             # container path (/app/ui)
-    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui", "ui")), # local path (repo ops/ui/ui)
-    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui"))       # fallback local path (repo ops/ui)
+    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui", "ui")) # fallback local path (repo ops/ui/ui)
 ]
 ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0])
 
 # Mount static files for NETREEX UI
 app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
-app.mount("/assets", StaticFiles(directory=os.path.join(ui_dir, "assets")), name="assets")
+# Note: NETREEX UI is a single HTML file, no separate assets directory needed
 
 # Public endpoints (no auth dependency)
 app.include_router(system_router)
@@ -443,10 +443,7 @@ async def docs():
 # Serve root endpoint
 @app.get("/", include_in_schema=False)
 async def root():
-    return JSONResponse({
-        "status": "ok",
-        "message": "Telemetry API. See /v1/health, /v1/version, /v1/metrics, and /ui (if enabled)."
-    })
+    return FileResponse(os.path.join(ui_dir, "index.html"))
 
 # ---------- Stage 5 Helper Functions ----------
 def _maybe_gunzip(body: bytes, content_encoding: Optional[str]) -> bytes:
