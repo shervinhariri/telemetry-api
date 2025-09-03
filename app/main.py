@@ -440,10 +440,13 @@ async def docs():
 
 
 
-# Serve index.html at root
+# Serve root endpoint
 @app.get("/", include_in_schema=False)
 async def root():
-    return FileResponse(os.path.join(ui_dir, "index-old.html"))
+    return JSONResponse({
+        "status": "ok",
+        "message": "Telemetry API. See /v1/health, /v1/version, /v1/metrics, and /ops/ui/ (if enabled)."
+    })
 
 # ---------- Stage 5 Helper Functions ----------
 def _maybe_gunzip(body: bytes, content_encoding: Optional[str]) -> bytes:
