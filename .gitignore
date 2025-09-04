@@ -44,6 +44,10 @@ env/
 *.swo
 *~
 
+# Node
+node_modules/
+ops/ui/ui/node_modules/
+
 # OS
 .DS_Store
 Thumbs.db

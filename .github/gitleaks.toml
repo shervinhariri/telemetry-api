@@ -5,6 +5,7 @@ description = "Allowlist for telemetry-api"
 paths = [
     "tests/",
     "docs/",
+    "ops/ui/ui/node_modules/",
     ".*\\.md$",
     ".*\\.txt$",
     ".*\\.json$",

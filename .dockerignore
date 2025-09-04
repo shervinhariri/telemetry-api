@@ -12,8 +12,9 @@
 *.pyo
 __pycache__/
 
-# Node.js (if any)
+# Node.js (exclude from context)
 node_modules/
+ops/ui/ui/node_modules/
 npm-debug.log*
 
 # Documentation (keep docs/ for Docker build)

@@ -52,9 +52,6 @@ COPY ops/ui/ /app/ui/
 COPY openapi.yaml /app/openapi.yaml
 COPY docs /app/docs
 
-# Copy tests
-COPY tests /app/tests
-
 # Copy alembic files for database migrations
 COPY alembic.ini /app/alembic.ini
 COPY alembic /app/alembic
