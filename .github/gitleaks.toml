@@ -12,6 +12,10 @@ paths = [
     ".*\\.yaml$",
     ".*\\.yml$"
 ]
+commits = [
+    # Historical node_modules content from Tailwind peers falsely detected as secrets
+    "7aaf443a7f0f7f115132654e3d3e2f3b009f31e5"
+]
 
 [[rules]]
 id = "generic-api-key"
