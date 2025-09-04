@@ -1,4 +1,4 @@
-# Telemetry API — v0.9.0-golden
+# Telemetry API — v0.8.11
 
 Fast, local network telemetry enrichment with GeoIP, ASN, threat intelligence, and risk scoring. Ship to Splunk/Elastic with request-level observability and multi-tenant authentication.
 
@@ -15,7 +15,7 @@ Ingest NetFlow/IPFIX and Zeek JSON → enrich with GeoIP/ASN/threat intel → ap
 docker run -d -p 80:80 \
   -e API_KEY=TEST_KEY \
   -e REDACT_HEADERS=authorization \
-        --name telapi shvin/telemetry-api:v0.9.0-golden
+        --name telapi shvin/telemetry-api:v0.8.11-golden
 
 # 2) Ingest sample Zeek
 curl -s -X POST http://localhost/v1/ingest/zeek \
@@ -37,7 +37,7 @@ This project follows a strict two-container deployment model to ensure stability
 
 ### **:80 = Golden Image (Stable Release)**
 - **Purpose**: Production deployments, stable releases
-- **Image**: `shvin/telemetry-api:v0.9.0-golden` (latest golden tag)
+- **Image**: `shvin/telemetry-api:v0.8.11-golden` (latest golden tag)
 - **Port**: 80
 - **Policy**: Never change unless approved for release
 - **Use Case**: Production environments, demos, stable testing
