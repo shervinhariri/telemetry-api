@@ -64,20 +64,29 @@ jobs:
         id: ver
         run: |
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
-            echo "GOLDEN_VERSION=${GITHUB_REF_NAME}-golden" >> $GITHUB_OUTPUT
+            TAG="${GITHUB_REF_NAME}"
+            # Strip a single trailing -golden (if present)
+            BASE_TAG="${TAG%-golden}"
+            # Compose tags (avoid double -golden)
+            echo "VERSION=${BASE_TAG}" >> $GITHUB_OUTPUT
+            echo "GOLDEN_VERSION=${BASE_TAG}-golden" >> $GITHUB_OUTPUT
+            # APP_VERSION is numeric only (no leading 'v', no '-golden')
+            APP_VERSION_NUM="${BASE_TAG#v}"
+            echo "APP_VERSION=${APP_VERSION_NUM}" >> $GITHUB_OUTPUT
           else
             # Read from VERSION file, fallback to hardcoded version
             if [ -f "VERSION" ]; then
               VERSION_FROM_FILE=$(cat VERSION | tr -d '\n\r')
               echo "VERSION=v${VERSION_FROM_FILE}" >> $GITHUB_OUTPUT
               echo "GOLDEN_VERSION=v${VERSION_FROM_FILE}-golden" >> $GITHUB_OUTPUT
+              echo "APP_VERSION=${VERSION_FROM_FILE}" >> $GITHUB_OUTPUT
             else
               echo "VERSION=v0.8.10" >> $GITHUB_OUTPUT
               echo "GOLDEN_VERSION=v0.8.10-golden" >> $GITHUB_OUTPUT
+              echo "APP_VERSION=0.8.10" >> $GITHUB_OUTPUT
             fi
           fi
-          
+
           # Get git SHA for build args
           echo "GIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
@@ -88,7 +97,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            APP_VERSION=${{ steps.ver.outputs.VERSION }}
+            APP_VERSION=${{ steps.ver.outputs.APP_VERSION }}
             GIT_SHA=${{ steps.ver.outputs.GIT_SHA }}
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
