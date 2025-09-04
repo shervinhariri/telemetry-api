@@ -343,9 +343,9 @@ async def tenancy_middleware(request: Request, call_next):
 # Mount static files BEFORE API routers to ensure they take precedence
 app_dir = os.path.dirname(__file__)
 _ui_candidates = [
-    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui")),      # NETREEX UI path (repo ops/ui)
+    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui", "ui")), # NETREEX UI path (repo ops/ui/ui) - has app.js
+    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui")),      # fallback (repo ops/ui)
     os.path.abspath(os.path.join(app_dir, "..", "ui")),             # container path (/app/ui)
-    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui", "ui")) # fallback local path (repo ops/ui/ui)
 ]
 ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0])
 
