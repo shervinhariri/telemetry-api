@@ -87,7 +87,7 @@ const Tabs = ({ tab, setTab, items }: {
 
 export default function App() {
   const [apiBase, setApiBase] = useState(""); // Use relative URLs by default
-  const [apiKey, setApiKey] = useState("TEST_ADMIN_KEY");
+  const [apiKey, setApiKey] = useState("TEST_KEY");
   const [tab, setTab] = useState("Dashboard");
   const [status, setStatus] = useState("online");
   const [versionText, setVersionText] = useState("");
