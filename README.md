@@ -100,7 +100,7 @@ curl -s http://localhost:8080/v1/version && echo
 - ✅ Checksums verified for integrity
 ```
 
-## 🏢 Multi-Tenancy (v0.8.10)
+## 🏢 Multi-Tenancy (v0.8.11)
 
 The API now supports multi-tenant deployments with complete data isolation:
 
@@ -119,7 +119,7 @@ docker run -d -p 80:80 \
   -e DATABASE_URL=sqlite:///./telemetry.db \
   -e ADMIN_API_KEY=YOUR_ADMIN_KEY \
   -v $PWD/data:/data \
-  --name telemetry-api shvin/telemetry-api:0.8.10
+  --name telemetry-api shvin/telemetry-api:0.8.11
 
 # 2) Create default tenant and admin key
 docker exec telemetry-api python3 scripts/seed_default_tenant.py
@@ -448,7 +448,7 @@ sudo nft delete rule inet telemetry input udp dport 2055 drop
 version: '3.8'
 services:
   telemetry-api:
-    image: shvin/telemetry-api:0.8.10
+    image: shvin/telemetry-api:0.8.11
     ports:
       - "80:80"
     environment:
@@ -477,7 +477,7 @@ spec:
     spec:
       containers:
       - name: telemetry-api
-        image: shvin/telemetry-api:0.8.10
+        image: shvin/telemetry-api:0.8.11
         ports:
         - containerPort: 80
         env:
@@ -492,7 +492,7 @@ spec:
 
 -- Images are tagged :latest, :0.x.y, and :golden for stable rollback.
 
-This release: shvin/telemetry-api:0.8.10
+This release: shvin/telemetry-api:0.8.11
 
 Previous golden: shvin/telemetry-api:0.8.2-golden
 
@@ -504,7 +504,7 @@ Keep VERSION in repo aligned with Docker tag and /v1/version
 
 ## 📋 Changelog
 
-### v0.8.10 (Current)
+### v0.8.11 (Current)
 - ✅ **Multi-Tenancy Support**: Complete tenant isolation with database-backed tenants
 - ✅ **Database Models**: SQLAlchemy models for Tenant, ApiKey, OutputConfig, and Job
 - ✅ **Tenant-Scoped Authentication**: Per-tenant API keys with scope validation

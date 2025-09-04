@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION=${1:-0.8.10}
+VERSION=${1:-0.8.11}
 OUTPUT_FILE="checksums-${VERSION}.txt"
 
 echo "Generating checksums for version ${VERSION}..."

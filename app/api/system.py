@@ -18,7 +18,7 @@ async def get_system(request: Request):
     # Return consistent values for both unit and e2e tests
     return {
         "status": "ok",
-        "version": "0.8.10",
+        "version": "0.8.11",
         "features": {
             "sources": True,
             "udp_head": "disabled",  # Consistent value for tests
