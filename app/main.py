@@ -343,15 +343,22 @@ async def tenancy_middleware(request: Request, call_next):
 # Mount static files BEFORE API routers to ensure they take precedence
 app_dir = os.path.dirname(__file__)
 _ui_candidates = [
-    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui", "ui")), # NETREEX UI path (repo ops/ui/ui) - has app.js
-    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui")),      # fallback (repo ops/ui)
-    os.path.abspath(os.path.join(app_dir, "..", "ui")),             # container path (/app/ui)
+    # Prefer container NETREEX UI if present: /app/ui/ui
+    os.path.abspath(os.path.join(app_dir, "..", "ui", "ui")),
+    # Repo paths (when running locally with source tree)
+    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui", "ui")),
+    os.path.abspath(os.path.join(app_dir, "..", "ops", "ui")),
+    # Fallback container path (/app/ui)
+    os.path.abspath(os.path.join(app_dir, "..", "ui")),
 ]
 ui_dir = next((p for p in _ui_candidates if os.path.isdir(p)), _ui_candidates[0])
 
 # Mount static files for NETREEX UI
 app.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
-# Note: NETREEX UI is a single HTML file, no separate assets directory needed
+# Also serve built assets directly if present
+assets_dir = os.path.join(ui_dir, "assets")
+if os.path.isdir(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
 # Public endpoints (no auth dependency)
 app.include_router(system_router)
